@@ -452,15 +452,27 @@ free times and removes selected times that cannot be booked in the new place.
   times. One calendar holds everything (11 November 2026, Dan: "is time off
   and the timetable page really necessary"): pressing a time, or dragging
   over several, opens a small choice at them, their `From – Until` times to
-  the minute, then `Time off` or `Online only` (a single time also offers
-  `Add a lesson here`); nothing saves until she chooses. Hours already set
-  open as their block, their kind pressed, to change the times, switch the
-  kind or `Open again`, which opens just the times set. Each date has two
-  switches, `Day off` and `Online only`, and a day is one or the other: a day
-  off loses its online-only hours, and online only reopens a day off,
-  keeping its hours off. Time off is hatched and online only is sky blue,
-  each labelled with its times, and both save as she chooses; the line under
-  the calendar says what changed or what failed.
+  the minute, then `Time off`, `Online only` or `Extra hours` (a single time
+  also offers `Add a lesson here`); nothing saves until she chooses. Extra
+  hours (11 November 2026, Dan: "can Ines also have the option to add in
+  working hours too against her normal weekly hours") are exactly her weekly
+  hours for one date: lessons can start every booking interval from `From`
+  until before `Until`, so `15:00–17:00` at 30 minutes starts 15:00 to 16:30,
+  which one dab under the times says (`Lessons can start 15:00–16:30`) while
+  `Extra hours` is the kind in view. The chip is offered only where it would
+  let a lesson start: never inside her weekly hours, on a day off, a past
+  date or a whole day. Hours already set open as their block, their kind
+  pressed, to change the times, switch the kind, `Open again` (time off and
+  online only), which opens just the times set, or `Not working` (extra
+  hours), which takes just the times set away. Time off and extra hours are
+  never both. Each date has two switches, `Day off` and `Online only`, and a
+  day is one or the other: a day off loses its online-only hours, and online
+  only reopens a day off, keeping its hours off. Time off is hatched, online
+  only is sky blue and extra hours take the weekly hours' wash, each labelled
+  with its times (`Extra hours 15:00–17:00`), and all save as she chooses;
+  the line under the calendar says what changed (`Lessons can start
+  15:00–16:30 on Tue 1 Dec.`, `Not working 15:00–17:00 on Tue 1 Dec.`) or
+  what failed.
   Weekly blocks such as lunch are shown but not toggled per date. Keyboard and
   touch input must work without dragging.
 - A sliding tab bar with a thin dark-blue border groups `Students`, `Timetable`,
@@ -523,7 +535,8 @@ free times and removes selected times that cannot be booked in the new place.
   and its `Change` opens the lesson. Nothing here moves or cancels a lesson
   on its own. `Coming up` lists what she has set that is not on the week in
   view (consecutive whole days as one line, `Wed 25 Nov – Fri 27 Nov` / `3
-  days off`; hours as `Off 09:00–12:00`; an online-only stretch as `3 days
+  days off`; hours as `Off 09:00–12:00`; extra hours as `Extra 15:00–17:00`,
+  not on a day off; an online-only stretch as `3 days
   online only`), the next four and `And 3 more later on`; pressing one turns
   the Timetable to its week and day. Choosing several days at once went with
   the Time off tab: each day is one switch.
@@ -1994,9 +2007,9 @@ as a form:
   timetable's globe and person beside Online and In Porto, her sign-in with no `Create an account`, and each student's chosen
   splat beside their name when she opens a lesson. Her week is set as the
   student's calendar: a hand-cut card, compact weekday/date headings with today
-  in a blue date lozenge, the solid blue arrows, blue lessons over a faint coral wash for
-  her weekly hours, Monday to Friday only (a weekend day appears when it
-  holds a lesson or hours of its own), and each lesson marks its place
+  in a blue date lozenge, the solid blue arrows, blue lessons over a faint lilac wash for
+  her weekly hours and a date's extra hours, Monday to Friday only (a weekend day appears when it
+  holds a lesson, extra hours or hours of its own), and each lesson marks its place
   as the student's calendar does, a globe or a person in its top right
   corner, explained in the key, with a small `Meet` pill at the foot of an
   online lesson whose call is ready,
@@ -2628,8 +2641,13 @@ with a band across the page afterwards) "this is ugly".
 - Inês labels a whole day with its `Online only` switch beside `Day off`,
   and some hours from the choice at the times, as she takes hours off. The
   choice's `Online only` wears the colour as its swatch (so it is its own
-  key) and is pressed while the hours are online only. Hours are never both:
-  making them one kind takes them out of the other.
+  key) and is pressed while the hours are online only. Time off and online
+  only are never both: making hours one takes them out of the other. Online
+  only labels time a student can book, so extra hours can be online only
+  too: such a block is labelled once (`Extra hours 19:00–20:00, online
+  only`), opens on `Extra hours` with `Online only` pressed too, keeps its
+  label when `Extra hours` gives it new times, and loses it with `Not
+  working`; `Open again` takes only the label off.
 - Her Timetable tints online-only time on every cell it covers, labels its
   hours as time off is labelled (`Online only 15:00–17:00`, or `Online only`
   across a whole day), and edits it there; the key names it while the week

@@ -281,13 +281,15 @@ export function saveOnlineOnlyPeriods(token: string, periods: OnlineOnlyPeriod[]
 }
 
 /**
- * Replaces one date's time off. `dayOff` and `blocks` are independent: each
- * replaces only its own rows, and weekly blocks are never touched.
+ * Replaces one date's time off and extra hours. `dayOff`, `blocks` and
+ * `extra` (the times she chose, which the Worker keeps as lesson starts) are
+ * independent: each replaces only its own rows, and weekly rows are never
+ * touched. A part left out is left as it is.
  */
 export function saveDayOff(
   token: string,
   date: string,
-  change: { dayOff?: boolean; blocks?: { start: number; end: number }[] },
+  change: { dayOff?: boolean; blocks?: { start: number; end: number }[]; extra?: { start: number; end: number }[] },
 ) {
   return adminRequest<{ ok: true; exceptions: AvailabilityException[] }>(
     token,
@@ -300,6 +302,10 @@ export function saveDayOff(
         blocks: change.blocks?.map((block) => ({
           startMinute: block.start,
           endMinute: block.end,
+        })),
+        extra: change.extra?.map((span) => ({
+          startMinute: span.start,
+          endMinute: span.end,
         })),
       }),
     },

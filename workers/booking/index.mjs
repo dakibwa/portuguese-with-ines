@@ -1,4 +1,4 @@
-import { availabilityRevisionSql, computeAvailability, inTimeOff, isSlotBookable, listLessonTypes, loadLessonType, loadSettings, normaliseBlockedSpans, normaliseOnlineOnlyPeriods, onlineOnlyProblem } from "./availability.mjs";
+import { availabilityRevisionSql, computeAvailability, extraStartRanges, inTimeOff, isSlotBookable, listLessonTypes, loadLessonType, loadSettings, normaliseBlockedSpans, normaliseOnlineOnlyPeriods, onlineOnlyProblem } from "./availability.mjs";
 import {
   OPEN_ENDED_HORIZON_WEEKS,
   SERIES_LENGTHS,
@@ -7172,18 +7172,21 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     return json({ ok: true }, 200, request, env);
   }
 
-  // One date's time off, from the teacher calendar. `dayOff` and `blocks` are
-  // independent and each replaces only its own rows, so taking the whole day
-  // off never discards the hours blocked within it. Weekly blocks and extra
-  // hours are never touched here.
+  // One date's time off and extra hours, from the teacher calendar. `dayOff`,
+  // `blocks` and `extra` are independent and each replaces only its own rows,
+  // all in one batch, so taking the whole day off never discards the hours
+  // blocked within it and time off and extra hours change together. Weekly
+  // blocks and weekly extra hours are never touched here.
   if (request.method === "POST" && path === "/admin/exceptions/day") {
     const body = adminBody;
     if (!parseDateKey(body.date)) return fail("Invalid date.", 400, request, env);
     if (body.date < dateKey(new Date(), homeZone())) return fail("That date has already passed.", 400, request, env);
     const dayOff = typeof body.dayOff === "boolean" ? body.dayOff : undefined;
     const blocks = "blocks" in body ? normaliseBlockedSpans(body.blocks) : undefined;
-    if (blocks === null) return fail("Those times could not be saved. Please reload and try again.", 400, request, env);
-    if (dayOff === undefined && blocks === undefined) return fail("Nothing to change.", 400, request, env);
+    // Sent as the times she chose; kept as the starts they give at her interval.
+    const extra = "extra" in body ? extraStartRanges(body.extra, (await loadSettings(env)).slotIntervalMinutes) : undefined;
+    if (blocks === null || extra === null) return fail("Those times could not be saved. Please reload and try again.", 400, request, env);
+    if (dayOff === undefined && blocks === undefined && extra === undefined) return fail("Nothing to change.", 400, request, env);
 
     const oneOff = "date = ? AND weekday IS NULL AND kind = 'blocked'";
     const wholeDay = "(start_minute IS NULL OR start_minute <= 0) AND (end_minute IS NULL OR end_minute >= 1440)";
@@ -7208,6 +7211,17 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
           env.DB.prepare(
             `INSERT INTO availability_exceptions (date, kind, start_minute, end_minute, note, created_at) SELECT ?, 'blocked', ?, ?, '', ? WHERE (${authorization.sql})`
           ).bind(body.date, block.start, block.end, created, ...authorization.values)
+        );
+      }
+    }
+    if (extra) {
+      // An extra row ends at its last start, as availability reads it.
+      statements.push(env.DB.prepare(`DELETE FROM availability_exceptions WHERE date = ? AND weekday IS NULL AND kind = 'extra' AND (${authorization.sql})`).bind(body.date, ...authorization.values));
+      for (const range of extra) {
+        statements.push(
+          env.DB.prepare(
+            `INSERT INTO availability_exceptions (date, kind, start_minute, end_minute, note, created_at) SELECT ?, 'extra', ?, ?, '', ? WHERE (${authorization.sql})`
+          ).bind(body.date, range.start, range.lastStart, created, ...authorization.values)
         );
       }
     }

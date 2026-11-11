@@ -10,12 +10,13 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type FocusEvent,
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { CalendarCheck, CalendarPlus, ChevronDown, Plus, Trash2, Video, Globe, UserRound } from "lucide-react";
+import { CalendarCheck, CalendarMinus, CalendarPlus, ChevronDown, Plus, Trash2, Video, Globe, UserRound } from "lucide-react";
 import { addedByTeacher, type AdminBooking, type AvailabilityException, type OnlineOnlyPeriod } from "@/lib/admin-api";
 import { meetingHref } from "@/components/MeetingLink";
 import { formatSlotTime } from "@/lib/booking-api";
@@ -25,11 +26,14 @@ import {
   bookingSegments,
   canPaintHours,
   dateBlocks,
+  dateExtraWindows,
+  dateExtras,
   dateKey,
   dateLabel,
   daysOff,
   lessonStarts,
   minuteLabel,
+  offersExtraHours,
   onlineOnlyHours,
   onlineOnlyLabel,
   overlapsSpan,
@@ -38,7 +42,10 @@ import {
   shiftDate,
   spanAround,
   spanLabel,
+  startsLabel,
   weeklyBlocks,
+  type HoursBlock,
+  type HoursChoice,
   type HoursKind,
   type Span,
   type TeachingWindow,
@@ -65,17 +72,15 @@ type Props = {
   /** Online only all day, or not. */
   onOnlineDay: (date: string, on: boolean) => void;
   /**
-   * What some hours of a date are: time off, online only, or open again
-   * (`kind` null). `original` is the block she pressed, which they replace.
+   * What some hours of a date are: time off, online only, extra hours, open
+   * again (`kind` null) or not working. `original` is the block she pressed,
+   * which they replace.
    */
-  onChooseHours: (date: string, original: Hours | null, kind: HoursKind | null, span: Span) => void;
+  onChooseHours: (date: string, original: HoursBlock | null, kind: HoursChoice, span: Span) => void;
   /** A free time chosen for a lesson arranged elsewhere: its date and minute in Porto. */
   onAddLesson?: (date: string, minute: number) => void;
   onSelectBooking: (booking: AdminBooking) => void;
 };
-
-/** Some hours already off or online only on a date. */
-type Hours = { kind: HoursKind; span: Span };
 
 /**
  * The choice at the times she pressed or dragged over (11 November 2026,
@@ -90,8 +95,8 @@ type SlotMenu = {
   single: boolean;
   /** The hours it sets; null where none can be (past, a day off, a weekly block). */
   span: Span | null;
-  /** The block pressed, already off or online only. */
-  original: Hours | null;
+  /** The block pressed, already off, online only or extra hours. */
+  original: HoursBlock | null;
 };
 
 /** While editing her hours a drag marks lesson starts (`paint`); on dates it chooses times. */
@@ -129,6 +134,10 @@ export function WeeklyTimetable({
   // The choice's two times as she types them, from and until.
   const [times, setTimes] = useState({ from: "", until: "" });
   const [timesError, setTimesError] = useState("");
+  // Extra hours is the kind in view once she arrives on it by keyboard, until
+  // she moves to another kind: its dab then says when lessons can start.
+  const [extraInView, setExtraInView] = useState(false);
+  const startsId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
   // A drag across several times has already opened its choice by the time
   // its click arrives, so that click is spent.
@@ -147,14 +156,16 @@ export function WeeklyTimetable({
   );
   const offDays = useMemo(() => daysOff(exceptions), [exceptions]);
   // Inês doesn't teach at weekends, so Saturday and Sunday stay out of her
-  // week (10 October 2026, at Dan's request) unless one holds a lesson that
-  // week or weekly hours of its own; Set exact hours still offers every day.
+  // week (10 October 2026, at Dan's request) unless one holds a lesson or
+  // extra hours that week, or weekly hours of its own; Set exact hours still
+  // offers every day.
   const shown = WEEKDAYS.map((_, index) => index).filter(
     (index) =>
       index < 5 ||
       (hours[WEEKDAYS[index].value] ?? []).length > 0 ||
       (!editing &&
-        segments.some((segment) => segment.date === shiftDate(weekStart, index))),
+        (segments.some((segment) => segment.date === shiftDate(weekStart, index)) ||
+          dateExtraWindows(exceptions, shiftDate(weekStart, index)).length > 0)),
   );
   const activeDay = shown.includes(mobileDay)
     ? mobileDay
@@ -175,6 +186,7 @@ export function WeeklyTimetable({
     blocks: editing ? [] : shown.flatMap(index => [
       ...dateBlocks(exceptions, shiftDate(weekStart, index)),
       ...weeklyBlocks(exceptions, WEEKDAYS[index].value),
+      ...dateExtras(exceptions, shiftDate(weekStart, index), interval),
     ]),
     step,
     editing,
@@ -187,6 +199,10 @@ export function WeeklyTimetable({
   );
   const focusMinute = Math.max(start, Math.min(end - step, focus.minute));
   const menuSpan = slotMenu?.span ? chosenSpan() : null;
+  const choices = slotMenu?.span ? hoursChoices({ ...slotMenu, span: slotMenu.span }) : null;
+  // When lessons could start in the times as typed, said while Extra hours is the kind in view.
+  const starts = choices?.extra && menuSpan ? startsLabel(menuSpan, interval) : null;
+  const startsShown = Boolean(starts) && (slotMenu?.original?.kind === "extra" || extraInView);
 
   useLayoutEffect(() => {
     if (!pendingFocus.current) return;
@@ -213,9 +229,12 @@ export function WeeklyTimetable({
       ...(hours[WEEKDAYS[index].value] ?? []).map((window) => window.start),
       ...(editing
         ? []
-        : segments
-            .filter((segment) => segment.date === date)
-            .map((segment) => segment.start)),
+        : [
+            ...segments
+              .filter((segment) => segment.date === date)
+              .map((segment) => segment.start),
+            ...dateExtraWindows(exceptions, date).map((window) => window.start),
+          ]),
     ].filter(Number.isFinite);
     const usual = allWindows.map((window) => window.start);
     const minute = Math.min(...(firsts.length ? firsts : usual.length ? usual : [start]));
@@ -276,17 +295,22 @@ export function WeeklyTimetable({
     );
   }
 
-  /** The hours off, or else online only, that the time touches. */
-  function hoursAt(day: number, start: number, end: number): Hours | null {
+  /** The hours off, or else extra hours, or else online only, that the time touches. */
+  function hoursAt(day: number, start: number, end: number): HoursBlock | null {
     const date = dateOf(day);
     const off = spanAround(dateBlocks(exceptions, date), start, end);
     if (off) return { kind: "off", span: off };
-    const online = spanAround(onlineOnlyHours(onlineOnly, date), start, end);
-    return online ? { kind: "online", span: online } : null;
+    const online = onlineOnlyHours(onlineOnly, date);
+    // Extra hours online only at the same times are one block, and open on Extra hours.
+    const extra = spanAround(dateExtras(exceptions, date, interval), start, end);
+    if (extra) return { kind: "extra", span: extra, online: online.some((span) => span.start === extra.start && span.end === extra.end) };
+    const label = spanAround(online, start, end);
+    return label ? { kind: "online", span: label } : null;
   }
 
   function openSlotMenu(menu: SlotMenu) {
     setTimesError("");
+    setExtraInView(false);
     setTimes(menu.span ? { from: minuteLabel(menu.span.start), until: menu.span.end === 1440 ? "00:00" : minuteLabel(menu.span.end) } : { from: "", until: "" });
     setSlotMenu(menu);
   }
@@ -421,6 +445,12 @@ export function WeeklyTimetable({
     menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slotMenu]);
+  // The dab comes and goes by keyboard or as the times are typed, never under
+  // a pointer, so the choice can keep its place beside the time.
+  useLayoutEffect(() => {
+    if (slotMenu) placeSlotMenu();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startsShown]);
 
   /** The choice's times as minutes, or null until the end is after the start. */
   function chosenSpan(): Span | null {
@@ -428,14 +458,44 @@ export function WeeklyTimetable({
     return Number.isFinite(span.start) && Number.isFinite(span.end) && span.start < span.end ? span : null;
   }
 
-  function choose(kind: HoursKind | null) {
+  /**
+   * What the choice offers for some hours: which kinds they already are,
+   * whether extra hours would let a lesson start there (never inside her
+   * hours, judged on the times as typed), and the ways back for what is set.
+   */
+  function hoursChoices(menu: SlotMenu & { span: Span }) {
+    const date = dateOf(menu.day);
+    const { original } = menu;
+    const online = onlineOnlyHours(onlineOnly, date);
+    const touches = (spans: Span[]) => overlapsSpan(spans, menu.span.start, menu.span.end);
+    const live = menuSpan ?? menu.span;
+    return {
+      pressed: (kind: HoursKind) => original?.kind === kind || (kind === "online" && original?.kind === "extra" &&
+        online.some((span) => span.start <= original.span.start && original.span.end <= span.end)),
+      // Extra hours pressed can always take new times, short of the whole day.
+      extra: offersExtraHours([...(hours[menu.day] ?? []), ...dateExtraWindows(exceptions, date)], live, interval) ||
+        (original?.kind === "extra" && (live.start > 0 || live.end < 1440)),
+      openAgain: original?.kind === "off" || original?.kind === "online" || touches(dateBlocks(exceptions, date)) || touches(online),
+      notWorking: original?.kind === "extra" || touches(dateExtras(exceptions, date, interval)),
+    };
+  }
+
+  /** Arriving on a kind by keyboard puts it in view; a pointer press saves at once, as always. */
+  function kindInView(kind: HoursKind) {
+    return (event: FocusEvent<HTMLButtonElement>) => {
+      if (event.currentTarget.matches(":focus-visible")) setExtraInView(kind === "extra");
+    };
+  }
+
+  function choose(kind: HoursChoice) {
     if (!slotMenu?.span) return;
     const span = chosenSpan();
     if (!span) { setTimesError("Choose an end after the start."); return; }
     const { day, original } = slotMenu;
+    const already = kind !== null && kind !== "not working" && hoursChoices({ ...slotMenu, span: slotMenu.span }).pressed(kind);
     closeSlotMenu(true);
     // The kind it already is, at the same times, changes nothing.
-    if (kind && original?.kind === kind && original.span.start === span.start && original.span.end === span.end) return;
+    if (already && original?.span.start === span.start && original.span.end === span.end) return;
     onChooseHours(dateOf(day), original, kind, span);
   }
 
@@ -704,6 +764,11 @@ export function WeeklyTimetable({
               const weekly = weeklyBlocks(exceptions, day.value);
               const blocks = editing ? [] : dateBlocks(exceptions, date);
               const online = editing ? [] : onlineOnlyHours(onlineOnly, date);
+              // Extra hours are drawn as her weekly hours are: washed where a lesson can start.
+              const extraWindows = editing ? [] : dateExtraWindows(exceptions, date);
+              const extraStarts = lessonStarts(extraWindows, interval);
+              const extras = editing ? [] : dateExtras(exceptions, date, interval);
+              const sameAsExtra = (span: Span) => extras.some((other) => other.start === span.start && other.end === span.end);
               const daySegments = segments.filter(
                 (segment) => segment.date === date,
               );
@@ -720,8 +785,14 @@ export function WeeklyTimetable({
                       text: span.note || "Blocked every week",
                       weekly: true,
                     })),
+                    // Extra hours online only at the same times are one block with one label.
+                    ...extras.map((span) => ({
+                      ...span,
+                      text: `Extra hours ${spanLabel(span)}${online.some((other) => other.start === span.start && other.end === span.end) ? ", online only" : ""}`,
+                      weekly: false,
+                    })),
                     // A day online only all day is named as a day off is, below.
-                    ...(onlineAllDay(date) ? [] : online.map((span) => ({
+                    ...(onlineAllDay(date) ? [] : online.filter((span) => !sameAsExtra(span)).map((span) => ({
                       ...span,
                       text: `Online only ${spanLabel(span)}`,
                       weekly: false,
@@ -808,6 +879,8 @@ export function WeeklyTimetable({
                         Math.max(span.start, start) < cellEnd,
                     );
                     const onlineHere = !off && !blocked && overlapsSpan(online, minute, cellEnd);
+                    const extraHere = !off && !blocked && overlapsSpan(extras, minute, cellEnd);
+                    const bookable = (usual || extraStarts.some((value) => value >= minute && value < cellEnd)) && !off && !blocked;
                     const fixed = past || off || inWeekly;
                     const blockedHere = !fixed && overlapsSpan(blocks, minute, cellEnd);
                     const reason = past
@@ -815,11 +888,13 @@ export function WeeklyTimetable({
                       : off
                         ? "day off"
                         : `${weekly.find((span) => span.start < cellEnd && minute < span.end)?.note || "blocked"} every week`;
+                    const kinds = offersExtraHours([...windows, ...extraWindows], { start: minute, end: cellEnd }, interval)
+                      ? "time off, online only or extra hours" : "time off or online only";
                     return (
                       <button
                         key={minute}
                         type="button"
-                        className={`teacher-time-slot ${usual && !off && !blocked ? "is-available" : ""} ${onlineHere ? "is-online-only" : ""} ${blocked && !off ? "is-blocked" : ""} ${chosen ? "is-chosen" : ""} ${labelled ? "is-labelled" : ""} ${weeklyClass} ${hourClass}`}
+                        className={`teacher-time-slot ${bookable ? "is-available" : ""} ${onlineHere ? "is-online-only" : ""} ${blocked && !off ? "is-blocked" : ""} ${chosen ? "is-chosen" : ""} ${labelled ? "is-labelled" : ""} ${weeklyClass} ${hourClass}`}
                         aria-pressed={fixed ? undefined : blocked}
                         aria-disabled={(past && !onAddLesson) || undefined}
                         aria-expanded={fixed && !onAddLesson ? undefined : expanded}
@@ -828,9 +903,11 @@ export function WeeklyTimetable({
                             ? `${minuteLabel(minute)}, ${dateLabel(date)}, ${reason}${past && onAddLesson ? ": add a past lesson" : ""}`
                             : blockedHere
                               ? `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}, off: change`
-                              : onlineHere
-                                ? `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}, online only: change`
-                                : `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}${usual ? ", in your weekly hours" : ""}: add a lesson, time off or online only`
+                              : extraHere
+                                ? `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}, extra hours${onlineHere ? ", online only" : ""}: change`
+                                : onlineHere
+                                  ? `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}, online only: change`
+                                  : `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}${usual ? ", in your weekly hours" : ""}: add a lesson, ${kinds}`
                         }
                         {...pointer}
                         onClick={() => {
@@ -849,7 +926,7 @@ export function WeeklyTimetable({
                   {labels.map((span) => (
                     <span
                       className={`teacher-block-label ${span.weekly ? "is-weekly" : ""}`}
-                      key={`${span.weekly}-${span.start}`}
+                      key={`${span.weekly}-${span.start}-${span.text}`}
                       aria-hidden="true"
                       style={{
                         top: `calc(${(Math.max(span.start, start) - start) / step} * var(--teacher-slot-height) + 3px)`,
@@ -1033,7 +1110,7 @@ export function WeeklyTimetable({
                   Add a lesson here
                 </button>
               ) : null}
-              {slotMenu.span ? (
+              {choices ? (
                 <div className="teacher-slot-menu__hours">
                   {/* Exactly, to the minute, as hours off always could be. */}
                   <div className="teacher-form teacher-slot-menu__times">
@@ -1042,22 +1119,41 @@ export function WeeklyTimetable({
                     <input aria-invalid={timesError ? true : undefined} aria-label="Until" onChange={(event) => { setTimesError(""); setTimes({ ...times, until: event.target.value }); }} type="time" value={times.until} />
                   </div>
                   {timesError ? <p className="teacher-inline-error teacher-slot-menu__error" role="alert">{timesError}</p> : null}
+                  {/* What extra hours at these times give a student; also the chip's description. */}
+                  {starts ? (
+                    <ul className="booking-payment-facts teacher-slot-menu__starts" hidden={!startsShown} id={startsId}>
+                      <li>Lessons can start {starts}</li>
+                    </ul>
+                  ) : null}
                   {/* Each wears the swatch of what it makes, as the key does,
                       and is pressed while the hours already are that. */}
                   <div className="teacher-slot-menu__kinds">
-                    <button aria-pressed={slotMenu.original?.kind === "off"} className="teacher-quiet teacher-day-choice" onClick={() => choose("off")} type="button">
+                    <button aria-pressed={choices.pressed("off")} className="teacher-quiet teacher-day-choice" onClick={() => choose("off")} onFocus={kindInView("off")} type="button">
                       <i className="teacher-swatch is-off" aria-hidden="true" />
                       Time off
                     </button>
-                    <button aria-pressed={slotMenu.original?.kind === "online"} className="teacher-quiet teacher-day-choice" onClick={() => choose("online")} type="button">
+                    <button aria-pressed={choices.pressed("online")} className="teacher-quiet teacher-day-choice" onClick={() => choose("online")} onFocus={kindInView("online")} type="button">
                       <i className="teacher-swatch is-online" aria-hidden="true" />
                       Online only
                     </button>
+                    {choices.extra ? (
+                      <button aria-describedby={starts ? startsId : undefined} aria-pressed={choices.pressed("extra")} className="teacher-quiet teacher-day-choice" onClick={() => choose("extra")} onFocus={kindInView("extra")} type="button">
+                        <i className="teacher-swatch is-extra" aria-hidden="true" />
+                        Extra hours
+                      </button>
+                    ) : null}
                   </div>
-                  {slotMenu.original || hoursAt(slotMenu.day, slotMenu.span.start, slotMenu.span.end) ? (
+                  {choices.openAgain ? (
                     <button className="teacher-slot-menu__item" onClick={() => choose(null)} type="button">
                       <CalendarCheck size={17} aria-hidden="true" />
                       Open again
+                    </button>
+                  ) : null}
+                  {/* Extra hours' own way back; Open again keeps its meaning. */}
+                  {choices.notWorking ? (
+                    <button className="teacher-slot-menu__item" onClick={() => choose("not working")} type="button">
+                      <CalendarMinus size={17} aria-hidden="true" />
+                      Not working
                     </button>
                   ) : null}
                 </div>

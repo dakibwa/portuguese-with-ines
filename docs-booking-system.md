@@ -39,7 +39,7 @@ Inês on /schedule                     (her own account, role=teacher)
   → GET/POST /admin/availability, /admin/exceptions
   → POST /admin/online-only                          online-only date ranges and daily hours
   → GET  /admin/lesson-availability                 teacher lesson picker
-  → POST /admin/exceptions/day                       one date's day off and blocked hours
+  → POST /admin/exceptions/day                       one date's day off, blocked hours and extra hours
   → GET  /admin/bookings, /admin/students            her lessons; her students and how far
                                                      each is onto the site
   → POST /admin/bookings                             add a lesson, or a weekly slot, for someone
@@ -515,28 +515,40 @@ Migration `0024-cancellation-message.sql` adds that nullable booking field and
 must be applied to each database before deploying this Worker. Her existing
 no-fee cancellation and automatic refund rules remain the same.
 
-The week itself is where Inês takes time off and labels online-only time;
-there is no separate Time off tab (11 November 2026). Pressing a free time,
-or dragging over several on one date, opens a small choice at them: `Add a
-lesson here` (for a single time), `From` and `Until` to the minute, then
-`Time off` or `Online only`. Nothing is written until she chooses. Pressing
-hours already off or online only opens that whole block with its kind
-pressed: the other kind switches it, changed times save, and `Open again`
-opens only the times in the fields. Hours are never both kinds: setting one
-takes the span out of the other (`chooseHours` in
+The week itself is where Inês takes time off, labels online-only time and
+adds extra hours; there is no separate Time off tab (11 November 2026).
+Pressing a free time, or dragging over several on one date, opens a small
+choice at them: `Add a lesson here` (for a single time), `From` and `Until`
+to the minute, then `Time off`, `Online only` or `Extra hours`. Nothing is
+written until she chooses. Extra hours are lesson starts for that one date,
+read exactly as weekly hours are: every booking interval from `From` while
+before `Until` (16:00–18:00 at 30 minutes starts 16:00 to 17:30). They are
+offered only where they add a start (`offersExtraHours`: outside her weekly
+and extra hours' ranges, never a whole day, a day off or a past date), drawn
+with the weekly hours' wash and labelled `Extra hours 16:00–18:00`. Pressing
+hours already off, online only or extra opens that whole block with its kind
+pressed: another kind switches it, changed times save, `Open again` opens
+only the times in the fields from time off and online only, and `Not
+working` takes only those times out of the extra hours. Time off is never
+online only or extra hours: setting one takes the span out of the others.
+Online only labels bookable time, so extra hours can be online only too; a
+block that is both, at the same times, opens on `Extra hours`, keeps its
+label as its times change and loses it with `Not working` (`chooseHours` in
 `src/lib/teacher-calendar.ts`). In the time fields `00:00` as Until means the
 end of that day (stored as minute 1440). Each date has a `Day off` switch,
 which blocks the whole day and takes away its online-only hours, and an
 `Online only` switch, which labels the whole day and reopens a day off,
-keeping its hours off. Hours off save through `/admin/exceptions/day`, as
-before. Weekly blocks and extra hours stay. Under the week, `Clashes` lists
+keeping its hours off. Hours off and extra hours save through
+`/admin/exceptions/day`, in one request when both change; weekly blocks and
+weekly extra rows stay. Under the week, `Clashes` lists
 each lesson to come that time off or online-only hours left standing: booked
 on a day off, inside hours off, or in person inside online-only hours
 (`timeOffClashes`, proved in `scripts/test-teacher-calendar.mjs`). It is a
 read of what the page already holds; no lesson is moved or cancelled by
 taking time off. Each is a card whose `Change` opens that lesson's own
 move/cancel dialog. `Coming up` beside it lists what is set beyond the week
-in view (`timeAhead`), and pressing one turns to that week. Reopening a day
+in view (`timeAhead`; extra hours as `Extra 16:00–18:00`, not on a day off),
+and pressing one turns to that week. Reopening a day
 removes only its whole-day block, retaining partial time off and weekly
 hours. Each date's change saves one request at a time, so quick clicks
 coalesce into the date's latest choice. A failed older save keeps a newer
@@ -558,11 +570,17 @@ weekly blocks such as lunch are shown but not toggled.
 Existing lessons are never cancelled by time off — they stay on the calendar
 and need their own move or cancel.
 
-`POST /admin/exceptions/day` takes `{ date, dayOff?, blocks? }`. The two parts
-are independent and each replaces only its own one-off rows in one batch:
-switching the day off never discards the hours blocked within it, reopening it
-brings them back, and an existing day off keeps its note. Weekly blocks and
-extra hours are never touched there. Malformed or whole-day `blocks`, and past
+`POST /admin/exceptions/day` takes `{ date, dayOff?, blocks?, extra? }`. The
+three parts are independent and each replaces only its own one-off rows in one
+batch, each write guarded by the teacher check and the availability revision
+bumped once: switching the day off never discards the hours blocked within it,
+reopening it brings them back, and an existing day off keeps its note. `extra`
+is the date's extra hours as spans of times in the same `{ startMinute,
+endMinute }` terms as `blocks` (end exclusive); each is stored as a `kind =
+'extra'` row whose `start_minute` is its first start and whose `end_minute` is
+its last start, the last step of `slot_interval_minutes` before the span ends,
+as availability reads an extra window. Weekly blocks and weekly extra rows are
+never touched there. Malformed or whole-day `blocks` or `extra`, and past
 dates, are refused rather than partly saved. `GET /admin/availability` returns
 weekly blocks alongside the upcoming one-off rows so the calendar shows every
 time students cannot book.

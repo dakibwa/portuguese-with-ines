@@ -63,7 +63,8 @@ async function fixture(width, options = {}) {
         end_minute: 660,
         note: "Short break",
       },
-      { id: 3, date: "2026-09-22", kind: "extra", note: "Extra hours" },
+      // Lessons can start 18:00 and 18:30: extra hours 18:00–19:00.
+      { id: 3, date: "2026-09-22", kind: "extra", start_minute: 1080, end_minute: 1110, note: "Extra hours" },
       { id: 4, date: "2026-09-21", kind: "blocked", note: "Duplicate day" },
       {
         id: 5,
@@ -215,7 +216,8 @@ async function fixture(width, options = {}) {
       return route.fulfill({ json: { ok: true, periods: state.onlineOnlyPeriods, revision: state.onlineOnlyRevision } });
     }
     if (path === "/admin/exceptions/day") {
-      // Mirrors the Worker: a day off and hour blocks replace only their own rows.
+      // Mirrors the Worker: a day off, hour blocks and extra hours replace only
+      // their own rows, extra hours kept as the starts they give at 30 minutes.
       if (state.dayGate) await state.dayGate;
       if (state.delay)
         await new Promise((done) => setTimeout(done, state.delay));
@@ -252,6 +254,14 @@ async function fixture(width, options = {}) {
           ...data.blocks.map((block) =>
             row(block.startMinute, block.endMinute),
           ),
+        ];
+      if (data.extra)
+        state.exceptions = [
+          ...state.exceptions.filter((entry) => !(entry.date === data.date && entry.weekday == null && entry.kind === "extra")),
+          ...data.extra.map((span) => ({
+            ...row(span.startMinute, span.startMinute + (Math.ceil((span.endMinute - span.startMinute) / 30) - 1) * 30),
+            kind: "extra",
+          })),
         ];
       return route.fulfill({
         json: {
@@ -522,7 +532,8 @@ async function lessonLocation(page, name, location) {
 
 try {
   // Online only from the Timetable (11 November 2026): a day's switch beside
-  // Day off, a day being one or the other, and some hours by exact times.
+  // Day off, a day being one or the other, and some hours by exact times;
+  // then extra hours on one date, at the same choice.
   for (const width of [1280, 390]) {
     const { page, state } = await fixture(width);
     const note = page.locator(".teacher-week .teacher-save-state");
@@ -575,6 +586,25 @@ try {
     await slot(page, 3, 660).click();
     await choice.getByRole("button", { name: "Open again", exact: true }).click();
     await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-09", blocks: [] });
+    // Extra hours on a date outside her weekly hours (Tuesdays have none):
+    // lesson starts, washed as her weekly hours are and labelled.
+    if (width === 390) await page.getByRole("button", { name: /^Tuesday 8 September/ }).click();
+    await slot(page, 2, 960).click();
+    await expect(choice.getByRole("button")).toHaveText(["Add a lesson here", "Time off", "Online only", "Extra hours"]);
+    await choice.getByLabel("Until", { exact: true }).fill("18:00");
+    await choice.getByRole("button", { name: "Extra hours", exact: true }).click();
+    await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-08", extra: [{ startMinute: 960, endMinute: 1080 }] });
+    await expect(note).toHaveText("Lessons can start 16:00–17:30 on Tue 8 Sept.");
+    await expect(page.locator(".teacher-block-label", { hasText: "Extra hours 16:00–18:00" })).toBeVisible();
+    for (const minute of [960, 1050]) await expect(slot(page, 2, minute)).toHaveClass(/is-available/);
+    // Pressed again they open as their block, their starts in words, and go with Not working.
+    await slot(page, 2, 1020).click();
+    await expect(choice.getByRole("button", { name: "Extra hours", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(choice.locator(".teacher-slot-menu__starts")).toHaveText("Lessons can start 16:00–17:30");
+    await choice.getByRole("button", { name: "Not working", exact: true }).click();
+    await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-08", extra: [] });
+    await expect(page.locator(".teacher-block-label", { hasText: "Extra hours" })).toHaveCount(0);
+    await expect(slot(page, 2, 960)).not.toHaveClass(/is-available/);
     await noOverflow(page);
     assert.equal(state.bookings.length, 2, "Her existing lessons remain booked");
     assert.deepEqual(state.errors, []);
@@ -786,7 +816,7 @@ try {
   const writesBeforeChoice = state.writes.length;
   await slot(page, 2, 960).click();
   const choice = choiceAt(page);
-  await expect(choice.getByRole("button")).toHaveText(["Add a lesson here", "Time off", "Online only"]);
+  await expect(choice.getByRole("button")).toHaveText(["Add a lesson here", "Time off", "Online only", "Extra hours"]);
   await expect(choice.getByRole("button", { name: "Add a lesson here" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(choice).toHaveCount(0);
@@ -821,7 +851,7 @@ try {
   // A drag offers the same choice for all its times, saving nothing until then.
   const writesBeforeDrag = state.writes.length;
   await dragDown(page, slot(page, 3, 1020), slot(page, 3, 1050));
-  await expect(choiceAt(page).getByRole("button")).toHaveText(["Time off", "Online only"]);
+  await expect(choiceAt(page).getByRole("button")).toHaveText(["Time off", "Online only", "Extra hours"]);
   await expect(choiceAt(page).getByLabel("From", { exact: true })).toHaveValue("17:00");
   await expect(choiceAt(page).getByLabel("Until", { exact: true })).toHaveValue("18:00");
   assert.equal(state.writes.length, writesBeforeDrag, "A drag alone must not save");
@@ -2032,7 +2062,7 @@ try {
   assert.deepEqual(student.state.writes, []);
   await student.page.close();
   console.log(
-    "Teacher calendar passed: online-only days, visible locations in 60/90-minute blocks, drag/keyboard/touch hours and time off, day-off switches, weekly lunch, past weeks, failed and coalesced saves, protected exceptions, exact hours, drafts, Porto moves, attendance, cancellation, student cards with their checks, invites and profiles, teacher email/password links and verified session renewal, responsive layout and access gate.",
+    "Teacher calendar passed: online-only days, extra hours, visible locations in 60/90-minute blocks, drag/keyboard/touch hours and time off, day-off switches, weekly lunch, past weeks, failed and coalesced saves, protected exceptions, exact hours, drafts, Porto moves, attendance, cancellation, student cards with their checks, invites and profiles, teacher email/password links and verified session renewal, responsive layout and access gate.",
   );
 } finally {
   await browser.close();
