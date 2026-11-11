@@ -850,11 +850,16 @@ function contentHeight(stage: HTMLElement) {
  * scroll is actually needed. Reduced-motion preferences are respected.
  */
 function orientTo(id: string, focus = false, forceOnMobile = false) {
+  const previousFocus = document.activeElement;
   const orient = () => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const target = document.getElementById(id);
         if (!target) return;
+        // A delayed handover must not take focus from a control the student
+        // has already reached, such as the account menu opened in the new bar.
+        const active = document.activeElement;
+        if (focus && active && active !== document.body && active !== previousFocus && active !== target) return;
         if (focus) target.focus({ preventScroll: true });
         const bounds = target.getBoundingClientRect();
         const visibleHeight = Math.max(0, Math.min(bounds.bottom, window.innerHeight) - Math.max(bounds.top, 0));

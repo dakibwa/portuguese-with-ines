@@ -196,11 +196,23 @@ by protecting a student, Inês or money in a way these don't already.
 
 ## Security maintenance
 
-As of 18 October 2026, Next and its ESLint configuration are
-patched to 16.3.8, with compatible Sharp and source-map-js fixes in the lockfile.
-`npm audit --omit=dev` reports zero known vulnerabilities. The full audit still
-reports the development-only Braces/ESLint chain; Braces has no published fix.
-The install script applies a source-checked local mitigation for
+As of 11 November 2026, Next and its ESLint configuration are pinned to
+16.4.6. The lockfile also updates the lint and Wrangler dependencies, clearing
+the reported high-severity development-tool advisories.
+`npm audit --omit=dev` reports zero known vulnerabilities. The full audit has
+no high or critical findings; its seven moderate package warnings come from
+one [Minimatch advisory](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249)
+in TypeScript ESLint. Its current release, 8.72.2, still requires Minimatch 10;
+the upstream fix is in 11. No transitive major-version override is applied.
+
+The Next update includes fixes for
+[image optimization](https://github.com/vercel/next.js/security/advisories/GHSA-2464-fhr4-w9xw),
+[Server Actions](https://github.com/vercel/next.js/security/advisories/GHSA-p3m5-59mp-jv5r)
+and [`use cache` typed arrays](https://github.com/vercel/next.js/security/advisories/GHSA-673q-mjm6-r5xr).
+Production serves a static export with unoptimized images, no Server Actions
+and no `use cache` functions; those affected Next server paths are not deployed.
+
+The install script also retains a source-checked local mitigation for
 [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm):
 Braces rejects nesting beyond 128 levels in its parser and recursive walkers,
 including directly supplied syntax trees. Ordinary patterns retain their
@@ -292,6 +304,8 @@ the page no longer dissolves as one oversized snapshot. Older browsers keep the
 working flow and use a small content fade instead. Orientation scrolling waits
 for the surface change to settle and runs only when less than 160 px of the next
 decision is visible; an already visible desktop choice does not move the page.
+Delayed focus yields to a control the student has already reached, so an account
+menu opened during the handover stays open.
 Interrupted transitions from a quick second choice are treated as normal input,
 not as browser errors.
 

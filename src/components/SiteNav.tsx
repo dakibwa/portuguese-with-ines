@@ -100,7 +100,8 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
         setOpen(false);
         requestAnimationFrame(() => openerRef.current?.focus({ preventScroll: true }));
       } else if (event.key === "Tab") {
-        const controls = [...menuRef.current?.querySelectorAll<HTMLButtonElement | HTMLAnchorElement>("button, a[href]") ?? []];
+        const controls = [...menuRef.current?.querySelectorAll<HTMLButtonElement | HTMLAnchorElement>("button:not([disabled]), a[href]") ?? []]
+          .filter((element) => element.getClientRects().length > 0);
         const current = controls.indexOf(document.activeElement as HTMLButtonElement | HTMLAnchorElement);
         const next = event.shiftKey ? (current <= 0 ? controls.length - 1 : current - 1) : (current + 1) % controls.length;
         event.preventDefault();
