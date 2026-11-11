@@ -225,8 +225,8 @@
   align-items: center;
   gap: 0.5rem;
 }
-/* The one pager (14 October 2026, Dan): the Timetable's week and the Time off
-   and Receipts months turn the same way. The arrows are the student's
+/* The one pager (14 October 2026, Dan): the Timetable's week and the
+   Receipts month turn the same way. The arrows are the student's
    calendar's, solid blue with a white chevron, and never move; `This week` /
    `This month` joins them on the left only while she is away from the current
    one, so it takes nothing's place when it is gone. */
@@ -344,9 +344,15 @@
 .teacher-day-heading .teacher-day-today { padding: 0.15rem 0.35rem; border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); }
 .teacher-day-full-name { display: none; }
 .teacher-week-day-control { display: none; }
-@container teacher-day (max-width: 160px) {
+/* A day's two switches, `Day off` and `Online only` (11 November 2026),
+   stand one above the other at the date's right, their tracks in one
+   column, so the header keeps the height of its date. */
+.teacher-day-switches { display: grid; justify-items: start; padding-block: 0.2rem; }
+.teacher-day-switches .teacher-day-toggle { min-height: 22px; padding-block: 0.1rem; }
+@container teacher-day (max-width: 170px) {
   .teacher-day-cell__band { justify-content: center; padding-inline: 0; }
   .teacher-day-cell__band > .teacher-day-heading { flex-basis: 100%; padding-block: 0.35rem; min-height: 32px; }
+  .teacher-day-cell__band > .teacher-day-switches { padding-block: 0 0.3rem; }
 }
 /* A phone's seven-day strip (a week with weekend lessons) puts each date
    under its day, so neighbouring days never run into each other. */
@@ -454,11 +460,16 @@
 .teacher-time-slot.is-available {
   background: rgba(170, 164, 230, 0.22);
 }
-/* Her weekly hours that can only be booked online take the one online-only
-   colour (10 November 2026, Dan); the key names it, and a day online only
-   all day has a globe by its date. */
-.teacher-time-slot.is-available.is-online-only {
+/* Online-only time takes the one online-only colour (10 November 2026,
+   Dan), labelled with its hours as time off is; the key names it. */
+.teacher-time-slot.is-online-only {
   background: var(--online-only);
+}
+/* The times a drag or her open choice holds, as she sets them. */
+.teacher-timetable:not(.teacher-timetable--editing) .teacher-time-slot.is-chosen {
+  z-index: 1;
+  background: var(--lavender-soft);
+  box-shadow: inset 2px 0 0 var(--blue), inset -2px 0 0 var(--blue);
 }
 .teacher-timetable--editing .teacher-time-slot.is-available {
   background: var(--lavender-soft);
@@ -1577,8 +1588,8 @@
   .teacher-day-heading.is-selected {
     background-color: var(--lavender-soft);
   }
-  /* On a phone a day with lessons takes the booked hatch on its tab, as on
-     the Time off month, so she sees where her lessons are without opening
+  /* On a phone a day with lessons takes the booked hatch on its tab, as a
+     student's calendar does, so she sees where her lessons are without opening
      each day. */
   .teacher-day-heading.has-lessons {
     background-image: var(--hatch-booked);
@@ -1600,7 +1611,7 @@
     display: none;
   }
   .teacher-day-cell { border-left: 0; }
-  .teacher-day-cell__band > .teacher-day-toggle { display: none; }
+  .teacher-day-cell__band > .teacher-day-switches { display: none; }
   .teacher-day-cell__band > .teacher-day-heading { width: 100%; min-height: 44px; }
   /* Too narrow to follow the date, the globe takes the corner the booked dot leaves. */
   .teacher-block-label {
@@ -1697,6 +1708,8 @@
     gap: 0.4rem;
   }
   .teacher-week-day-control { display: flex; grid-area: day; justify-self: end; }
+  .teacher-week-day-control .teacher-day-switches { display: flex; gap: 0.1rem; padding: 0; }
+  .teacher-week-day-control .teacher-day-switches .teacher-day-toggle { min-height: 44px; }
   .teacher-week:not(.teacher-week--editing) .teacher-week-toolbar .teacher-week-mode { justify-self: start; }
   .teacher-week-day-control .teacher-day-toggle { padding-inline: 0.3rem; font-size: 0.7rem; }
   .teacher-week:not(.teacher-week--editing) .teacher-week-toolbar .teacher-pager { display: contents; }
@@ -1711,7 +1724,7 @@
 }
 
 /* From a side panel up, Edit weekly hours sits beside the month it belongs
-   to and the pager keeps the right edge, as on Time off and Receipts and as
+   to and the pager keeps the right edge, as on Receipts and as
    a phone lays them out. The held place of `This week` is then part of the
    space between the two, not a gap inside a row of buttons. The whole week
    is in view here, so its lessons need no dot above their dates. */
@@ -1725,6 +1738,14 @@
   .teacher-calendar-key > .teacher-key-tabs { display: none; }
 }
 
+/* Below about 380 px the day's two switches take a row of their own beneath
+   Edit weekly hours rather than running into it. */
+@media (max-width: 379px) {
+  .teacher-week:not(.teacher-week--editing) .teacher-week-toolbar {
+    grid-template-areas: "title current previous next" "mode mode mode mode" "day day day day";
+  }
+  .teacher-week-day-control { justify-self: start; margin-left: -0.3rem; }
+}
 /* Keep both lilac controls together on the narrowest phones. */
 @media (max-width: 360px) {
   .teacher-week-toolbar .button--compact { padding-inline: 0.65rem; }
@@ -1735,7 +1756,7 @@
   .teacher-workspace { --teacher-slot-height: 32px; }
   .teacher-time-grid,
   .teacher-week-days { grid-template-columns: 44px repeat(var(--teacher-days, 7), minmax(0, 1fr)); }
-  .teacher-day-cell__band > .teacher-day-toggle { display: inline-flex; }
+  .teacher-day-cell__band > .teacher-day-switches { display: grid; }
   .teacher-axis-heading { display: grid; }
   .teacher-calendar-lesson { padding: 5px 5px; }
   .teacher-calendar-lesson strong { font-size: 0.7rem; }
@@ -1761,7 +1782,7 @@
   }
 }
 
-/* Google Meet as one card on the same lilac sheet as the time-off month
+/* Google Meet as one card on the same lilac sheet as her other tool cards
    (13 October 2026, Dan): logo and state at the head, a short dab list, then
    the one action that matters for that state. */
 .teacher-meet {
@@ -1939,16 +1960,22 @@
   color: var(--lavender-soft);
   font-size: 0.8rem;
 }
-/* On a phone the call ends the label's line, as Book ends Your lessons'
-   header, rather than taking a full-width row of its own (9 November 2026,
-   Dan: the compact-card method for every small card). */
+/* On a phone the label runs across the top; beneath it the lesson reads
+   down, who above when and where, with the call beside it at its own width,
+   never a full-width row of its own (9 November 2026, Dan: the compact-card
+   method for every small card) nor squeezed into the label's corner
+   (11 November 2026, Dan: "ugly and cramped"). */
 @media (max-width: 560px) {
   .teacher-next {
     display: grid;
-    grid-template-areas: "label join" "lesson lesson";
+    grid-template-areas: "label label" "lesson join";
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.3rem 0.75rem;
-    padding: 0.7rem 0.8rem 0.85rem 1.1rem;
+    align-items: center;
+    gap: 0.45rem 0.9rem;
+    padding: 0.95rem 0.95rem 0.95rem 1.15rem;
+  }
+  .teacher-next__lesson strong {
+    flex-basis: 100%;
   }
   .teacher-next__text {
     display: contents;
@@ -2009,7 +2036,7 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.teacher-slot-menu button {
+.teacher-slot-menu__item {
   display: flex;
   min-height: 44px;
   align-items: center;
@@ -2024,17 +2051,36 @@
   text-align: left;
 }
 @media (hover: hover) {
-  .teacher-slot-menu button:hover {
+  .teacher-slot-menu__item:hover {
     background: var(--lavender-soft);
   }
 }
-.teacher-slot-menu button:focus-visible {
+.teacher-slot-menu__item:focus-visible {
   background: var(--lavender-soft);
   outline: none;
 }
-.teacher-slot-menu button svg {
+.teacher-slot-menu__item svg {
   color: var(--blue);
 }
+/* What the hours are: their times exactly, then the two kinds side by side,
+   each its own width. */
+.teacher-slot-menu__hours {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.25rem 0.4rem 0.2rem;
+}
+.teacher-slot-menu__times {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--lavender-ink);
+}
+.teacher-slot-menu__times input { width: 100%; min-width: 0; min-height: 40px; padding-block: 0.35rem; }
+.teacher-slot-menu__kinds { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.teacher-slot-menu__kinds .teacher-quiet { min-height: 40px; gap: 0.4rem; }
+.teacher-slot-menu__hours > .teacher-slot-menu__item { margin-inline: -0.4rem; }
+.teacher-slot-menu__error { margin: 0; font-size: 0.75rem; }
 
 /* A lesson she added herself reads apart from the students' own bookings:
    pencilled in, lilac with a dashed edge, and says so. */
@@ -2166,22 +2212,6 @@
   .teacher-setup__body .teacher-manual-form > .paid-tick { grid-column: 1; justify-self: start; }
 }
 
-/* What the chosen days hold, as the confirm step's dab list; a lesson that
-   stays booked takes the coral dab. */
-.teacher-timeoff-facts li.teacher-timeoff-booked::before {
-  background: var(--coral);
-}
-.teacher-timeoff-lessons {
-  display: grid;
-  gap: 0.45rem;
-}
-.teacher-timeoff-lessons .teacher-eyebrow {
-  margin: 0;
-}
-/* Beside the month the cards stack in one column. */
-.teacher-timeoff-lessons .teacher-lesson-cards {
-  grid-template-columns: minmax(0, 1fr);
-}
 .teacher-hours-warning:not(:empty) {
   margin: 0 0 0.8rem;
   font: 400 0.8rem/1.5 var(--ui);
@@ -2200,6 +2230,33 @@
 .teacher-lesson-card__time { white-space: nowrap; }
 .teacher-lesson-card .button { flex: none; width: auto; padding-inline: 0.95rem; }
 .teacher-hours-clashes-more { margin-top: 0.55rem; }
+/* Under the week, what the Time off month used to show beside it (11
+   November 2026): Clashes, then Coming up, side by side where there is room.
+   No card around them: space and their small capitals group them. */
+.teacher-ahead { display: grid; gap: 1rem 1.5rem; margin-top: 1rem; }
+@media (min-width: 900px) { .teacher-ahead { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .teacher-ahead { margin-top: 0.4rem; } }
+.teacher-ahead > section { display: grid; align-content: start; gap: 0.45rem; min-width: 0; }
+.teacher-ahead .teacher-eyebrow { margin: 0; }
+.teacher-ahead .teacher-lesson-cards { grid-template-columns: minmax(0, 1fr); }
+.teacher-ahead__upcoming ul { display: grid; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.teacher-ahead__upcoming button {
+  display: grid;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--squiggle-field);
+  padding: 0.6rem 0.9rem;
+  background: var(--paper-light);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.teacher-ahead__upcoming button:hover { border-color: var(--rule); }
+.teacher-ahead__upcoming button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.teacher-ahead__upcoming strong { font: 600 0.88rem/1.35 var(--ui); }
+.teacher-ahead__upcoming span { color: var(--lavender-ink); font: 400 0.75rem/1.4 var(--ui); }
+.teacher-ahead__more { margin: 0; color: var(--lavender-ink); font: 400 0.75rem/1.4 var(--ui); }
 .teacher-hours-clashes-more[open] > summary { margin-bottom: 0.35rem; }
 /* What waits on her, under her next lesson (Phase 2, 14 October 2026). */
 .teacher-needs-you { display: grid; gap: 0.45rem; margin: 0 0 1.4rem; }
@@ -2233,34 +2290,6 @@
 .teacher-needs-you__keep { white-space: nowrap; }
 /* More than three: a quiet chip at its own width, never a bar across the row. */
 .teacher-needs-you__all { justify-self: start; }
-.teacher-timeoff-dialog h2 { margin-right: 2.5rem; }
-.teacher-timeoff-dialog form { display: grid; gap: 1rem; }
-.teacher-timeoff-dialog .teacher-eyebrow { margin: 0 2.5rem -0.5rem 0; }
-.teacher-timeoff-times { display: grid; gap: 0.65rem; }
-.teacher-timeoff-times > p { margin: 0; }
-.teacher-timeoff-times > .teacher-quiet { justify-self: start; }
-.teacher-timeoff-time { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 0.5rem; align-items: end; }
-.teacher-timeoff-time input { width: 100%; min-width: 0; }
-/* At 320 px both times keep their digits whole. */
-@media (max-width: 360px) {
-  .teacher-timeoff-time { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px; gap: 0.35rem; }
-  .teacher-timeoff-time input { padding-inline: 0.55rem; }
-  .teacher-timeoff-time .teacher-icon-button { width: 36px; }
-}
-.teacher-timeoff-dialog .teacher-dialog-actions { margin: 0; }
-
-/* Whole days use the booking calendar's lilac sheet, its dates raised in
-   cream inside it (13 October 2026, Dan: her tool cards are the lilac sheet). */
-/* Her cards share one inset and one gutter (9 November 2026, Dan: "spacing
-   is important too"): every card in her tabs is the booking card's
-   --pad-card, and two cards side by side (Time off, Profile) stand 1.25rem
-   apart, so their headings start on one line. */
-.teacher-timeoff-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(290px, 0.8fr);
-  align-items: start;
-  gap: var(--gap-panel);
-}
 .teacher-month {
   min-width: 0;
   border: 1px solid var(--rule);
@@ -2327,15 +2356,6 @@
   font: 500 1rem/1.2 var(--ui);
   cursor: pointer;
 }
-.teacher-month-day.is-off {
-  background: repeating-linear-gradient(-45deg, transparent, transparent 5px, var(--hover-wash) 5px, var(--hover-wash) 7px), var(--lavender-soft);
-}
-/* Online only tints the day, which the key names (its corner globe went on
-   10 November 2026: Dan, "is it necessary if it's already in the legend what
-   the colour means?"). A day off keeps its hatching. */
-.teacher-month-day.is-online:not(.is-off):not([aria-pressed="true"]) {
-  background: var(--online-only);
-}
 .teacher-month-day.is-outside:not([aria-pressed="true"]) {
   background-color: transparent;
 }
@@ -2349,20 +2369,6 @@
   background: var(--blue-deep);
   color: var(--paper-light);
 }
-/* A day with a lesson booked takes the fine booked hatch, over whatever else
-   the day is: on a day off the two hatches cross, on a chosen day it is
-   drawn in paper (10 November 2026, Dan: no dot). */
-.teacher-month-day.is-booked::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--hatch-booked);
-}
-.teacher-month-day.is-booked[aria-pressed="true"]::before {
-  background: var(--hatch-booked-light);
-}
 /* Today's blob is paper on a chosen day. */
 .teacher-month-day[aria-pressed="true"] .today-pill {
   background: var(--paper-light);
@@ -2372,10 +2378,6 @@
   outline: 2px solid var(--blue);
   outline-offset: 2px;
   box-shadow: none;
-}
-.teacher-month-state {
-  min-height: 1.2em;
-  font: 600 0.58rem/1.2 var(--ui);
 }
 /* The one key hand: the Timetable's and a student's calendar's. */
 .teacher-month-key {
@@ -2404,151 +2406,24 @@
   border: 1px solid var(--rule);
   border-radius: 4px 5px 4px 6px;
 }
-.teacher-month-key .is-selected {
-  border-color: var(--blue-deep);
-  background: var(--blue-deep);
-}
-.teacher-month-key .is-off,
-.teacher-swatch.is-off {
-  background: repeating-linear-gradient(-45deg, transparent 0 2px, var(--lavender) 2px 3px), var(--lavender-soft);
-}
-.teacher-month-key .is-online,
-.teacher-swatch.is-online {
-  background: var(--online-only);
-}
-.teacher-month-key .is-booked {
-  background: repeating-linear-gradient(45deg, transparent 0 2px, rgba(32, 62, 130, 0.42) 2px 3px), var(--raised);
+.teacher-month-key .is-free {
+  background: var(--raised);
 }
 .teacher-month-key .is-free {
   background: var(--raised);
 }
-/* The choice sits at the month's foot (10 November 2026, Dan: "can you
-   literally just click 3 days then the option is there to mark as online
-   only or off?"): how many days, the two things a day can be, and a cross to
-   let them go. Before a day is chosen the same line says what the month is
-   for, so the card never changes height by more than the hours beneath. */
-.teacher-day-choices,
-.teacher-day-hint {
-  display: flex;
-  align-items: center;
-  min-height: 44px;
-  margin: 0.85rem 0 0;
+.teacher-swatch.is-off {
+  background: repeating-linear-gradient(-45deg, transparent 0 2px, var(--lavender) 2px 3px), var(--lavender-soft);
 }
-.teacher-day-choices {
-  flex-wrap: wrap;
-  gap: 0.4rem 0.5rem;
+.teacher-swatch.is-online {
+  background: var(--online-only);
 }
-.teacher-day-choices > strong {
-  margin-right: 0.15rem;
-  font: 600 0.88rem/1.3 var(--ui);
-  white-space: nowrap;
-}
-.teacher-day-choices > .teacher-pencil {
-  margin-left: auto;
-}
-.teacher-day-hint {
-  color: var(--lavender-ink);
-  font: 400 0.82rem/1.4 var(--ui);
-}
-/* On the narrowest phone the count and its cross keep the first line and the
-   two chips take the second, so the cross never drops alone beneath them. */
-@media (max-width: 359px) {
-  .teacher-day-choices > strong { flex: 1 1 calc(100% - 3rem); }
-  .teacher-day-choices > .teacher-pencil { order: 1; margin-left: 0; }
-  .teacher-day-choices > .teacher-day-choice { order: 2; }
-  .teacher-day-choices > .teacher-day-hours { order: 3; }
-}
-/* Pressed, a chip is the deep blue of a chosen tab: every chosen day is that. */
+/* Pressed, a chip is the deep blue of a chosen tab: the hours already are that. */
 .teacher-day-choice[aria-pressed="true"],
 .teacher-day-choice[aria-pressed="true"]:hover:not(:disabled) {
   background: var(--blue-deep);
   color: var(--paper-light);
 }
-/* Hours are the exception, so they come after and beneath: each a value
-   with its pencil, behind the swatch of what it is the hours of. */
-.teacher-day-hours {
-  display: flex;
-  flex: 1 1 100%;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem 1.1rem;
-  min-width: 0;
-}
-.teacher-day-hours .teacher-edit { margin-inline: 0; font: 600 0.82rem/1.5 var(--ui); }
-.teacher-day-hours .teacher-edit > svg { margin-top: 0.4em; }
-.teacher-day-hours .teacher-edit__value > span { display: inline-flex; align-items: center; gap: 0.4rem; }
-.teacher-online-hours { display: flex; min-width: 0; }
-.teacher-online-hours:has(> form) { flex: 1 1 100%; }
-.teacher-online-hours__edit { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem; width: 100%; min-width: 0; }
-.teacher-online-hours__edit .teacher-manual-choice { flex: 1 1 100%; }
-.teacher-online-hours__times { display: grid; flex: 1 1 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; min-width: 0; }
-.teacher-online-hours__edit > .teacher-edit-actions { min-height: 44px; margin-left: auto; }
-.teacher-online-hours__edit > .teacher-inline-edit__error { flex: 1 1 100%; }
-/* What was saved shows on the month itself, so only a failure is written
-   out; the rest is still said to a screen reader. */
-.teacher-month > .teacher-save-state {
-  justify-content: flex-start;
-  min-height: 0;
-  margin: 0.4rem 0 0;
-  text-align: left;
-}
-.teacher-month > .teacher-save-state:not(.is-error) {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-.teacher-month > .teacher-save-state:empty {
-  display: none;
-}
-/* Beside the month, always: any lessons her time off left standing, then the
-   time off ahead, each stretch a cream row like a booked lesson's (2 November
-   2026). Tapping one chooses its days. The same sheet and edge as the month. */
-.teacher-timeoff-ahead {
-  display: grid;
-  gap: var(--gap-card);
-  min-width: 0;
-  border: 1px solid var(--rule);
-  border-radius: var(--squiggle-panel);
-  padding: var(--pad-card);
-  background: var(--sheet);
-}
-/* With nothing ahead it is only a quiet line, not a card. */
-.teacher-timeoff-ahead:not(.has-rows) {
-  border-color: transparent;
-  background: transparent;
-}
-.teacher-timeoff-upcoming {
-  display: grid;
-  gap: 0.45rem;
-}
-.teacher-timeoff-upcoming .teacher-eyebrow { margin: 0; }
-.teacher-timeoff-upcoming ul {
-  display: grid;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.teacher-timeoff-upcoming button {
-  display: grid;
-  width: 100%;
-  min-height: 44px;
-  border: 1px solid var(--rule-soft);
-  border-radius: var(--squiggle-field);
-  padding: 0.6rem 0.9rem;
-  background: var(--paper-light);
-  color: var(--ink);
-  text-align: left;
-  cursor: pointer;
-}
-.teacher-timeoff-upcoming button:hover { border-color: var(--rule); }
-.teacher-timeoff-upcoming strong { font: 600 0.88rem/1.35 var(--ui); }
-.teacher-timeoff-upcoming span { color: var(--lavender-ink); font: 400 0.75rem/1.4 var(--ui); }
-.teacher-timeoff-upcoming__more { margin: 0; color: var(--lavender-ink); font: 400 0.75rem/1.4 var(--ui); }
 @media (max-width: 900px) {
   .teacher-tools-header { gap: 0.75rem; }
   /* Compact labels keep the tools readable on smaller tablets. */
@@ -2559,11 +2434,16 @@
    tab filled. Account controls and Google Meet live inside Profile. */
 @media (max-width: 1000px) {
   .teacher-tabs-scroll { overflow: visible; }
-  /* Six tools form two balanced rows. Weekly hours lives in Timetable. */
-  .teacher-tabs { display: flex; flex-wrap: wrap; width: 100%; }
+  /* Five tools form two rows, three above two, every tab one width: a row of
+     two left over sits centred under the gaps above, never stretched to half
+     the bar each (11 November 2026, Dan: "the spread of the top menu"), and
+     one left alone sits in the middle. Weekly hours lives in Timetable. */
+  .teacher-tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); width: 100%; }
   /* Readable on a phone (9 November 2026): the places' 0.7rem from 390 wide
      up, tracked a little closer, and "Expressions" still fits its third at 320. */
-  .teacher-tabs button { flex: 1 1 calc(33.333% - 4px); min-width: 0; gap: 0.2rem; font-size: clamp(0.6rem, 2.9vw, 0.7rem); letter-spacing: 0.08em; }
+  .teacher-tabs button { grid-column: span 2; min-width: 0; gap: 0.2rem; font-size: clamp(0.6rem, 2.9vw, 0.7rem); letter-spacing: 0.08em; }
+  .teacher-tabs button:nth-of-type(3n + 1):nth-last-of-type(2) { grid-column: 2 / span 2; }
+  .teacher-tabs button:nth-of-type(3n + 1):last-of-type { grid-column: 3 / span 2; }
   .teacher-tabs .teacher-tabs__thumb { display: none; }
   .teacher-tabs button { min-height: 44px; padding-inline: 0.4rem; }
   /* Keep every tool in view as the collection grows. */
@@ -2580,24 +2460,11 @@
   .teacher-workspace .button--small,
   .teacher-lesson-dialog .button--small { min-height: 44px; }
 }
-@media (max-width: 820px) {
-  /* Down to a phone held sideways the card stays beside the month, so a
-     short screen never loses the month behind it. */
-  .teacher-timeoff-layout { grid-template-columns: minmax(0, 1fr) minmax(290px, 0.9fr); gap: 1rem; }
-}
-@media (max-width: 639px) {
-  .teacher-timeoff-layout { grid-template-columns: minmax(0, 1fr); }
-}
-/* On a phone an empty list of what is ahead says nothing worth a line. */
-@media (max-width: 639px) {
-  .teacher-timeoff-ahead:not(.has-rows) { display: none; }
-}
 @media (max-width: 480px) {
   .teacher-month { padding: 0.8rem; }
   .teacher-month-heading { gap: 0.15rem; }
   .teacher-month-grid { gap: 0.2rem; }
   .teacher-month-day { min-height: 54px; }
-  .teacher-month-state { font-size: 0.5rem; }
   .teacher-month-key { column-gap: 0.65rem; }
 }
 /* Her students (12 October 2026, Dan): one row each, who first, then what

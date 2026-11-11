@@ -515,35 +515,33 @@ Migration `0024-cancellation-message.sql` adds that nullable booking field and
 must be applied to each database before deploying this Worker. Her existing
 no-fee cancellation and automatic refund rules remain the same.
 
-The week itself is where Inês takes time off. Choosing a free time offers
-`Add a lesson here` or `Take this time off`; dragging across times on a date
-blocks them all for that date only, and choosing a blocked time reopens it.
-The `Day off` switch above each date blocks the whole day. The `Time off`
-tab shows a month calendar. Tapping dates chooses them, one or several, across
-months; chosen dates survive tab changes. One line at the month's foot then
-offers `Off` and `Online only` (10 November 2026): `Off` takes the chosen
-dates not already off as whole days, and pressed again opens them, removing
-only the whole-day block. A single date that is off shows its hours beneath
-(`All day`, or its breaks), whose pencil opens a draft of one or more timed
-breaks; in the time picker, `00:00` means the end of that day (stored as
-minute 1440). That draft saves explicitly through the same
-`/admin/exceptions/day` endpoint; saving breaks removes that date's whole-day
-block, and `Remove hours off` clears its breaks. Weekly blocks and extra hours
-stay. The month marks whole days off and booked lessons, without displaying
-weekly unavailability or partial blocks from the week. Beside the month,
-`Clashes` lists each lesson to come that time off left standing: booked on a
-day off, inside hours off, or in person inside online-only hours
-(`timeOffClashes` in `src/lib/teacher-calendar.ts`, proved in
-`scripts/test-teacher-calendar.mjs`). It is a read of what the page already
-holds; no lesson is moved or cancelled by taking time off.
-Booked lessons on the chosen dates are listed as cards whose `Change` opens
-that lesson's own move/cancel dialog, and unavailable booking data must be
-retried before applying changes. Each bulk-selected date uses the same queue;
-already-matching days require no write. Reopening a day removes only its
-whole-day block, retaining partial time off and weekly hours. Each change
-saves one request at a time, so quick clicks coalesce
-into the date's latest choice. A failed older save keeps a newer choice queued;
-failure of the latest choice puts that date back as saved and says so.
+The week itself is where Inês takes time off and labels online-only time;
+there is no separate Time off tab (11 November 2026). Pressing a free time,
+or dragging over several on one date, opens a small choice at them: `Add a
+lesson here` (for a single time), `From` and `Until` to the minute, then
+`Time off` or `Online only`. Nothing is written until she chooses. Pressing
+hours already off or online only opens that whole block with its kind
+pressed: the other kind switches it, changed times save, and `Open again`
+opens only the times in the fields. Hours are never both kinds: setting one
+takes the span out of the other (`chooseHours` in
+`src/lib/teacher-calendar.ts`). In the time fields `00:00` as Until means the
+end of that day (stored as minute 1440). Each date has a `Day off` switch,
+which blocks the whole day and takes away its online-only hours, and an
+`Online only` switch, which labels the whole day and reopens a day off,
+keeping its hours off. Hours off save through `/admin/exceptions/day`, as
+before. Weekly blocks and extra hours stay. Under the week, `Clashes` lists
+each lesson to come that time off or online-only hours left standing: booked
+on a day off, inside hours off, or in person inside online-only hours
+(`timeOffClashes`, proved in `scripts/test-teacher-calendar.mjs`). It is a
+read of what the page already holds; no lesson is moved or cancelled by
+taking time off. Each is a card whose `Change` opens that lesson's own
+move/cancel dialog. `Coming up` beside it lists what is set beyond the week
+in view (`timeAhead`), and pressing one turns to that week. Reopening a day
+removes only its whole-day block, retaining partial time off and weekly
+hours. Each date's change saves one request at a time, so quick clicks
+coalesce into the date's latest choice. A failed older save keeps a newer
+choice queued; failure of the latest choice puts that date back as saved and
+says so.
 
 Weekly-hours drafts warn when changed lesson start times overlap an existing
 confirmed lesson in Porto time, including ongoing and future lessons. Saving
@@ -582,8 +580,9 @@ time. Precise existing windows remain available through `Set exact hours` and
 are not rounded by the grid. Drafts survive week/view changes and booking
 actions, and validation prevents the API from silently dropping invalid rows.
 
-The tools bar groups `Students`, `Timetable`, `Time off`,
-`Receipts`, `Expressions` and `Profile`, opening on `Timetable`.
+The tools bar groups `Students`, `Timetable`,
+`Receipts`, `Expressions` and `Profile`, opening on `Timetable`. An old
+`?tab=time-off` link opens Timetable.
 Profile holds her sign-in email change, password reset link, Google Meet
 connection and Sign out. Email changes use the existing new-address confirmation
 flow; password changes use the existing reset email. Google callbacks open Profile
@@ -1747,18 +1746,20 @@ get wrong:
 
 ### Time and availability
 
-**Online-only periods** (10 November 2026). Inês labels days as online only
-on the Time off month: she taps days and presses `Online only` at its foot,
-and edits their hours in place (`All day`, or the same From/Until hours each
-day, on the teaching clock). The service stores periods, not days: each
+**Online-only periods** (10 November 2026; on the Timetable from 11
+November 2026). Inês labels a whole day with its `Online only` switch, and
+some hours from the choice at the times, on the teaching clock. A date may
+hold several online-only spans. The service stores periods, not days: each
 includes both dates and is either all day or one daily window, with `00:00`
 as Until meaning the end of that day. The website converts between the two
-(`labelOnlineOnly`, `onlineOnlyHours` in `src/lib/teacher-calendar.ts`, proved
-in `scripts/test-teacher-calendar.mjs`): neighbouring days with the same
-hours are one period, a period splits around days taken out of it, and each
-save sends the whole list with periods wholly in the past left out. A failed
-save keeps her days chosen. Her Time off month and Timetable show
-online-only time; the Timetable does not edit it.
+(`labelOnlineOnly`, `setOnlineOnlyHours`, `onlineOnlyHours` in
+`src/lib/teacher-calendar.ts`, proved in `scripts/test-teacher-calendar.mjs`):
+neighbouring days with the same hours are one period, a period splits around
+days taken out of it, a date's further spans are periods of their own, and
+each save sends the whole list against the revision it was read at, with
+periods wholly in the past left out. Online only saves as she chooses it,
+one save at a time, quick changes coalescing into the latest list; a failure
+puts the list back as saved and says so under the week.
 
 A student who has chosen In Porto is shown which days could still be had
 online. The calendar reads the online availability beside the Porto one (the

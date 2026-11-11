@@ -15,7 +15,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { CalendarOff, CalendarPlus, ChevronDown, Plus, Trash2, Video, Globe, UserRound } from "lucide-react";
+import { CalendarCheck, CalendarPlus, ChevronDown, Plus, Trash2, Video, Globe, UserRound } from "lucide-react";
 import { addedByTeacher, type AdminBooking, type AvailabilityException, type OnlineOnlyPeriod } from "@/lib/admin-api";
 import { meetingHref } from "@/components/MeetingLink";
 import { formatSlotTime } from "@/lib/booking-api";
@@ -36,8 +36,10 @@ import {
   paintHours,
   parseMinute,
   shiftDate,
+  spanAround,
   spanLabel,
   weeklyBlocks,
+  type HoursKind,
   type Span,
   type TeachingWindow,
   type WeekHours,
@@ -48,7 +50,6 @@ type Props = {
   hours: WeekHours;
   bookings: AdminBooking[];
   exceptions: AvailabilityException[];
-  /** Shown, not edited, here: her weekly hours in them take the online-only colour. */
   onlineOnly: OnlineOnlyPeriod[];
   editing: boolean;
   interval: number;
@@ -61,20 +62,39 @@ type Props = {
   onSelectDay: (index: number) => void;
   onChange: (day: number, windows: TeachingWindow[]) => void;
   onDayOff: (date: string, off: boolean) => void;
-  onBlockTime: (date: string, span: Span, blocked: boolean) => void;
+  /** Online only all day, or not. */
+  onOnlineDay: (date: string, on: boolean) => void;
+  /**
+   * What some hours of a date are: time off, online only, or open again
+   * (`kind` null). `original` is the block she pressed, which they replace.
+   */
+  onChooseHours: (date: string, original: Hours | null, kind: HoursKind | null, span: Span) => void;
   /** A free time chosen for a lesson arranged elsewhere: its date and minute in Porto. */
   onAddLesson?: (date: string, minute: number) => void;
   onSelectBooking: (booking: AdminBooking) => void;
 };
 
-/** The choice a free time offers, beside the time chosen. */
+/** Some hours already off or online only on a date. */
+type Hours = { kind: HoursKind; span: Span };
+
+/**
+ * The choice at the times she pressed or dragged over (11 November 2026,
+ * Dan: "allow ines to drag over times to make it online only too"): add a
+ * lesson there, or what those hours are, their times set exactly first.
+ */
 type SlotMenu = {
   day: number;
+  /** The time it stands at, where focus returns. */
   minute: number;
-  canTakeOff: boolean;
+  /** One time pressed, which can also hold a lesson; a drag cannot. */
+  single: boolean;
+  /** The hours it sets; null where none can be (past, a day off, a weekly block). */
+  span: Span | null;
+  /** The block pressed, already off or online only. */
+  original: Hours | null;
 };
 
-/** `paint` marks lesson starts while editing, and takes time off on dates. */
+/** While editing her hours a drag marks lesson starts (`paint`); on dates it chooses times. */
 type Drag = { day: number; from: number; to: number; paint: boolean };
 
 export function WeeklyTimetable({
@@ -93,7 +113,8 @@ export function WeeklyTimetable({
   onSelectDay,
   onChange,
   onDayOff,
-  onBlockTime,
+  onOnlineDay,
+  onChooseHours,
   onAddLesson,
   onSelectBooking,
 }: Props) {
@@ -105,9 +126,12 @@ export function WeeklyTimetable({
   const [exactDay, setExactDay] = useState(1);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [slotMenu, setSlotMenu] = useState<SlotMenu | null>(null);
+  // The choice's two times as she types them, from and until.
+  const [times, setTimes] = useState({ from: "", until: "" });
+  const [timesError, setTimesError] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
-  // A drag across several times has already taken them off by the time its
-  // click arrives, so that click is spent.
+  // A drag across several times has already opened its choice by the time
+  // its click arrives, so that click is spent.
   const dragHandled = useRef(false);
   const [exactOpen, setExactOpen] = useState(false);
   const exactRef = useRef<HTMLDivElement>(null);
@@ -162,6 +186,7 @@ export function WeeklyTimetable({
     (_, index) => start + index * step,
   );
   const focusMinute = Math.max(start, Math.min(end - step, focus.minute));
+  const menuSpan = slotMenu?.span ? chosenSpan() : null;
 
   useLayoutEffect(() => {
     if (!pendingFocus.current) return;
@@ -251,32 +276,34 @@ export function WeeklyTimetable({
     );
   }
 
-  function takenOff(day: number, minute: number) {
-    return overlapsSpan(
-      dateBlocks(exceptions, dateOf(day)),
-      minute,
-      minute + step,
-    );
+  /** The hours off, or else online only, that the time touches. */
+  function hoursAt(day: number, start: number, end: number): Hours | null {
+    const date = dateOf(day);
+    const off = spanAround(dateBlocks(exceptions, date), start, end);
+    if (off) return { kind: "off", span: off };
+    const online = spanAround(onlineOnlyHours(onlineOnly, date), start, end);
+    return online ? { kind: "online", span: online } : null;
+  }
+
+  function openSlotMenu(menu: SlotMenu) {
+    setTimesError("");
+    setTimes(menu.span ? { from: minuteLabel(menu.span.start), until: menu.span.end === 1440 ? "00:00" : minuteLabel(menu.span.end) } : { from: "", until: "" });
+    setSlotMenu(menu);
   }
 
   function toggle(day: number, minute: number) {
     if (disabled) return;
     if (!editing) {
       setFocus({ day, minute });
-      const date = dateOf(day);
-      // A time gone can only have a lesson recorded in it (15 October 2026, Dan).
-      if (date < today) {
-        if (onAddLesson) setSlotMenu({ day, minute, canTakeOff: false });
+      // A time gone can only have a lesson recorded in it (15 October 2026,
+      // Dan); a day off or a weekly block can still hold one she arranges.
+      if (locked(day, minute)) {
+        if (onAddLesson) openSlotMenu({ day, minute, single: true, span: null, original: null });
         return;
       }
-      // A time already off reopens at once; a free one offers a choice:
-      // add a lesson there, or take it off (12 October 2026, at Dan's
-      // request: tapping a time used to take it off without saying so).
-      if (!locked(day, minute) && takenOff(day, minute)) {
-        onBlockTime(date, { start: minute, end: minute + step }, false);
-        return;
-      }
-      setSlotMenu({ day, minute, canTakeOff: !locked(day, minute) });
+      // Hours already off or online only open as the whole block they are in.
+      const original = hoursAt(day, minute, minute + step);
+      openSlotMenu({ day, minute, single: true, span: original?.span ?? { start: minute, end: minute + step }, original });
       return;
     }
     if (!canPaintHours(hours[day] ?? [], interval)) return openExact(day);
@@ -313,9 +340,7 @@ export function WeeklyTimetable({
       day,
       from: minute,
       to: minute,
-      paint: editing
-        ? !lessonStarts(hours[day] ?? [], interval).some(value => value >= minute && value < minute + step)
-        : !takenOff(day, minute),
+      paint: editing && !lessonStarts(hours[day] ?? [], interval).some(value => value >= minute && value < minute + step),
     });
   }
 
@@ -346,15 +371,15 @@ export function WeeklyTimetable({
       setDrag(null);
       return;
     } else {
+      // Nothing is saved until she chooses what the hours are.
       dragHandled.current = true;
-      onBlockTime(
-        dateOf(drag.day),
-        {
-          start: Math.min(drag.from, drag.to),
-          end: Math.max(drag.from, drag.to) + step,
-        },
-        drag.paint,
-      );
+      openSlotMenu({
+        day: drag.day,
+        minute: Math.max(drag.from, drag.to),
+        single: false,
+        span: { start: Math.min(drag.from, drag.to), end: Math.max(drag.from, drag.to) + step },
+        original: null,
+      });
     }
     setDrag(null);
   }
@@ -396,6 +421,23 @@ export function WeeklyTimetable({
     menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slotMenu]);
+
+  /** The choice's times as minutes, or null until the end is after the start. */
+  function chosenSpan(): Span | null {
+    const span = { start: parseMinute(times.from), end: times.until === "00:00" ? 1440 : parseMinute(times.until) };
+    return Number.isFinite(span.start) && Number.isFinite(span.end) && span.start < span.end ? span : null;
+  }
+
+  function choose(kind: HoursKind | null) {
+    if (!slotMenu?.span) return;
+    const span = chosenSpan();
+    if (!span) { setTimesError("Choose an end after the start."); return; }
+    const { day, original } = slotMenu;
+    closeSlotMenu(true);
+    // The kind it already is, at the same times, changes nothing.
+    if (kind && original?.kind === kind && original.span.start === span.start && original.span.end === span.end) return;
+    onChooseHours(dateOf(day), original, kind, span);
+  }
 
   // It closes on a press elsewhere, Escape or a new week.
   useEffect(() => {
@@ -458,13 +500,25 @@ export function WeeklyTimetable({
     );
   }
 
-  function dayOffSwitch(index: number) {
+  /**
+   * A date is open, off or online only (11 November 2026, Dan: "a selecter
+   * that ticks online only like the day off button"): two switches, and
+   * turning one on turns the other off. Past dates are as they were.
+   */
+  function daySwitches(index: number) {
     const date = shiftDate(weekStart, index);
     const off = offDays.has(date);
-    return <button className="teacher-day-toggle" type="button" role="switch" aria-checked={off}
-      aria-label={`Day off, ${dateLabel(date)}`} disabled={date < today} onClick={() => onDayOff(date, !off)}>
-      <span className="teacher-day-toggle__track" aria-hidden="true" />Day off
-    </button>;
+    const online = !off && onlineAllDay(date);
+    return <span className="teacher-day-switches">
+      <button className="teacher-day-toggle" type="button" role="switch" aria-checked={off}
+        aria-label={`Day off, ${dateLabel(date)}`} disabled={date < today} onClick={() => onDayOff(date, !off)}>
+        <span className="teacher-day-toggle__track" aria-hidden="true" />Day off
+      </button>
+      <button className="teacher-day-toggle teacher-day-toggle--online" type="button" role="switch" aria-checked={online}
+        aria-label={`Online only, ${dateLabel(date)}`} disabled={date < today} onClick={() => onOnlineDay(date, !online)}>
+        <span className="teacher-day-toggle__track" aria-hidden="true" />Online only
+      </button>
+    </span>;
   }
 
   /** A date online only all day; its hours otherwise show in its cells. */
@@ -484,7 +538,7 @@ export function WeeklyTimetable({
 
   return (
     <>
-      {!editing && dayControlHost ? createPortal(dayOffSwitch(activeDay), dayControlHost) : null}
+      {!editing && dayControlHost ? createPortal(daySwitches(activeDay), dayControlHost) : null}
       {editing && exactHost ? createPortal(
         <button
           aria-controls={exactOpen ? exactId : undefined}
@@ -607,7 +661,7 @@ export function WeeklyTimetable({
                     onSelectDay(index);
                     setFocus(current => ({ ...current, day: day.value }));
                   }}>{dayLabel(index)}</button>
-                {!editing ? dayOffSwitch(index) : null}
+                {!editing ? daySwitches(index) : null}
               </div>
             </div>;
           })}
@@ -666,6 +720,12 @@ export function WeeklyTimetable({
                       text: span.note || "Blocked every week",
                       weekly: true,
                     })),
+                    // A day online only all day is named as a day off is, below.
+                    ...(onlineAllDay(date) ? [] : online.map((span) => ({
+                      ...span,
+                      text: `Online only ${spanLabel(span)}`,
+                      weekly: false,
+                    }))),
                   ].filter((span) => span.end > start && span.start < end);
               return (
                 <div
@@ -678,6 +738,8 @@ export function WeeklyTimetable({
                       Day off
                       {offDays.get(date) ? ` · ${offDays.get(date)}` : ""}
                     </span>
+                  ) : onlineAllDay(date) ? (
+                    <span className="teacher-off-label">Online only</span>
                   ) : null}
                   {minutes.map((minute) => {
                     const cellEnd = minute + step;
@@ -735,15 +797,17 @@ export function WeeklyTimetable({
                         </button>
                       );
                     }
-                    const blocked = dragging
-                      ? drag.paint
-                      : overlapsSpan(blocks, minute, cellEnd);
+                    const blocked = overlapsSpan(blocks, minute, cellEnd);
+                    // The times a drag or the open choice holds, as she sets them.
+                    const chosen = dragging || (slotMenu?.span && slotMenu.day === day.value && menuSpan
+                      ? overlapsSpan([menuSpan], minute, cellEnd) : false);
+                    const expanded = slotMenu?.day === day.value && slotMenu.minute === minute;
                     const labelled = labels.some(
                       (span) =>
                         Math.max(span.start, start) >= minute &&
                         Math.max(span.start, start) < cellEnd,
                     );
-                    const onlineHere = usual && !off && !blocked && overlapsSpan(online, minute, cellEnd);
+                    const onlineHere = !off && !blocked && overlapsSpan(online, minute, cellEnd);
                     const fixed = past || off || inWeekly;
                     const blockedHere = !fixed && overlapsSpan(blocks, minute, cellEnd);
                     const reason = past
@@ -755,16 +819,18 @@ export function WeeklyTimetable({
                       <button
                         key={minute}
                         type="button"
-                        className={`teacher-time-slot ${usual && !off && !blocked ? "is-available" : ""} ${onlineHere ? "is-online-only" : ""} ${blocked && !off ? "is-blocked" : ""} ${labelled ? "is-labelled" : ""} ${weeklyClass} ${hourClass}`}
+                        className={`teacher-time-slot ${usual && !off && !blocked ? "is-available" : ""} ${onlineHere ? "is-online-only" : ""} ${blocked && !off ? "is-blocked" : ""} ${chosen ? "is-chosen" : ""} ${labelled ? "is-labelled" : ""} ${weeklyClass} ${hourClass}`}
                         aria-pressed={fixed ? undefined : blocked}
                         aria-disabled={(past && !onAddLesson) || undefined}
-                        aria-haspopup={past ? (onAddLesson ? "menu" : undefined) : blockedHere ? undefined : "menu"}
+                        aria-expanded={fixed && !onAddLesson ? undefined : expanded}
                         aria-label={
                           fixed
                             ? `${minuteLabel(minute)}, ${dateLabel(date)}, ${reason}${past && onAddLesson ? ": add a past lesson" : ""}`
                             : blockedHere
-                              ? `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}, off: reopen`
-                              : `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}${usual ? ", in your weekly hours" : ""}${onlineHere ? ", online only" : ""}: add a lesson or take it off`
+                              ? `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}, off: change`
+                              : onlineHere
+                                ? `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}, online only: change`
+                                : `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}${usual ? ", in your weekly hours" : ""}: add a lesson, time off or online only`
                         }
                         {...pointer}
                         onClick={() => {
@@ -930,24 +996,28 @@ export function WeeklyTimetable({
       {slotMenu
         ? createPortal(
             <div
-              aria-label={`${dateLabel(dateOf(slotMenu.day), { weekday: "long", day: "numeric", month: "long" })}, ${minuteLabel(slotMenu.minute)}`}
+              aria-label={`${dateLabel(dateOf(slotMenu.day), { weekday: "long", day: "numeric", month: "long" })}${slotMenu.span ? "" : `, ${minuteLabel(slotMenu.minute)}`}`}
               className="teacher-slot-menu"
               ref={menuRef}
-              role="menu"
+              role="group"
+              // Tabbing on past its last choice puts it away, as a press elsewhere does.
+              onBlur={(event) => {
+                if (event.relatedTarget && !menuRef.current?.contains(event.relatedTarget as Node)) setSlotMenu(null);
+              }}
               onKeyDown={(event) => {
-                if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+                if ((event.key !== "ArrowDown" && event.key !== "ArrowUp") || (event.target as HTMLElement).tagName === "INPUT") return;
                 event.preventDefault();
-                const items = [...(menuRef.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]") ?? [])];
+                const items = [...(menuRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])];
                 const at = items.indexOf(document.activeElement as HTMLButtonElement);
                 items[(at + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
               }}
             >
               <p className="teacher-slot-menu__when" aria-hidden="true">
-                {dateLabel(dateOf(slotMenu.day), { weekday: "short", day: "numeric", month: "short" })} · {minuteLabel(slotMenu.minute)}
+                {dateLabel(dateOf(slotMenu.day), { weekday: "short", day: "numeric", month: "short" })}{slotMenu.span ? null : ` · ${minuteLabel(slotMenu.minute)}`}
               </p>
-              {onAddLesson ? (
+              {onAddLesson && slotMenu.single ? (
                 <button
-                  role="menuitem"
+                  className="teacher-slot-menu__item"
                   type="button"
                   onClick={() => {
                     const { day, minute } = slotMenu;
@@ -963,19 +1033,34 @@ export function WeeklyTimetable({
                   Add a lesson here
                 </button>
               ) : null}
-              {slotMenu.canTakeOff ? (
-                <button
-                  role="menuitem"
-                  type="button"
-                  onClick={() => {
-                    const { day, minute } = slotMenu;
-                    closeSlotMenu(true);
-                    onBlockTime(dateOf(day), { start: minute, end: minute + step }, true);
-                  }}
-                >
-                  <CalendarOff size={17} aria-hidden="true" />
-                  Take this time off
-                </button>
+              {slotMenu.span ? (
+                <div className="teacher-slot-menu__hours">
+                  {/* Exactly, to the minute, as hours off always could be. */}
+                  <div className="teacher-form teacher-slot-menu__times">
+                    <input aria-invalid={timesError ? true : undefined} aria-label="From" onChange={(event) => { setTimesError(""); setTimes({ ...times, from: event.target.value }); }} type="time" value={times.from} />
+                    <span aria-hidden="true">–</span>
+                    <input aria-invalid={timesError ? true : undefined} aria-label="Until" onChange={(event) => { setTimesError(""); setTimes({ ...times, until: event.target.value }); }} type="time" value={times.until} />
+                  </div>
+                  {timesError ? <p className="teacher-inline-error teacher-slot-menu__error" role="alert">{timesError}</p> : null}
+                  {/* Each wears the swatch of what it makes, as the key does,
+                      and is pressed while the hours already are that. */}
+                  <div className="teacher-slot-menu__kinds">
+                    <button aria-pressed={slotMenu.original?.kind === "off"} className="teacher-quiet teacher-day-choice" onClick={() => choose("off")} type="button">
+                      <i className="teacher-swatch is-off" aria-hidden="true" />
+                      Time off
+                    </button>
+                    <button aria-pressed={slotMenu.original?.kind === "online"} className="teacher-quiet teacher-day-choice" onClick={() => choose("online")} type="button">
+                      <i className="teacher-swatch is-online" aria-hidden="true" />
+                      Online only
+                    </button>
+                  </div>
+                  {slotMenu.original || hoursAt(slotMenu.day, slotMenu.span.start, slotMenu.span.end) ? (
+                    <button className="teacher-slot-menu__item" onClick={() => choose(null)} type="button">
+                      <CalendarCheck size={17} aria-hidden="true" />
+                      Open again
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
             </div>,
             document.body,
