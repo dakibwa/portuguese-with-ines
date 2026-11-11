@@ -55,6 +55,9 @@ with answers separate from questions. Offer Do online and Print worksheet.
 Online submission saves a fixed copy for automatic marking; only Inês sees
 those suggestions until she checks, edits and approves them. Homework to review
 belongs in the relevant student row, as a coral prompt with its count.
+Leaving a student's sheet saves their answers first. If saving fails, the site
+menu closes and focus goes to the error beside their answers so they can retry.
+Reading Terms & privacy opens its dialog without leaving or saving the sheet.
 Inês's new sheet is the booking journey's step structure, one decision per
 step (15 October 2026, Dan: "far too much text"): **What did you work on?**
 with one large lilac `Take a photo` blob (a coral dab carrying the camera, a

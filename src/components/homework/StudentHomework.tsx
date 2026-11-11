@@ -26,6 +26,7 @@ export function StudentHomework({ bookingId, leaveGuard, onBack }: {
   const [notice, setNotice] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [view, setView] = useState<"online" | "print">("online");
+  const errorMessage = useRef<HTMLParagraphElement>(null);
   const active = useRef(true);
   const unsaved = useRef(false);
   const dirty = Boolean(selected && draft && JSON.stringify(draft.answers) !== JSON.stringify(selected.progress.answers));
@@ -33,6 +34,9 @@ export function StudentHomework({ bookingId, leaveGuard, onBack }: {
   const awaitingReview = Boolean(submission && !submission.returnedAt);
   const answered = Object.values(draft?.answers ?? {}).filter(answer => answer.trim()).length;
   const changedSinceSubmission = Boolean(draft && submission && Object.entries(draft.answers).some(([id, answer]) => answer !== (submission.answers[id] ?? "")));
+  useEffect(() => {
+    if (error && !busy) errorMessage.current?.focus();
+  }, [error, busy]);
   // Account navigation waits for a save; a failed save keeps the answers visible.
   useEffect(() => {
     leaveGuard.current = async () => !busy && (!dirty || await save());
@@ -54,12 +58,14 @@ export function StudentHomework({ bookingId, leaveGuard, onBack }: {
     const warn = (event: BeforeUnloadEvent) => { if (unsaved.current) event.preventDefault(); };
     // Next's header links do not unload the document. Save before following one.
     const followLink = (event: MouseEvent) => {
-      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
-      if (!link || link.hasAttribute("download") || (link.target && link.target !== "_self")) return;
+      if (!link || link.hasAttribute("download") || link.hasAttribute("data-terms-privacy") || (link.target && link.target !== "_self")) return;
       const destination = new URL(link.href);
-      if (!/^https?:$/.test(destination.protocol) || (destination.pathname === location.pathname && destination.search === location.search && destination.hash)) return;
-      event.preventDefault(); event.stopImmediatePropagation();
+      if (!/^https?:$/.test(destination.protocol) || (destination.origin === location.origin && destination.pathname === location.pathname && destination.search === location.search && destination.hash)) return;
+      // The menu still needs its click to close and release the page. A failed
+      // save can then show its error beside the answers instead of behind it.
+      event.preventDefault();
       void leaveGuard.current?.().then(allowed => { if (allowed) window.location.assign(destination.href); });
     };
     window.addEventListener("beforeunload", warn);
@@ -105,7 +111,7 @@ export function StudentHomework({ bookingId, leaveGuard, onBack }: {
           {awaitingReview ? <Send size={15} aria-hidden="true" /> : <CheckCircle2 size={15} aria-hidden="true" />}{awaitingReview ? `Sent to ${TUTOR_NAME}` : "Done"}
         </span> : <span className="homework-status homework-status--quiet">{dirty ? "Unsaved answers" : draft.updatedAt ? "Saved" : "Ready to start"}</span>}
       </div>
-      {error ? <p className="homework-error" role="alert">{error}</p> : null}
+      {error ? <p className="homework-error" ref={errorMessage} role="alert" tabIndex={-1}>{error}</p> : null}
       {/* Approved by Inês: as plain a Done as she sees on her side. */}
       {submission?.returnedAt && !changedSinceSubmission ? <div className="homework-done">
         <span className="homework-done__dab" aria-hidden="true"><CheckCircle2 size={26} /></span>

@@ -285,8 +285,24 @@ try {
     await backToLessons();
     await expect(page.locator(".student-homework [role=alert]")).toContainText("Answers could not be saved");
     await expect(page.locator(".student-homework textarea").nth(2)).toHaveValue("café");
-    answerSaveFails = false;
     // A student's bar keeps the site's pages behind its menu at every width.
+    await page.getByRole("button", { name: "Open menu", exact: true }).click();
+    await page.getByRole("dialog", { name: "Site navigation" }).getByRole("link", { name: "Approach", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Site navigation" })).toBeHidden();
+    await expect(page.locator(".student-homework [role=alert]")).toBeVisible();
+    await expect(page.locator(".student-homework [role=alert]")).toBeFocused();
+    await expect(page.locator(".student-homework textarea").nth(2)).toHaveValue("café");
+    await page.locator(".my-lessons__homework").screenshot({ path: `${output}/student-save-error-${width}.png` });
+    // Reading the terms is an in-page dialog and must not trigger a save or
+    // leave the unfinished worksheet, even while the service is unavailable.
+    const homeworkUrl = page.url();
+    await page.getByRole("link", { name: "Terms & privacy", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Terms & privacy", exact: true })).toBeVisible();
+    assert.equal(page.url(), homeworkUrl);
+    assert.equal(homework.progress.answers.q3, "cafe", "Reading terms has not saved the unfinished answer");
+    await page.getByRole("button", { name: "Close terms & privacy", exact: true }).click();
+    await expect(page.locator(".student-homework textarea").nth(2)).toHaveValue("café");
+    answerSaveFails = false;
     await page.getByRole("button", { name: "Open menu", exact: true }).click();
     await page.getByRole("dialog", { name: "Site navigation" }).getByRole("link", { name: "Approach", exact: true }).click();
     await page.waitForURL("**/approach/");
