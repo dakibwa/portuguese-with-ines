@@ -1053,24 +1053,33 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 
 /* A visitor's way in, in the booking page's bar: beside the menu button,
    leading the menu instead on a phone, and gone once the page is a
-   student's, whose own menu holds their lessons. Underlined because it is
-   not a page; never a button of its own. */
+   student's, whose own menu holds their lessons. A small cream button in
+   the site's hand-cut shape (11 November 2026, Dan, of underlined words:
+   "can this be a stylised button"), as Join Meet is on her blue card;
+   pointed at, it turns coral as that one and the header's Booking do. */
 .site-header__sign-in {
   position: relative;
   z-index: 2;
   display: inline-flex;
   flex: none;
   align-items: center;
-  min-height: 44px;
+  min-height: 42px;
   margin-left: auto;
-  color: var(--paper);
+  border-radius: var(--squiggle-pill);
+  padding: 0 1.25rem;
+  background: var(--paper-light);
+  color: var(--blue-deep);
   font: 700 0.72rem/1 var(--ui);
   letter-spacing: 0.14em;
-  text-decoration: underline;
-  text-decoration-thickness: 1.5px;
   text-transform: uppercase;
-  text-underline-offset: 6px;
   white-space: nowrap;
+  transition: background-color var(--motion-surface) var(--motion-ease), color var(--motion-surface) var(--motion-ease);
+}
+
+.site-header__sign-in:hover,
+.site-header__sign-in:focus-visible {
+  background: var(--coral-action);
+  color: var(--paper-light);
 }
 
 .site-header__sign-in:focus-visible {
