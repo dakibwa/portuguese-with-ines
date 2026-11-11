@@ -3296,7 +3296,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     return (
       <div className={`booking-bar${inConfirmation ? " booking-bar--review" : ""}`}>
         {!inConfirmation ? (
-          <div className={`booking-bar__head${student ? " booking-bar__head--account" : ""}`}>
+          <div className={`booking-bar__head${student ? " booking-bar__head--account" : " booking-bar__head--quiet"}`}>
             {/* Signed in, the account heads booking: its name's menu at every
                 width, which holds the way back to Your lessons. Booking is not
                 one of the account's places, so the places stay folded here
@@ -3314,18 +3314,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 onSignOut={signOut}
                 upcomingCount={upcomingCount}
               />
-            ) : (
-              // Every visitor can sign in at once, not only one who has
-              // before (11 November 2026, Dan: "can they just sign in
-              // immediately too?"): a student Inês added comes to sign in,
-              // not to book.
-              <p className="booking-bar__sign-in">
-                <span className="booking-bar__sign-in-note">Already booked?</span>
-                <button className="button button--coral button--compact" onClick={openLessonsJourney} type="button">
-                  Sign in
-                </button>
-              </p>
-            )}
+            ) : null}
+            {/* Signed out, the way in is the site header's `Sign in`, on every
+                page (11 November 2026, Dan, of a coral `Already booked? Sign
+                in` here: "I don't like this"). */}
           </div>
         ) : null}
         <div className="booking-bar__choices" role="group" aria-label="Your lesson">

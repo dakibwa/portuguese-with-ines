@@ -345,25 +345,18 @@ for (const route of routes) {
       }
     }
 
-    if (route.id === "booking" && viewport.id === "desktop") {
-      const bannerArtwork = await page.evaluate(() => {
-        const intro = document.querySelector(".booking-intro")?.getBoundingClientRect();
-        const corner = document.querySelector(".booking-intro__time-window")?.getBoundingClientRect();
-        return {
-          intro: intro ? { top: intro.top, right: intro.right } : null,
-          corner: corner ? { top: corner.top, right: corner.right, width: corner.width } : null,
-          extras: document.querySelectorAll(".booking-intro ul, .booking-intro p").length
-        };
-      });
-      if (
-        !bannerArtwork.intro ||
-        !bannerArtwork.corner ||
-        bannerArtwork.corner.width < 220 ||
-        bannerArtwork.corner.top >= bannerArtwork.intro.top ||
-        bannerArtwork.corner.right <= bannerArtwork.intro.right ||
-        bannerArtwork.extras
-      ) {
-        throw new Error(`The booking banner should be its title and a cropped top-right splat, nothing more: ${JSON.stringify(bannerArtwork)}.`);
+    if (route.id === "booking") {
+      // A visitor's booking page is the one blue bar: the wordmark beside
+      // Book a Lesson, their Sign in and the menu button, with no band.
+      const bar = page.locator(".site-header.is-bar");
+      const titles = bar.locator(".site-header__title span:visible");
+      const signIn = bar.getByRole("link", { name: "Sign in", exact: true });
+      const band = await page.locator(".booking-intro").boundingBox();
+      if ((await titles.count()) !== 1 || (await titles.innerText()).trim() !== "Book a Lesson" ||
+          !await signIn.isVisible() || !(await signIn.getAttribute("href")).endsWith("/book/?view=lessons") ||
+          !await bar.getByRole("button", { name: "Open menu", exact: true }).isVisible() ||
+          await page.locator(".site-nav").count() || (band && band.height > 2)) {
+        throw new Error(`${viewport.id}: booking should be headed by the one bar, Book a Lesson with Sign in and the menu, and no band.`);
       }
     }
 
@@ -1706,7 +1699,7 @@ const desktopAccountLayout = await accountPage.evaluate(() => {
   };
   return {
     composition: bounds(".booking-composition"),
-    bar: bounds(".site-header.is-account-bar .site-header__inner"),
+    bar: bounds(".site-header.is-bar .site-header__inner"),
     provider: bounds(".booking-provider"),
     calendar: bounds("#lesson-calendar .calendar-panel")
   };
@@ -2890,7 +2883,16 @@ if (!(await accountPage.evaluate(() => window.localStorage.getItem("ines-account
 // are already open on wide cards; Sign out is always in Your details.
 await chooseAccountAction("Edit details");
 await accountPanel.locator(".my-lessons__details").getByRole("button", { name: "Sign out", exact: true }).click();
-await accountPage.locator("#lesson-calendar .booking-bar__sign-in").waitFor();
+// Signed out, the way back in is the bar's Sign in.
+const headerSignIn = accountPage.locator(".site-header").getByRole("link", { name: "Sign in", exact: true });
+await headerSignIn.waitFor();
+const signInHref = new URL(await headerSignIn.getAttribute("href"), base);
+if (`${signInHref.pathname}${signInHref.search}` !== "/book/?view=lessons") {
+  throw new Error(`The bar's Sign in should open Your lessons: ${signInHref}`);
+}
+if (await accountPage.locator("#lesson-calendar .booking-bar__head").getByRole("button", { name: "Sign in" }).count()) {
+  throw new Error("The booking card should have no sign-in of its own.");
+}
 await accountPanel.waitFor({ state: "detached" });
 if (await accountPage.evaluate(() => window.localStorage.getItem("ines-account-snapshot"))) {
   throw new Error("Signing out should forget the remembered account.");
