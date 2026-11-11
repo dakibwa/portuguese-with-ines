@@ -6825,6 +6825,8 @@ await test("a hand-set-up student's account lists exactly their outstanding less
     const middle = past("oona-middle", "2026-08-25T10:00:00.000Z");
     const oldest = past("oona-oldest", "2026-08-18T10:00:00.000Z");
     const newest = past("oona-newest", "2026-09-01T10:00:00.000Z");
+    // One she added after it happened, kept before those carried a price.
+    const record = past("oona-record", "2026-08-17T10:00:00.000Z", ", payment_status='recorded', amount_cents=NULL");
     past("oona-paid-by-hand", "2026-08-19T10:00:00.000Z", ", payment_consent_version='paid-by-hand'");
     past("oona-cancelled", "2026-08-20T10:00:00.000Z", ", status='cancelled'");
     past("oona-free", "2026-08-21T10:00:00.000Z", ", payment_status='free'");
@@ -6835,7 +6837,7 @@ await test("a hand-set-up student's account lists exactly their outstanding less
     const ownToken = await createSession(id, env.BOOKING_TOKEN_SECRET);
     const me = async () => (await (await call("/me", { method: "GET", token: ownToken })).json()).outstandingLessons;
     const outstanding = await me();
-    assert.deepEqual(outstanding, [oldest, middle, newest]);
+    assert.deepEqual(outstanding, [record, oldest, middle, newest]);
     assert.ok(toCome.every((lesson) => !outstanding.includes(lesson.id)), "lessons still to come are not outstanding");
     const preview = await call("/me/card/preview", { token: ownToken, body: { bookingIds: outstanding } });
     assert.equal(preview.status, 200, await preview.clone().text());

@@ -179,14 +179,12 @@ try {
     await expect(owedStep.locator(".card-terms__lessons--then")).toHaveText("Every Tuesday, 17:00€15");
     await expect(owedStep.getByText("Already paid Inês for one? Tap it to leave it out.")).toBeVisible();
     assert.deepEqual(owed.posts.find(post => post.endpoint === "/me/card/preview")?.body, { bookingIds: owedIds });
-    await owedStep.screenshot({ path: `tmp/qa/transition-kit/owed-${width}.png` });
     const owedTiles = owedStep.locator(".card-terms__lesson--choice");
     await owedTiles.first().click();
     await expect(owedTiles.first()).toHaveAttribute("aria-pressed", "false");
     await expect(owedStep.locator(".card-terms__total")).toHaveText("Charged now€15");
     await owedStep.getByRole("button", { name: "I authorise card payments for this and future lessons" }).click();
     assert.ok(await noOverflow(owed.page));
-    await owedStep.screenshot({ path: `tmp/qa/transition-kit/owed-left-out-${width}.png` });
     await owedStep.getByRole("button", { name: "Agree & confirm payments" }).click();
     await owed.page.waitForURL(/checkout\.stripe\.com/);
     assert.deepEqual(owed.posts.find(post => post.endpoint === "/me/card")?.body, { consent: true, bookings: [approvedBookings[1]], bookingConsent: true });
@@ -208,11 +206,9 @@ try {
     const standingStep = standing.page.locator(".card-prompt");
     await expect(standingStep.getByRole("button", { name: "Authorise payments" })).toBeDisabled({ timeout: 15000 });
     await expect(standing.page.locator(".lesson-overview")).toBeHidden();
-    await standingStep.screenshot({ path: `tmp/qa/transition-kit/standing-${width}.png` });
     await standingStep.locator(".card-terms__lesson--choice").click();
     await expect(standingStep.locator(".card-terms__agreement")).toHaveCount(0);
     await expect(standingStep.getByRole("button", { name: "Authorise payments" })).toHaveCount(0);
-    await standingStep.screenshot({ path: `tmp/qa/transition-kit/standing-left-out-${width}.png` });
     await standingStep.getByRole("button", { name: "See your lessons", exact: true }).click();
     await expect(standingStep).toHaveCount(0);
     await expect(standing.page.locator(".lesson-overview")).toBeVisible();
