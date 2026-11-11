@@ -1236,11 +1236,15 @@ while validation runs. Inês's explicit calendar additions retain their override
   `cancelRemaining` cancels them too. It applies the same payment policy as an
   individual cancellation: a future paid lesson is refunded, an uncharged one
   is never charged, and a lesson inside the 14-hour window remains booked. A selected
-  weekly lesson exposes `Manage weekly lessons`, keeps both outcomes visibly
-  distinct, and asks for confirmation before calling the stop endpoint.
+  weekly lesson's `Cancel`, set to `Every week`, offers `Cancel all booked
+  lessons` (`cancelRemaining: true`) and a quiet `Stop repeating` (`false`);
+  the step states what each does and is itself the confirmation.
 - **Moving a recurrence moves every future confirmed occurrence together.**
   The student chooses the new weekly anchor, length, and location through the
-  same compact change-booking controls. Every proposed week is checked before
+  same compact change-booking controls, under `Change` set to `Every week`. It
+  starts on the run's first lesson outside the notice window, the anchor the
+  Worker lays the run out from, so keeping that time keeps every week in
+  place; a later lesson opened never shifts the earlier ones. Every proposed week is checked before
   one guarded database update moves the run and its series recipe; a newly
   claimed slot or concurrent individual change moves none of it. Each planned
   occurrence is guarded by its sequence as well as its prior slot.

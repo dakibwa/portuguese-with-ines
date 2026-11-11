@@ -108,6 +108,37 @@ import { staticLessonTypes } from "@/lib/lesson-products";
 const weekdayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const weekdayNames = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
 
+/**
+ * This lesson, or every week of its run, as Inês's own lesson panel chooses
+ * (11 November 2026): the site's slider, starting on This lesson. Where the
+ * lesson itself can't be changed, only its run can, so This lesson is closed.
+ */
+function WeekChoice({ verb, everyWeek, lessonClosed = false, disabled, name, onChange }: {
+  verb: string; everyWeek: boolean; lessonClosed?: boolean; disabled: boolean; name: string; onChange: (everyWeek: boolean) => void;
+}) {
+  return (
+    <fieldset className="lesson-week-choice">
+      <legend className="visually-hidden">{verb}</legend>
+      <div className={`segmented${everyWeek ? " segmented--second" : ""}`}>
+        <span aria-hidden="true" className="segmented__thumb" />
+        {([[false, "This lesson"], [true, "Every week"]] as const).map(([value, label]) => (
+          <label className={everyWeek === value ? "is-active" : ""} key={label}>
+            <input
+              checked={everyWeek === value}
+              disabled={disabled || (!value && lessonClosed)}
+              name={name}
+              onChange={() => onChange(value)}
+              type="radio"
+              value={value ? "every-week" : "this-lesson"}
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 type Step = "day" | "time" | "details";
 
 /** A lesson at a price Inês set to €0 says so beside its length and place (16 October 2026). */
@@ -1081,11 +1112,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     | "reschedule"
     | "reschedule-sequence"
     | "confirm-cancel"
-    | "sequence"
-    | "confirm-stop-sequence"
-    | "confirm-cancel-sequence"
     | "pay-by-card"
   >("view");
+  // Cancel's `This lesson | Every week`, which starts on This lesson.
+  const [cancelEveryWeek, setCancelEveryWeek] = useState(false);
   const [manageLoading, setManageLoading] = useState(false);
   // The lesson as the calendar already knows it, shown while its full details
   // load, so opening it is immediate and the dialog never changes size.
@@ -1168,6 +1198,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     : type.price_cents;
   const managedPrice = managed && selectedManagedType ? managedPriceOf(selectedManagedType) : undefined;
   const isManagedReschedule = manageMode === "reschedule" || manageMode === "reschedule-sequence";
+  // A step opening takes focus; This lesson and Every week are one step, so
+  // the slider keeps it.
+  const manageStep = isManagedReschedule ? "change" : manageMode;
   // Changing a lesson opens on the lesson as it stands: until its time,
   // length or place differs there is nothing to save, so Save changes waits.
   const managedChangeIsEmpty = Boolean(
@@ -1520,8 +1553,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
   const openManaged = useCallback(async (
     token: string,
-    seriesId: string | null = null,
-    initialMode: "view" | "sequence" = "view"
+    seriesId: string | null = null
   ) => {
     if (!token) return;
     const request = ++managedRequest.current;
@@ -1535,7 +1567,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     setManageOutcome("");
     setLessonSignInLink({ state: "idle", error: "" });
     setManagedCalendarPlaceholderHeight(0);
-    setManageMode(initialMode);
+    setManageMode("view");
     setSelectedSlot("");
     try {
       const result = await fetchBooking(token);
@@ -1546,7 +1578,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         setManagedLocation(result.booking.location);
         // Read here rather than from render state: this callback outlives renders.
         setSelectedDate(dateKeyIn(new Date(result.booking.startAt), result.booking.location === "porto" ? BOOKING_TIME_ZONE : browserTimeZone()));
-        setManageMode(initialMode);
+        setManageMode("view");
         setManageLoading(false);
       });
     } catch (caught) {
@@ -1658,11 +1690,43 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       : lessonTypeId;
   const availabilityLocation = isManagedReschedule ? managedLocation : form.location;
 
+  const resolvedManagedSeriesId = managedSeriesId ?? myBookings.find((booking) => booking.manageToken === managedToken)?.seriesId ?? null;
+  const activeManagedSeries = resolvedManagedSeriesId
+    ? lessonSeries.find((entry) => entry.id === resolvedManagedSeriesId) ?? null
+    : null;
+  /*
+   * One Change and one Cancel on every lesson (11 November 2026, Dan); a
+   * confirmed lesson of a running weekly repeat adds `This lesson | Every
+   * week` to each. A lesson that can't be changed itself (past, or locked
+   * inside the notice) still reaches its run's choices, with This lesson closed.
+   */
+  const weeklyRun = Boolean(activeManagedSeries && managed?.booking.status === "confirmed");
+  const lessonChangeable = Boolean(managed && managed.booking.status === "confirmed" && !managed.isPast && !managed.changeLocked);
+  const runLessons = weeklyRun
+    ? myBookings
+        .filter((booking) => booking.seriesId === resolvedManagedSeriesId && booking.status === "confirmed" && !booking.isPast && Date.parse(booking.startAt) > clock)
+        .sort((a, b) => a.startAt.localeCompare(b.startAt))
+    : [];
+  // Inside the notice, a lesson stays where it is when its run moves; the
+  // account's read says which (a free lesson's it can't, and the Worker still keeps it).
+  const runKept = runLessons.filter((booking) => booking.sameDayFeeApplies || booking.changeLocked);
+  /*
+   * The Worker lays a moved run out week by week from the time chosen, so
+   * Every week starts on the run's first lesson that can still move: keeping
+   * that time keeps every week where it is. The lesson opened may be a later one.
+   */
+  const runFirst = runLessons.find((booking) => !runKept.includes(booking)) ?? null;
+  const changingEveryWeek = manageMode === "reschedule-sequence";
+  // The lesson as it stands for this change: its time stays chosen until another is picked.
+  const currentManaged = managed
+    ? changingEveryWeek && runFirst
+      ? { startAt: runFirst.startAt, endAt: runFirst.endAt, lessonTypeId: runFirst.lessonType.id }
+      : { startAt: managed.booking.startAt, endAt: managed.booking.endAt, lessonTypeId: managed.booking.lessonType.id }
+    : null;
+
   // The lesson being moved, so availability does not count it against itself.
   const movingToken = isManagedReschedule ? managedToken : "";
-  const movingSeriesId = manageMode === "reschedule-sequence"
-    ? managedSeriesId ?? myBookings.find((booking) => booking.manageToken === managedToken)?.seriesId ?? ""
-    : "";
+  const movingSeriesId = changingEveryWeek ? resolvedManagedSeriesId ?? "" : "";
 
   const loadAvailability = useCallback(
     (signal?: AbortSignal) => {
@@ -1948,29 +2012,59 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // A failed lookup says nothing about the weeks: its own alert shows instead.
   const noFreeTimes = intent === "book" && !managed && !selectedDate && !loadingSlots && !availabilityError && Boolean(lessonType) &&
     !(restrictedWeeks ? displayedCalendarWeeks : rangeWeeks).some((week) => week.cells.some((cell) => selectableSlots(cell.key).length));
-  const managedDate = managed ? dateKeyIn(new Date(managed.booking.startAt), viewZone) : "";
+  const managedDate = currentManaged ? dateKeyIn(new Date(currentManaged.startAt), viewZone) : "";
   const shouldShowCurrentManagedSlot = Boolean(
     managed &&
+    currentManaged &&
     isManagedReschedule &&
     selectedDate === managedDate &&
-    (managedLessonTypeId || managed.booking.lessonType.id) === managed.booking.lessonType.id &&
+    (managedLessonTypeId || currentManaged.lessonTypeId) === currentManaged.lessonTypeId &&
     !(managedLocation === "porto" && managed.booking.location === "online" && currentSlotOnlineOnly) &&
-    !rawDaySlots.some((slot) => slot.startAt === managed.booking.startAt)
+    !rawDaySlots.some((slot) => slot.startAt === currentManaged.startAt)
   );
-  const daySlots = shouldShowCurrentManagedSlot && managed
+  const daySlots = shouldShowCurrentManagedSlot && currentManaged
     ? [
         ...rawDaySlots,
-        { startAt: managed.booking.startAt, endAt: managed.booking.endAt }
+        { startAt: currentManaged.startAt, endAt: currentManaged.endAt }
       ].sort((a, b) => a.startAt.localeCompare(b.startAt))
     : rawDaySlots;
-  const managedStartAt = shouldShowCurrentManagedSlot && managed ? managed.booking.startAt : "";
+  const managedStartAt = shouldShowCurrentManagedSlot && currentManaged ? currentManaged.startAt : "";
+  const currentStartAt = currentManaged?.startAt ?? "";
+  const currentLessonTypeId = currentManaged?.lessonTypeId ?? "";
   useEffect(() => {
     if (!managed || !isManagedReschedule || loadingSlots || availabilityError || !selectedSlot) return;
-    const keepingTime = selectedSlot === managed.booking.startAt &&
-      (managedLessonTypeId || managed.booking.lessonType.id) === managed.booking.lessonType.id &&
+    const keepingTime = selectedSlot === currentStartAt &&
+      (managedLessonTypeId || currentLessonTypeId) === currentLessonTypeId &&
       !(managedLocation === "porto" && managed.booking.location === "online" && currentSlotOnlineOnly);
     if (!keepingTime && !Object.values(slotsByDate).some(slots => slots.some(slot => slot.startAt === selectedSlot))) setSelectedSlot("");
-  }, [managed, isManagedReschedule, loadingSlots, availabilityError, selectedSlot, managedLessonTypeId, managedLocation, currentSlotOnlineOnly, slotsByDate]);
+  }, [managed, isManagedReschedule, loadingSlots, availabilityError, selectedSlot, managedLessonTypeId, managedLocation, currentSlotOnlineOnly, slotsByDate, currentStartAt, currentLessonTypeId]);
+  // What the change will do, a dab each, above its one button, as Inês's own
+  // lesson panel says it. Every week always names the weekly time it sets
+  // and the date it runs from, since the run is laid out from there.
+  const managedChangeDabs: string[] = [];
+  if (managed && isManagedReschedule && selectedSlot && !managedChangeIsEmpty) {
+    const lengthChanges = Boolean(selectedManagedType && selectedManagedType.id !== managed.booking.lessonType.id);
+    const placeChanges = managedLocation !== managed.booking.location;
+    const where = managedLocation === "online" ? "online" : `to ${TUTOR_CITY}`;
+    const length = selectedManagedType && managedPrice !== undefined ? `${selectedManagedType.duration_minutes} mins, ${formatPriceCents(managedPrice)}` : "";
+    if (changingEveryWeek) {
+      const weekday = weekdayNames[new Date(`${dateKeyIn(new Date(selectedSlot), viewZone)}T12:00:00Z`).getUTCDay()];
+      managedChangeDabs.push(`${weekday} at ${lessonTime(selectedSlot, viewZone)}, from ${formatShortDay(selectedSlot, viewZone)}`);
+      if (lengthChanges && length) managedChangeDabs.push(`Each becomes ${length}`);
+      // Said where it applies: a lesson of the run already at that length.
+      if (lengthChanges && (!runLessons.length || runLessons.some((booking) => booking.lessonType.id === selectedManagedType?.id))) {
+        managedChangeDabs.push("Lessons already this length keep their prices");
+      }
+      if (placeChanges) managedChangeDabs.push(`Each moves ${where}`);
+      for (const kept of runKept) {
+        managedChangeDabs.push(`${formatLongDate(kept.startAt, viewZone)} at ${lessonTime(kept.startAt, viewZone)} stays where it is, as it’s less than ${noticeHours} hours away`);
+      }
+    } else {
+      if (selectedSlot !== managed.booking.startAt) managedChangeDabs.push(`Moves to ${formatShortDay(selectedSlot, viewZone)} at ${lessonTime(selectedSlot, viewZone)}`);
+      if (lengthChanges && length) managedChangeDabs.push(`Becomes ${length}`);
+      if (placeChanges) managedChangeDabs.push(`Moves ${where}`);
+    }
+  }
   /*
    * Inês's day divides at 14:00 in Porto. On another clock it divides at that
    * same moment, unless her day runs across the student's midnight, when it
@@ -2054,10 +2148,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // Booking with a day chosen: the times sit beside the calendar, or on a
   // phone take its place.
   const bookingDateChosen = intent === "book" && !managed && Boolean(selectedDate && lessonType);
-  const resolvedManagedSeriesId = managedSeriesId ?? myBookings.find((booking) => booking.manageToken === managedToken)?.seriesId ?? null;
-  const activeManagedSeries = resolvedManagedSeriesId
-    ? lessonSeries.find((entry) => entry.id === resolvedManagedSeriesId) ?? null
-    : null;
   const manageDialogOpen = Boolean(manageLoading || manageError || managed);
   const rebookOffered = Boolean(managed && managed.booking.status === "cancelled" && managed.canRebook);
   const offersAccountLink = Boolean(managed && !student && postpay && managed.booking.addedByTeacher &&
@@ -2711,7 +2801,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       releaseScroll();
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [dismissManagedDialog, isManagedReschedule, manageDialogOpen, manageMode]);
+  }, [dismissManagedDialog, isManagedReschedule, manageDialogOpen, manageStep]);
 
   // Where the change form sits beside the calendar (the booking column's
   // two-column layout, `@container booking (min-width: 700px)`), there is room
@@ -2724,43 +2814,53 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     return column.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) >= 700;
   }
 
-  function beginManagedReschedule() {
-    if (!managed) return;
-    const managedDate = dateKeyIn(new Date(managed.booking.startAt), zoneOf(managed.booking));
-    const isInCalendar = bookingRangeWeeks.some((week) => week.cells.some((cell) => cell.key === managedDate));
+  /**
+   * The one change screen, for this lesson or (a weekly lesson) every week
+   * from the run's first lesson that can move. It opens on the lesson as it
+   * stands, its time chosen, so another length or place keeps the time.
+   */
+  function beginManagedReschedule(everyWeek = false) {
+    if (!managed || (everyWeek && !weeklyRun)) return;
+    const from = everyWeek && runFirst ? runFirst : managed.booking;
+    const fromDate = dateKeyIn(new Date(from.startAt), zoneOf(managed.booking));
+    const isInCalendar = bookingRangeWeeks.some((week) => week.cells.some((cell) => cell.key === fromDate));
     const calendarHeight = managedRescheduleRef.current?.getBoundingClientRect().height ?? 0;
     transitionBooking(() => {
       setManagedCalendarPlaceholderHeight(calendarHeight);
-      setCalendarPageStart(isInCalendar ? weekKeyOf(managedDate) : "");
+      setCalendarPageStart(isInCalendar ? weekKeyOf(fromDate) : "");
       setAvailabilityRequest((current) => current + 1);
-      setManageMode("reschedule");
+      setManageMode(everyWeek ? "reschedule-sequence" : "reschedule");
       setManagedLessonTypeId(managed.booking.lessonType.id);
       setManagedLocation(managed.booking.location);
-      setSelectedDate(isInCalendar ? managedDate : "");
-      setSelectedSlot(isInCalendar ? managed.booking.startAt : "");
+      setSelectedDate(isInCalendar ? fromDate : "");
+      setSelectedSlot(isInCalendar ? from.startAt : "");
       setCalendarWeekCount(isInCalendar && !changeFormBesideCalendar() ? 1 : 4);
       setManageError("");
       setLoadingSlots(true);
     });
   }
 
-  function beginManagedSeriesReschedule() {
-    if (!managed || !activeManagedSeries) return;
-    const managedDate = dateKeyIn(new Date(managed.booking.startAt), zoneOf(managed.booking));
-    const isInCalendar = bookingRangeWeeks.some((week) => week.cells.some((cell) => cell.key === managedDate));
-    const calendarHeight = managedRescheduleRef.current?.getBoundingClientRect().height ?? 0;
+  /**
+   * `This lesson | Every week` on the change screen: the length and place
+   * chosen stay, and nothing is sent. A time still the current one follows
+   * to the other's current time; one picked stays picked.
+   */
+  function chooseChangeScope(everyWeek: boolean) {
+    if (!managed || !weeklyRun || everyWeek === changingEveryWeek) return;
+    const from = everyWeek && runFirst ? runFirst : managed.booking;
+    const keptCurrent = !selectedSlot || selectedSlot === currentStartAt;
+    const fromDate = dateKeyIn(new Date(from.startAt), viewZone);
+    const isInCalendar = bookingRangeWeeks.some((week) => week.cells.some((cell) => cell.key === fromDate));
     transitionBooking(() => {
-      setManagedCalendarPlaceholderHeight(calendarHeight);
-      setCalendarPageStart(isInCalendar ? weekKeyOf(managedDate) : "");
-      setAvailabilityRequest((current) => current + 1);
-      setManageMode("reschedule-sequence");
-      setManagedLessonTypeId(managed.booking.lessonType.id);
-      setManagedLocation(managed.booking.location);
-      setSelectedDate(isInCalendar ? managedDate : "");
-      setSelectedSlot(isInCalendar ? managed.booking.startAt : "");
-      setCalendarWeekCount(isInCalendar && !changeFormBesideCalendar() ? 1 : 4);
+      setManageMode(everyWeek ? "reschedule-sequence" : "reschedule");
       setManageError("");
-      setLoadingSlots(true);
+      if (keptCurrent && isInCalendar) {
+        if (selectedDate !== fromDate) setCalendarPageStart(weekKeyOf(fromDate));
+        setSelectedDate(fromDate);
+        // At another length it stays only while the times say it is free.
+        setSelectedSlot(from.startAt);
+      }
+      // The times are read again with or without the run (movingSeriesId).
     });
   }
 
@@ -3126,7 +3226,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             {preview.sameDayFeeAutomatic ? " Your saved card is charged when you confirm." : ""}
           </p>
         ) : null}
-        {changeable ? (
+        {changeable || (activeManagedSeries && preview.status === "confirmed") ? (
           <div className="lesson-manage-dialog__actions" inert>
             <button className="button button--coral" type="button">Change</button>
             <button className="button button--quiet" type="button">Cancel</button>
@@ -3143,9 +3243,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               </strong>
               {activeManagedSeries ? null : <span>The lessons already booked stay in your calendar.</span>}
             </div>
-            {activeManagedSeries ? (
-              <button className="button button--outline button--compact" type="button">Manage weekly lessons</button>
-            ) : null}
           </div>
         ) : null}
       </>
@@ -3729,13 +3826,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   </p>
                   <h2 id="lesson-manage-heading">
                     {manageMode === "confirm-cancel"
-                      ? "Cancel this lesson?"
+                      ? cancelEveryWeek ? "Cancel weekly lessons?" : "Cancel this lesson?"
                       : manageMode === "pay-by-card"
                         ? "Pay by card"
-                      : manageMode === "confirm-cancel-sequence"
-                        ? "Cancel booked lessons?"
-                        : manageMode === "sequence" || manageMode === "confirm-stop-sequence"
-                        ? "Manage weekly lessons"
                         : manageOutcome
                           ? "All sorted"
                           : "Manage this lesson"}
@@ -3840,28 +3933,30 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         </p>
                       ) : null}
 
-                      {managed.booking.status === "confirmed" && !managed.isPast && !managed.changeLocked ? (
-                        <>
-                          <div className="lesson-manage-dialog__actions">
-                            <button className="button button--coral" onClick={beginManagedReschedule} type="button">
-                              Change
-                            </button>
-                            <button
-                              className="button button--quiet"
-                              onClick={() => transitionBooking(() => setManageMode("confirm-cancel"))}
-                              type="button"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </>
+                      {/* One Change and one Cancel; a weekly lesson chooses
+                          this lesson or every week inside each. */}
+                      {lessonChangeable || weeklyRun ? (
+                        <div className="lesson-manage-dialog__actions">
+                          <button className="button button--coral" onClick={() => beginManagedReschedule(!lessonChangeable)} type="button">
+                            Change
+                          </button>
+                          <button
+                            className="button button--quiet"
+                            onClick={() => transitionBooking(() => {
+                              setCancelEveryWeek(!lessonChangeable);
+                              setManageMode("confirm-cancel");
+                            })}
+                            type="button"
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       ) : null}
 
+                      {/* The weekly time is a quiet fact; a stopped repeat says so. */}
                       {resolvedManagedSeriesId && managed.booking.status === "confirmed" ? (
                         <div className="lesson-manage-dialog__series">
                           <Repeat aria-hidden="true" size={17} />
-                          {/* The weekly time says what the run is; nothing needs to
-                              name it a sequence as well. */}
                           <div>
                             <strong>
                               {activeManagedSeries
@@ -3870,46 +3965,86 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                             </strong>
                             {activeManagedSeries ? null : <span>The lessons already booked stay in your calendar.</span>}
                           </div>
-                          {activeManagedSeries ? (
-                            <button className="teacher-quiet" onClick={() => transitionBooking(() => setManageMode("sequence"))} type="button">
-                              Manage weekly lessons
-                            </button>
-                          ) : null}
                         </div>
                       ) : null}
                     </>
                   ) : null}
 
+                  {/* Cancel, where it stands: a weekly lesson chooses this
+                      lesson or every week first (11 November 2026). The step
+                      is the question, so each press here is the answer. */}
                   {manageMode === "confirm-cancel" ? (
                     <div className="lesson-manage-dialog__decision">
-                      {/* "Only this date" matters where other weeks stay booked;
-                          a one-off lesson needs no such reassurance. */}
-                      {resolvedManagedSeriesId || (managed.refundOnCancel && managed.booking.amountCents) || managed.sameDayFeeApplies ? (
-                        <p>
-                          {resolvedManagedSeriesId ? "This only cancels the lesson on this date." : ""}
-                          {managed.refundOnCancel && managed.booking.amountCents
-                            ? ` Your ${formatMoneyCents(managed.booking.amountCents)} comes back to your card.`
-                            : ""}
-                          {managed.sameDayFeeApplies
-                            ? managed.sameDayFeeAutomatic
-                              ? ` Your saved card is charged the ${formatMoneyCents(managed.booking.sameDayFeeCents)} late change fee, and nothing for the lesson.`
-                              : ` The ${formatMoneyCents(managed.booking.sameDayFeeCents)} late change fee applies once per lesson.`
-                            : ""}
-                        </p>
-                      ) : null}
-                      <div className="lesson-manage-dialog__actions">
-                        <button className="button button--coral" disabled={manageWorking} onClick={cancelManagedLesson} type="button">
-                          {manageWorking ? "Cancelling…" : "Yes, cancel it"}
-                        </button>
-                        <button
-                          className="button button--quiet"
+                      {weeklyRun ? (
+                        <WeekChoice
                           disabled={manageWorking}
-                          onClick={() => transitionBooking(() => setManageMode("view"))}
-                          type="button"
-                        >
-                          Keep lesson
-                        </button>
-                      </div>
+                          lessonClosed={!lessonChangeable}
+                          name="lesson-cancel-scope"
+                          onChange={(everyWeek) => transitionBooking(() => { setManageError(""); setCancelEveryWeek(everyWeek); })}
+                          verb="Cancel"
+                          everyWeek={cancelEveryWeek}
+                        />
+                      ) : null}
+                      {cancelEveryWeek && weeklyRun ? (
+                        <>
+                          <ul className="booking-payment-facts">
+                            <li>Every upcoming weekly lesson is cancelled, and no new ones are added</li>
+                            <li>Any paid lesson that can still be cancelled is refunded automatically</li>
+                            <li>A lesson less than {noticeHours} hours away stays booked</li>
+                          </ul>
+                          <div className="lesson-manage-dialog__actions lesson-manage-dialog__actions--lead">
+                            <button className="button button--coral" disabled={manageWorking} onClick={() => stopManagedSequence(true)} type="button">
+                              {manageWorking ? "Cancelling…" : "Cancel all booked lessons"}
+                            </button>
+                            <button
+                              className="button button--quiet"
+                              disabled={manageWorking}
+                              onClick={() => transitionBooking(() => setManageMode("view"))}
+                              type="button"
+                            >
+                              Keep lessons
+                            </button>
+                          </div>
+                          {/* The lesser choice: the lessons stay, the weeks stop. */}
+                          <div className="lesson-manage-dialog__way-in">
+                            <p>Or keep them booked and stop new weeks</p>
+                            <button className="teacher-quiet" disabled={manageWorking} onClick={() => stopManagedSequence(false)} type="button">
+                              Stop repeating
+                            </button>
+                          </div>
+                        </>
+                      ) : lessonChangeable ? (
+                        <>
+                          {/* "Only this date" matters where other weeks stay booked;
+                              a one-off lesson needs no such reassurance. */}
+                          {resolvedManagedSeriesId || (managed.refundOnCancel && managed.booking.amountCents) || managed.sameDayFeeApplies ? (
+                            <ul className="booking-payment-facts">
+                              {resolvedManagedSeriesId ? <li>This only cancels the lesson on this date</li> : null}
+                              {managed.refundOnCancel && managed.booking.amountCents
+                                ? <li>Your {formatMoneyCents(managed.booking.amountCents)} comes back to your card</li>
+                                : null}
+                              {managed.sameDayFeeApplies
+                                ? managed.sameDayFeeAutomatic
+                                  ? <li>Your saved card is charged the {formatMoneyCents(managed.booking.sameDayFeeCents)} late change fee, and nothing for the lesson</li>
+                                  : <li>The {formatMoneyCents(managed.booking.sameDayFeeCents)} late change fee applies once per lesson</li>
+                                : null}
+                            </ul>
+                          ) : null}
+                          <div className="lesson-manage-dialog__actions">
+                            <button className="button button--coral" disabled={manageWorking} onClick={cancelManagedLesson} type="button">
+                              {manageWorking ? "Cancelling…" : "Yes, cancel it"}
+                            </button>
+                            <button
+                              className="button button--quiet"
+                              disabled={manageWorking}
+                              onClick={() => transitionBooking(() => setManageMode("view"))}
+                              type="button"
+                            >
+                              Keep lesson
+                            </button>
+                          </div>
+                        </>
+                      ) : null}
                     </div>
                   ) : null}
 
@@ -3965,68 +4100,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     </div>
                   ) : null}
 
-                  {activeManagedSeries && manageMode === "sequence" ? (
-                    <div className="lesson-manage-dialog__decision">
-                      <div className="lesson-manage-dialog__actions lesson-manage-dialog__actions--sequence">
-                        {/* One filled button, for the one next thing; cancelling
-                            them all is asked again, in coral, before it happens. */}
-                        <button className="button button--coral" onClick={beginManagedSeriesReschedule} type="button">
-                          Move weekly time
-                        </button>
-                        <button className="button button--quiet" onClick={() => transitionBooking(() => setManageMode("confirm-stop-sequence"))} type="button">
-                          Stop repeating
-                        </button>
-                        <button className="button button--quiet" onClick={() => transitionBooking(() => setManageMode("confirm-cancel-sequence"))} type="button">
-                          Cancel all booked lessons
-                        </button>
-                        <button className="booking-back booking-back--tertiary" onClick={() => transitionBooking(() => setManageMode("view"))} type="button">
-                          <ArrowLeft size={16} aria-hidden="true" /> Back
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {activeManagedSeries && manageMode === "confirm-stop-sequence" ? (
-                    <div className="lesson-manage-dialog__decision">
-                      <p><strong>Stop repeating?</strong> Your booked lessons will stay.</p>
-                      <div className="lesson-manage-dialog__actions">
-                        <button className="button button--coral" disabled={manageWorking} onClick={() => stopManagedSequence(false)} type="button">
-                          {manageWorking ? "Stopping…" : "Yes, stop repeating"}
-                        </button>
-                        <button
-                          className="button button--quiet"
-                          disabled={manageWorking}
-                          onClick={() => transitionBooking(() => setManageMode("sequence"))}
-                          type="button"
-                        >
-                          Keep repeating
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {activeManagedSeries && manageMode === "confirm-cancel-sequence" ? (
-                    <div className="lesson-manage-dialog__decision">
-                      <p>
-                        Every upcoming weekly lesson is cancelled, and no new ones are added. Any paid lesson that can still be cancelled is refunded automatically. A lesson less than {noticeHours} hours away stays booked.
-                      </p>
-                      <div className="lesson-manage-dialog__actions">
-                        <button className="button button--coral" disabled={manageWorking} onClick={() => stopManagedSequence(true)} type="button">
-                          {manageWorking ? "Cancelling…" : "Yes, cancel all"}
-                        </button>
-                        <button
-                          className="button button--quiet"
-                          disabled={manageWorking}
-                          onClick={() => transitionBooking(() => setManageMode("sequence"))}
-                          type="button"
-                        >
-                          Keep booked lessons
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {(manageOutcome || managed.booking.status === "cancelled" || managed.isPast || managed.changeLocked) && !(rebookOffered && manageMode === "view") ? (
+                  {(manageOutcome || ((managed.booking.status === "cancelled" || managed.isPast || managed.changeLocked) && !weeklyRun)) && !(rebookOffered && manageMode === "view") ? (
                     <button className="button button--quiet lesson-manage-dialog__done" onClick={dismissManagedDialog} type="button">
                       Done
                     </button>
@@ -4300,13 +4374,25 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             // calendar on a phone, across the top on a wide screen. Keep
             // current time at the foot of the form is the one way back.
             <div className="managed-lesson__head">
-              <h3 id="managed-reschedule-heading">
-                {manageMode === "reschedule-sequence" ? "Choose a new weekly day and time" : "Choose a new date and time"}
-              </h3>
+              {/* One screen for its time, length and place (11 November
+                  2026); a weekly lesson chooses this lesson or every week. */}
+              <h3 id="managed-reschedule-heading">Change your lesson</h3>
+              {weeklyRun ? (
+                <WeekChoice
+                  disabled={manageWorking}
+                  everyWeek={changingEveryWeek}
+                  lessonClosed={!lessonChangeable}
+                  name="managed-change-scope"
+                  onChange={chooseChangeScope}
+                  verb="Change"
+                />
+              ) : null}
               <p className="managed-lesson__current-time">
-                {manageMode === "reschedule-sequence" ? "Currently repeats from " : "Currently "}
-                {formatShortDay(managed.booking.startAt, zoneOf(managed.booking))}, {lessonTime(managed.booking.startAt, zoneOf(managed.booking))}
-                {manageMode === "reschedule-sequence" ? null : ` · ${formatBookedLessonLabel(managed.booking.lessonType)}`}
+                Currently{" "}
+                {changingEveryWeek && activeManagedSeries
+                  ? weeklyTimeLabel(activeManagedSeries, managed.booking)
+                  : `${formatShortDay(managed.booking.startAt, zoneOf(managed.booking))}, ${lessonTime(managed.booking.startAt, zoneOf(managed.booking))}`}
+                {` · ${formatBookedLessonLabel(managed.booking.lessonType)}`}
               </p>
             </div>
           ) : null}
@@ -4546,11 +4632,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                             setCalendarWeekCount(managed && !changeFormBesideCalendar() ? 1 : CALENDAR_PAGE_WEEKS);
                             setSlotNotice("");
                             setSelectedSlot(
-                              managed &&
+                              currentManaged &&
                               isManagedReschedule &&
                               cell.key === managedDate &&
-                              (managedLessonTypeId || managed.booking.lessonType.id) === managed.booking.lessonType.id
-                                ? managed.booking.startAt
+                              (managedLessonTypeId || currentManaged.lessonTypeId) === currentManaged.lessonTypeId
+                                ? currentManaged.startAt
                                 : ""
                             );
                             if (lessonType && !managed) {
@@ -4713,10 +4799,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                               setLoadingSlots(true);
                               setSlotsByDate({});
                               setManagedLessonTypeId(type.id);
+                              // The time chosen stays while it is free at the new
+                              // length (the times are read again, and one no
+                              // longer free is let go), so another length can
+                              // keep the same day and time.
                               setSelectedSlot(
-                                type.id === managed.booking.lessonType.id && selectedDate === managedDate
-                                  ? managed.booking.startAt
-                                  : ""
+                                selectedSlot ||
+                                (currentManaged && type.id === currentManaged.lessonTypeId && selectedDate === managedDate
+                                  ? currentManaged.startAt
+                                  : "")
                               );
                             }}
                             type="radio"
@@ -4734,9 +4825,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     Lesson length: {formatBookedLessonLabel(managed.booking.lessonType)}. As this lesson is already paid,
                     cancel and rebook to change its length.
                   </p>
-                ) : null}
-                {manageMode === "reschedule-sequence" && managedPrice !== undefined && managedLessonTypeId !== managed.booking.lessonType.id ? (
-                  <p className="booking-state-note">Lessons already this length keep their prices.</p>
                 ) : null}
                 <fieldset className="managed-lesson__duration">
                   <legend>Where</legend>
@@ -4805,6 +4893,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 ) : selectedDate ? (
                   <p className="booking-state-note">No free times on this day.</p>
                 ) : null}
+                {managedChangeDabs.length ? (
+                  <ul className="booking-payment-facts managed-lesson__facts">
+                    {managedChangeDabs.map((dab) => <li key={dab}>{dab}</li>)}
+                  </ul>
+                ) : null}
                 {manageMode === "reschedule" && managed.sameDayFeeApplies ? (
                   <p className="lesson-calendar__notice" id="managed-change-fee">
                     Changing now costs {formatMoneyCents(managed.booking.sameDayFeeCents)}
@@ -4821,9 +4914,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     type="button"
                   >
                     {manageWorking
-                      ? manageMode === "reschedule-sequence" ? "Moving weekly time…" : "Changing…"
+                      ? "Changing…"
                       : manageMode === "reschedule-sequence"
-                        ? "Move weekly time"
+                        ? "Change every week"
                         : selectedSlot
                         ? selectedSlot === managed.booking.startAt
                           ? "Save changes"
@@ -4833,7 +4926,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   <button
                     className="button button--quiet"
                     disabled={manageWorking}
-                    onClick={() => transitionBooking(() => setManageMode(manageMode === "reschedule-sequence" ? "sequence" : "view"))}
+                    onClick={() => transitionBooking(() => setManageMode("view"))}
                     type="button"
                   >
                     {manageMode === "reschedule-sequence" ? "Keep current schedule" : "Keep current time"}

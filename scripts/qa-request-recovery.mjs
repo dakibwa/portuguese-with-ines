@@ -227,7 +227,7 @@ try {
         await expect(dialog.getByText("Not confirmed", { exact: true })).toBeVisible();
         await expect(dialog).toContainText("This lesson isn’t booked yet, as your card wasn’t saved.");
         await expect(dialog.getByText("Booked", { exact: true })).toHaveCount(0);
-        await expect(dialog.getByRole("button", { name: /^(Change|Cancel|Manage weekly lessons)$/ })).toHaveCount(0);
+        await expect(dialog.getByRole("button", { name: /^(Change|Cancel)$/ })).toHaveCount(0);
         await expect(state.page.locator(".calendar-week button.has-booking")).toHaveCount(0);
         await dialog.getByRole("button", { name: "Book a lesson", exact: true }).click();
         await expect(dialog).toHaveCount(0);

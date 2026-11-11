@@ -592,16 +592,14 @@ try {
             await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
             await dialog.getByRole("button", { name: "Yes, cancel it", exact: true }).click();
           } else {
-            if (mode === "move-series") {
-              await dialog.getByRole("button", { name: "Manage weekly lessons", exact: true }).click();
-              await dialog.getByRole("button", { name: "Move weekly time", exact: true }).click();
-            } else await dialog.getByRole("button", { name: "Change", exact: true }).click();
+            await dialog.getByRole("button", { name: "Change", exact: true }).click();
+            if (mode === "move-series") await dialog.getByRole("radio", { name: "Every week", exact: true }).check();
             await choose(page, at(9));
-            await dialog.getByRole("button", { name: mode === "move-series" ? "Move weekly time" : "Change to 10:00", exact: true }).click();
+            await dialog.getByRole("button", { name: mode === "move-series" ? "Change every week" : "Change to 10:00", exact: true }).click();
           }
           // The change form names the lesson as it stands in its short form.
           if (mode === "cancel") await expect(dialog.locator(".lesson-manage-dialog__lesson")).toContainText("Monday, 5 October 2026, 11:00");
-          else await expect(dialog.locator(".managed-lesson__current-time")).toContainText("Mon 5 Oct, 11:00");
+          else await expect(dialog.locator(".managed-lesson__current-time")).toContainText(mode === "move-series" ? "Mondays at 11:00" : "Mon 5 Oct, 11:00");
           await expect(dialog.getByRole("heading", { name: "All sorted", exact: true })).toHaveCount(0);
         }
         await expect(page.getByRole("alert").filter({ hasText: unreadable })).toBeVisible();

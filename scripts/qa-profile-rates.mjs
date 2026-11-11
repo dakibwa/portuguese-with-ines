@@ -214,7 +214,7 @@ try {
     }));
     await page.goto(`${base}/book/?manage=profile-rate-lesson`, { waitUntil: "domcontentloaded" });
     await page.getByRole("dialog", { name: "Manage this lesson", exact: true }).getByRole("button", { name: "Change", exact: true }).click();
-    const change = page.getByRole("dialog", { name: "Choose a new date and time", exact: true });
+    const change = page.getByRole("dialog", { name: "Change your lesson", exact: true });
     // Each length carries its price: the lesson's own, then their price for 90.
     await expect(change.getByRole("radio", { name: "60-minute lesson · €18", exact: true })).toBeChecked();
     await change.getByRole("radio", { name: "90-minute lesson · €27", exact: true }).check();
