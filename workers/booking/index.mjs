@@ -6922,6 +6922,44 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
   }, 200, request, env);
 }
 
+/**
+ * Her dismissed Needs you notices: one settings row holding a JSON object of
+ * key to when she dismissed it, so no migration and no row per notice. Only
+ * the kinds that merely inform, each key ending in when it happened.
+ */
+const DISMISSED_SETTING = "needs_you_dismissed";
+const DISMISS_KEY = /^(changed|cancelled|first|card):[A-Za-z0-9_-]{1,64}:\d{1,15}$/;
+// Every dismissible notice clears itself within a week, so a month is ample;
+// the newest hundred bound the row however busy she is.
+const DISMISS_KEEP_MS = 30 * 86400000;
+const DISMISS_KEEP_COUNT = 100;
+
+async function dismissedNotices(env) {
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key = ?").bind(DISMISSED_SETTING).first();
+  try {
+    const kept = JSON.parse(row?.value ?? "{}");
+    return kept && typeof kept === "object" && !Array.isArray(kept) ? Object.keys(kept).filter(key => DISMISS_KEY.test(key)) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Adds one key and prunes in a single statement, inside the database, so two
+ * quick presses on two devices cannot lose either. Guarded by her authority.
+ */
+function dismissNotice(env, key, authorization) {
+  const now = Date.now();
+  const path = `$."${key}"`;
+  return env.DB.prepare(`INSERT INTO settings (key, value) SELECT ?, json_object(?, CAST(? AS INTEGER)) WHERE (${authorization.sql})
+    ON CONFLICT(key) DO UPDATE SET value = (
+      SELECT json_group_object(kept.key, kept.value) FROM (
+        SELECT key, value FROM json_each(json_set(CASE WHEN json_valid(settings.value) AND json_type(settings.value) = 'object' THEN settings.value ELSE '{}' END, ?, CAST(? AS INTEGER)))
+        WHERE value >= ? ORDER BY value DESC LIMIT ?
+      ) AS kept
+    )`).bind(DISMISSED_SETTING, key, now, ...authorization.values, path, now, now - DISMISS_KEEP_MS, DISMISS_KEEP_COUNT).run();
+}
+
 async function handleAdmin(request, env, ctx, url, path) {
   const admin = await isAdmin(request, env);
   if (admin === "throttled") return fail("Too many attempts. Please wait 15 minutes.", 429, request, env);
@@ -7214,7 +7252,19 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     const settings = await loadSettings(env);
     const students = await teacherStudentList(env);
     const { submissions } = await homeworkReturns(env);
-    return json({ students: students.map(student => ({ ...student, homeworkToReview: submissions.filter(item => item.studentId === student.id) })), cardsAccepted: cardsTaken(env, settings) }, 200, request, env);
+    return json({ students: students.map(student => ({ ...student, homeworkToReview: submissions.filter(item => item.studentId === student.id) })), cardsAccepted: cardsTaken(env, settings),
+      dismissed: await dismissedNotices(env) }, 200, request, env);
+  }
+
+  // A Needs you notice that only tells her something, dismissed on every
+  // device she uses (11 November 2026, Dan). The page works out the notices;
+  // this keeps only their keys.
+  if (request.method === "POST" && path === "/admin/needs-you/dismiss") {
+    const key = adminBody.key;
+    if (typeof key !== "string" || key.length > 100 || !DISMISS_KEY.test(key)) return fail("That notice could not be dismissed.", 400, request, env);
+    const result = await dismissNotice(env, key, authorization);
+    if (!result.meta.changes) await authorization.assert();
+    return json({ ok: true, dismissed: await dismissedNotices(env) }, 200, request, env);
   }
 
   // Onboarding starts here (13 October 2026, Dan): she sets a student up with

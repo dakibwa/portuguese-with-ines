@@ -159,7 +159,8 @@ export async function inTimeOff(env, startAt, endAt) {
 }
 
 export async function loadSettings(env) {
-  const { results } = await env.DB.prepare("SELECT key, value FROM settings").all();
+  // Her dismissed notices are read only where Needs you is (GET /admin/students).
+  const { results } = await env.DB.prepare("SELECT key, value FROM settings WHERE key <> 'needs_you_dismissed'").all();
   const settings = Object.fromEntries((results ?? []).map((row) => [row.key, row.value]));
   const onlineOnlyPeriods = normaliseOnlineOnlyPeriods(JSON.parse(settings.online_only_periods ?? "[]"));
   if (!onlineOnlyPeriods) throw new Error("Online-only availability could not be read.");

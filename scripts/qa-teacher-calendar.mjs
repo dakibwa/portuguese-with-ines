@@ -112,6 +112,7 @@ async function fixture(width, options = {}) {
     studentsReads: 0,
     studentsGate: null,
     studentsReply: options.studentsReply,
+    dismissed: [],
     receiptReply: options.receiptReply,
   };
   page.on("pageerror", (error) => state.errors.push(error.message));
@@ -170,6 +171,10 @@ async function fixture(width, options = {}) {
     const data = request.method() === "POST" ? request.postDataJSON() : null;
     const fail = (error) => route.fulfill({ status: 503, json: { error } });
     if (data) state.writes.push({ path, data });
+    if (path === "/admin/needs-you/dismiss") {
+      state.dismissed.push(data.key);
+      return route.fulfill({ json: { ok: true, dismissed: state.dismissed } });
+    }
     if (path === "/admin/lesson-availability") {
       assert.equal(request.headers().authorization, "Bearer isolated-teacher-fixture");
       return availableTimes(route);
@@ -341,7 +346,7 @@ async function fixture(width, options = {}) {
     if (path === "/admin/students") {
       state.studentsReads++;
       if (state.studentsReply !== undefined) return route.fulfill({ json: state.studentsReply });
-      const json = structuredClone({ cardsAccepted: true, students: [...state.students, ...(state.added ? [state.added] : [])] });
+      const json = structuredClone({ cardsAccepted: true, students: [...state.students, ...(state.added ? [state.added] : [])], dismissed: state.dismissed });
       const gate = state.studentsGate;
       state.studentsGate = null;
       if (gate) await gate;
@@ -2075,6 +2080,36 @@ try {
   assert.equal(await accountPage.evaluate(() => localStorage.getItem("ines-student-session")), null);
   assert.deepEqual(accountState.errors, []);
   await accountPage.close();
+
+  // A notice that only tells her something (11 November 2026, Dan): inside
+  // the student's card it does not say their name again, View and the cross
+  // end its first line, and the cross takes it away for all her devices.
+  for (const width of [1280, 390]) {
+    const { page, state } = await fixture(width);
+    state.students.push({ id: "roman", name: "Roman", email: "roman@example.invalid", phone: "", signedIn: true, hasCard: true, cardForAllLessons: true, nextLessonAt: "2026-09-09T17:00:00.000Z", upcoming: 1, unpaidUpcoming: 0, weekly: 0, hasLessons: true });
+    state.bookings.push({ ...lesson("roman-moved", "Roman", "2026-09-09T17:00:00Z", "porto", 90), student_id: "roman", student_changed_at: "2026-09-06T20:00:00Z", previous_starts_at: "2026-09-08T17:00:00Z" });
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.locator(".teacher-needs-you:visible .teacher-notice").filter({ hasText: "Roman changed their lesson" })).toBeVisible();
+    await page.getByRole("tab", { name: /^Students/ }).click();
+    const notice = studentRow(page, "Roman").locator(".teacher-notice");
+    await expect(notice.locator(".teacher-notice__title")).toHaveText("Changed their lesson");
+    const cross = notice.getByRole("button", { name: "Dismiss: Roman changed their lesson", exact: true });
+    // Each straddles the title's first line, at its right.
+    const title = await notice.locator(".teacher-notice__title").boundingBox();
+    const firstLine = title.y + 12;
+    for (const action of [notice.getByRole("button", { name: /^View/ }), cross]) {
+      const box = await action.boundingBox();
+      assert.ok(box.y < firstLine && box.y + box.height > firstLine && box.x >= title.x + 60, `${width}: View and the cross end the notice's first line`);
+    }
+    await cross.click();
+    await expect(notice).toHaveCount(0);
+    assert.deepEqual(state.writes.filter((entry) => entry.path === "/admin/needs-you/dismiss").map((entry) => entry.data),
+      [{ key: `changed:roman-moved:${Date.parse("2026-09-06T20:00:00Z")}` }]);
+    await expect(page.getByRole("button", { name: "Open Roman’s profile", exact: true })).toBeFocused();
+    await noOverflow(page);
+    assert.deepEqual(state.errors, []);
+    await page.close();
+  }
 
   const student = await fixture(390, { student: true });
   await student.page

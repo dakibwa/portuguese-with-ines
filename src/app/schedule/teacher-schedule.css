@@ -2205,15 +2205,23 @@
 .teacher-needs-you { display: grid; gap: 0.45rem; margin: 0 0 1.4rem; }
 .teacher-needs-you .teacher-eyebrow { margin: 0; }
 .teacher-needs-you .teacher-hours-clashes-more { margin-top: 0; }
-/* Text beside its action; when they cannot share a row the action drops under
-   the text at the card's full width. */
-.teacher-needs-you .teacher-lesson-card { flex-wrap: wrap; }
-.teacher-needs-you .teacher-lesson-card__who { flex: 999 1 11rem; text-wrap: pretty; }
+/* One notice (11 November 2026, Dan): its action and any cross float at the
+   end of the first line at every width, and the words flow round them, so the
+   facts take the full width once past them and break only between facts. No
+   action has a row of its own. */
+.teacher-notice.teacher-lesson-card { display: flow-root; }
+/* The chip and cross reach into the padding rather than heighten the line. */
+.teacher-notice__actions { float: right; display: flex; align-items: center; gap: 0.4rem; margin: -0.3rem 0 -0.3rem 0.5rem; }
 /* A title that wraps breaks evenly ("Jessica Riley / added a card"), never
    leaving two words alone on its second line. */
-.teacher-needs-you .teacher-lesson-card__who > strong { text-wrap: balance; }
+.teacher-notice__title { display: block; font: 600 0.88rem/1.35 var(--ui); overflow-wrap: anywhere; text-wrap: balance; }
+.teacher-notice__facts { display: block; margin-top: 0.1rem; color: var(--lavender-ink); font-size: 0.75rem; text-wrap: pretty; }
+.teacher-notice__facts:empty { display: none; }
+/* The site's round icon button, small beside the chip; its tap is still 44 px. */
+.teacher-notice .teacher-notice__dismiss { width: 32px; height: 32px; color: var(--blue-deep); }
+.teacher-notice .teacher-notice__dismiss::after { inset: -6px; }
+.teacher-notice .teacher-notice__dismiss:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .teacher-needs-you__keep { white-space: nowrap; }
-.teacher-needs-you .teacher-lesson-card :is(.button, .teacher-quiet) { flex: none; margin-left: auto; }
 /* More than three: a quiet chip at its own width, never a bar across the row. */
 .teacher-needs-you__all { justify-self: start; }
 .teacher-timeoff-dialog h2 { margin-right: 2.5rem; }
@@ -3259,10 +3267,8 @@
 /* A student on a weekly run says so in the row's corner, as a small lilac tag. */
 .teacher-student__weekly { display: inline-flex; align-items: center; gap: 0.35rem; border-radius: var(--squiggle-thumb); padding: 0.35rem 0.7rem; background: var(--lavender-soft); color: var(--ink); font: 700 0.6rem/1 var(--ui); letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; }
 .teacher-student__weekly svg { color: var(--blue); }
-.teacher-student-notices { position: relative; z-index: 2; margin: 0; }
-.teacher-student-notices .teacher-lesson-card { flex-wrap: wrap; padding: 0.5rem 0.65rem; }
-.teacher-student-notices .teacher-lesson-card__who { flex: 999 1 11rem; text-wrap: pretty; }
-.teacher-student-notices .teacher-lesson-card :is(.button, .teacher-quiet) { flex: none; margin-left: auto; }
+.teacher-student-notices { position: relative; z-index: 2; gap: 0.4rem; margin: 0; }
+.teacher-student-notices .teacher-lesson-card { padding: 0.35rem 0.4rem 0.45rem 0.65rem; }
 
 /* One card a student (2 November 2026, Dan): their name, three checks and
    the one thing to press next; the name opens their profile in place. */

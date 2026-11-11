@@ -29,7 +29,7 @@ const GROUPS: { key: Exclude<Group, "dormant">; title: string; hint?: string }[]
  * one card, in one lane; the one she opens is that card taken out of its lane
  * and shown once, across the whole width, above the board.
  */
-export function StudentList({ token, students, workspace, error, sending, request, onAddStudent, onStudentsChanged, onWelcome, onMeet, onView, onRetry }: {
+export function StudentList({ token, students, workspace, error, sending, request, onAddStudent, onStudentsChanged, onWelcome, onMeet, onView, onDismiss, onRetry }: {
   token: string;
   students: AdminStudent[] | null;
   workspace: ReturnType<typeof studentWorkspace>;
@@ -42,6 +42,7 @@ export function StudentList({ token, students, workspace, error, sending, reques
   onWelcome: (student: AdminStudent, again?: boolean) => Promise<boolean> | void;
   onMeet: () => void;
   onView: (booking: AdminBooking) => void;
+  onDismiss: (key: string) => void;
   onRetry: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -89,7 +90,7 @@ export function StudentList({ token, students, workspace, error, sending, reques
     (name ?? search.current)?.focus({ preventScroll: true });
   }, [expanded, busyStudent]);
   const noticeProps = {
-    sending, onMeet, onView, onWelcome,
+    sending, onMeet, onView, onWelcome, onDismiss,
     onStudent: (student: AdminStudent) => {
       if (!busyStudent) setExpanded({ studentId: student.id, panel: "lessons" });
     },

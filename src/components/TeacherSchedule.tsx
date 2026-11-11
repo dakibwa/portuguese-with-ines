@@ -20,6 +20,7 @@ import { ScheduleLoading, WeekLoading } from "@/components/teacher/ScheduleLoadi
 import { ReceiptsTab } from "@/components/teacher/ReceiptsTab";
 import { ExpressionsTab } from "@/components/teacher/ExpressionsTab";
 import {
+  dismissNeedsYou,
   fetchBookings,
   fetchSchedule,
   fetchStudents,
@@ -126,6 +127,11 @@ export function TeacherSchedule() {
   // adds: the form suggests them and Your students lists them.
   const [students, setStudents] = useState<{ list: AdminStudent[]; cardsAccepted: boolean } | null>(null);
   const [studentsError, setStudentsError] = useState("");
+  // Notices she has dismissed, kept by the Worker for all her devices; one
+  // still being saved is gone already, and comes back if the save fails.
+  const [dismissed, setDismissed] = useState<string[]>([]);
+  const [dismissing, setDismissing] = useState<string[]>([]);
+  const hiddenNotices = useMemo(() => new Set([...dismissed, ...dismissing]), [dismissed, dismissing]);
   // A student chosen from her list, put straight into the add-a-lesson form.
   const [paymentReview, setPaymentReview] = useState<PaymentReview[]>([]);
   // The student whose welcome she has just pressed, while it is sending.
@@ -166,8 +172,8 @@ export function TeacherSchedule() {
   const invalidHours = hoursProblem(draftHours);
   const affectedLessons = useMemo(() => bookingsAffectedByHours(bookings, savedHours, draftHours, interval, now), [bookings, savedHours, draftHours, interval, now]);
   const needs = useMemo(
-    () => needsYou({ now, meet, payments: paymentReview, students: students?.list ?? [], lessons: bookings, cancellations: studentCancellations }),
-    [now, meet, paymentReview, students, bookings, studentCancellations],
+    () => needsYou({ now, meet, payments: paymentReview, students: students?.list ?? [], lessons: bookings, cancellations: studentCancellations, dismissed: hiddenNotices }),
+    [now, meet, paymentReview, students, bookings, studentCancellations, hiddenNotices],
   );
 
   const studentWork = useMemo(
@@ -191,6 +197,8 @@ export function TeacherSchedule() {
     setStudentRequest(null);
     setStudents(null);
     setStudentsError("");
+    setDismissed([]);
+    setDismissing([]);
     setBookings([]);
     setStudentCancellations([]);
     setWelcoming("");
@@ -321,6 +329,8 @@ export function TeacherSchedule() {
       const data = await fetchStudents(token);
       if (readSession() !== token || request !== studentRequestGeneration.current) return;
       setStudents({ list: data.students, cardsAccepted: Boolean(data.cardsAccepted) });
+      // Never undone, so a read that left before a dismissal landed cannot bring it back.
+      setDismissed(current => [...new Set([...current, ...(data.dismissed ?? [])])]);
       setStudentsError("");
     } catch (caught) {
       if (readSession() === token && request === studentRequestGeneration.current) setStudentsError(caught instanceof Error ? caught.message : "Your students couldn’t be loaded.");
@@ -397,6 +407,22 @@ export function TeacherSchedule() {
     document.addEventListener("visibilitychange", returned);
     return () => document.removeEventListener("visibilitychange", returned);
   }, [reloadBookings, reloadStudents]);
+
+  /** A notice that only tells her something, gone at once; a failed save puts it back and says so. */
+  async function dismissNotice(key: string) {
+    const account = accountGeneration.current;
+    setDismissing(keys => [...keys, key]);
+    setError("");
+    setStatus("");
+    try {
+      const data = await dismissNeedsYou(token, key);
+      if (account === accountGeneration.current) setDismissed(current => [...new Set([...current, ...data.dismissed])]);
+    } catch {
+      if (account === accountGeneration.current) setError("That notice couldn’t be dismissed, so it’s back. Please try again.");
+    } finally {
+      if (account === accountGeneration.current) setDismissing(keys => keys.filter(entry => entry !== key));
+    }
+  }
 
   /** Initial welcomes are guarded; a requested reminder sends a fresh link. */
   async function sendWelcome(student: AdminStudent, again = false) {
@@ -770,6 +796,7 @@ export function TeacherSchedule() {
           onView={setSelectedBooking}
           onWelcome={(student) => void sendWelcome(student)}
           onStudent={student => openStudent(student, "lessons")}
+          onDismiss={key => void dismissNotice(key)}
           onSeeAll={() => { setActiveTab("students"); document.getElementById("teacher-tab-students")?.focus({ preventScroll: true }); }}
         />
       ) : null}
@@ -963,6 +990,7 @@ export function TeacherSchedule() {
         sending={welcoming}
         onMeet={() => { setActiveTab("profile"); document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true }); }}
         onView={setSelectedBooking}
+        onDismiss={key => void dismissNotice(key)}
         onRetry={() => { void reloadStudents(); void reloadBookings(); }}
         onWelcome={(student, again) => sendWelcome(student, again)}
         request={studentRequest}

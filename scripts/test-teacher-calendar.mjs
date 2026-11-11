@@ -459,6 +459,22 @@ test("a declined card and a card just added are Needs you cards on the student's
   const workspace = studentWorkspace(students, items, true, []);
   assert.equal(workspace.general.length, 0);
   assert.deepEqual(workspace.sections.needs.map((row) => [row.student.id, row.items.length]), [["ana", 2], ["kai", 1]]);
+
+  // Only what merely informs can be dismissed: the card added, never the declined card.
+  assert.deepEqual(items.map((item) => item.dismiss), [undefined, undefined, `card:kai:${Date.parse("2026-09-07T09:00:00Z")}`]);
+  const dismissed = needsYou({ now, meet: null, payments: [], students, lessons: [], cancellations: [], dismissed: new Set([items[2].dismiss, "declined:b1:lesson"]) });
+  assert.deepEqual(dismissed.map((item) => item.key), ["declined:b1:lesson", "declined:b1:fee"]);
+  assert.equal(studentWorkspace(students, dismissed, true, []).attentionCount, 1, "a dismissed notice leaves the badge");
+});
+
+test("a dismissed change stays gone until the student changes that lesson again", () => {
+  const now = new Date("2026-09-08T10:00:00Z");
+  const changed = (at) => ({ id: "l1", student_name: "Roman", student_email: "roman@example.invalid", status: "confirmed",
+    starts_at: "2026-09-10T18:00:00Z", ends_at: "2026-09-10T19:30:00Z", student_changed_at: at });
+  const keys = (at, dismissed) => needsYou({ now, meet: null, payments: [], students: [], lessons: [changed(at)], cancellations: [], dismissed }).map((item) => item.dismiss);
+  const [once] = keys("2026-09-07T20:00:00Z");
+  assert.deepEqual(keys("2026-09-07T20:00:00Z", new Set([once])), []);
+  assert.deepEqual(keys("2026-09-08T09:00:00Z", new Set([once])), [`changed:l1:${Date.parse("2026-09-08T09:00:00Z")}`], "a second change is new");
 });
 
 test("each student has three checks and one next step, grouped by whose move it is", () => {
