@@ -1473,9 +1473,10 @@ await test("moving a recurring sequence sends one updated calendar to each enabl
   );
   assert.ok(fixture.emailLog.every(({ dedupeKey }) => dedupeKey.endsWith(":2")));
   const message = JSON.parse(fixture.emailLog[0].request_json);
-  assert.match(message.text, /3 September[^\n]*— €15 · charged to your saved card at the end of the lesson/);
-  assert.match(message.text, /10 September[^\n]*— €18 · charged to your saved card at the end of the lesson/);
-  assert.match(message.text, /17 September[^\n]*— €15 · paid/);
+  // Each date is a lesson of its own, its date over its price and how that is paid.
+  assert.match(message.text, /^Thursday 3 September, 17:30: €15 · charged to your saved card at the end of the lesson$/m);
+  assert.match(message.text, /^Thursday 10 September, 17:30: €18 · charged to your saved card at the end of the lesson$/m);
+  assert.match(message.text, /^Thursday 17 September, 17:30: €15 · paid$/m);
   assert.ok(!message.text.includes("€15 a lesson"), "different agreed prices and terms belong beside their own dates");
 });
 
@@ -1712,6 +1713,10 @@ await test("Meet email links are clickable, present in plain text, and reject ot
   // The Meet mark sits only beside a real Meet link.
   assert.match(valid.html, /google-meet\.png/);
   assert.ok(!invalid.html.includes("google-meet.png"));
+  // A run's date carries its link as a bullet, and the text part keeps the URL the send path looks for.
+  const dated = renderEmail({ ...content, rows: [{ fact: "Thursday 3 September, 17:30", url: "https://meet.google.com/abc-defg-hij", link: "Join Google Meet" }] });
+  assert.match(dated.text, /^Thursday 3 September, 17:30 · Join Google Meet — https:\/\/meet\.google\.com\/abc-defg-hij$/m);
+  assert.match(dated.html, /href="https:\/\/meet.google.com\/abc-defg-hij"/);
 });
 
 await test("an email's time reads as its date, then its time and clock, without 'at'", () => {
@@ -1781,7 +1786,8 @@ await test("sixteen templates cover every email, each in both colour schemes and
   const stopped = renderEmail(templates.studentCancelled({ first: "Ana", run: { count: "2 lessons", zone: "Porto time", dates: "Tuesday 13 October 2026 at 17:00",
     kept: { count: 1, dates: "Tuesday 6 October 2026 at 17:00" } } }).content);
   assert.match(stopped.text, /removed from your calendar\. One lesson was too close to cancel and stays as it was\./);
-  assert.match(stopped.text, /Still booked, Porto time/);
+  // The clock is named once, over the cancelled dates; the lesson still on follows on the same clock.
+  assert.match(stopped.text, /\nCancelled · Porto time\nTuesday 13 October, 17:00\n\nStill booked\nTuesday 6 October, 17:00\n/);
   // Her receipt automation reads these words: kept exactly.
   const fee = templates.paymentReceivedTeacher({ ...lesson, ...money, item: "fee" });
   assert.equal(fee.subject, "Payment received — Ana Silva, €5 same-day fee");

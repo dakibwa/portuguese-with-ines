@@ -2726,7 +2726,22 @@ The site's forty emails are sixteen templates
 the date panel, a coral-dab note, the dab list of facts, numbered steps, one
 coral blob button and, rarely, one quiet underlined link, then dab footer facts
 and the site's link. Variants of an event (who made the change, one lesson or a
-run, how it is paid) change lines, never the structure. Emails declare
+run, how it is paid) change lines, never the structure. Every email is
+written as the welcome is (11 November 2026, Dan: "can we apply this logic to
+all emails that are sent out pleaes"): one short introduction that says what
+happened and who did it, then the facts as short bullets, each said once. The
+date panel names the clock and nothing beneath it repeats it; a list with no
+panel names it in its title (`Cancelled · Porto time`). A lesson is one
+bullet, `Online · 60 minutes · €25`, with how it is paid as the next and `Join
+Google Meet` as its own; a run lists its dates one bullet each, the link
+beside the dates that have one and the others' promise said once under the
+list. Labels stay only where they are the point: Reference, NIF, Notes, the
+student on Inês's copies, a new address, `Before` on her copy of a move, and
+the `Lesson` row of her payment-received email, which her records read.
+Footers are at most three dabs, the change rule in the site's words (`Free
+to change or cancel a lesson up to 14 hours before`, `€5 to move or cancel
+later`), with `A no-show costs €5 instead of the lesson price` on a saved
+card. Money sentences keep their exact words. Emails declare
 `light dark`: in dark mode they sit on the site's dark blue with cream text,
 lilac labels and lighter dabs; under 480px the margins tighten and the button
 fills the width. Inês's card-declined and card-added notices are Needs you

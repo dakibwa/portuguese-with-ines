@@ -121,7 +121,7 @@ const previews = [
   ["teacher-cancelled", "you-cancelled", [21], t.lessonCancelledTeacher({ ...lesson, ...inesWhen, ...policy, student: { ...anaForInes, notes: "" }, byTeacher: true,
     longWhen: "Tuesday, 8 September 2026 at 10:00", message: "Olá Ana,\nI’m unwell this week, sorry!", note: "€25 was refunded automatically — nothing to sort out." })],
   ["teacher-cancelled", "weekly", [23], t.lessonCancelledTeacher({ student: { name: "Ana Silva", email: "ana.silva@example.com", nif: "" },
-    run: { count: "3 lessons", dates: "Thursday 10 September 2026 at 17:30\nThursday 17 September 2026 at 17:30\nThursday 24 September 2026 at 17:30" } })],
+    run: { count: "3 lessons", zone: "Porto time", dates: "Thursday 10 September 2026 at 17:30\nThursday 17 September 2026 at 17:30\nThursday 24 September 2026 at 17:30" } })],
 
   ...[["lesson", 24, "€25"], ["no-show", 25, "€5"], ["fee", 27, "€5"]].map(([item, old, amount]) => ["payment-receipt", item === "fee" ? "late-change-fee" : item, [old],
     t.paymentReceipt({ ...ana, ...lesson, item, amount, shortWhen: "Tue 13 Oct, 17:00", nif: "123456789", noticeHours: 14 })]),

@@ -107,6 +107,8 @@ function keepTogether(value, mode = "text") {
       .replace(/\b(\d{1,2}) (?=(?:January|February|March|April|May|June|July|August|September|October|November|December)\b)/g, `$1${NBSP}`)
       .replace(/\b([A-Z][a-z]+) (?=\d{4}\b)/g, `$1${NBSP}`)
       .replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (?=\d)/g, `$1${NBSP}`)
+      // A lesson's length keeps its word, even in a row ("60 minutes").
+      .replace(/\b(\d{1,3}) (?=minutes\b)/g, `$1${NBSP}`)
       .replace(/\bat (?=\d{1,2}:\d{2})/g, `at${NBSP}`);
     const last = tied.lastIndexOf(" ");
     if (mode === "text" && last > 0 && tied.length - tied.lastIndexOf(" ", last - 1) - 1 <= 30) {
@@ -236,11 +238,17 @@ function layout({ heading, preheader, intro, hero, heroNote, rows = [], callout,
   //   title   a small label over the rows beneath it, with no dab: what they
   //           are and, said once, the clock their times are on (11 November
   //           2026, Dan: "porto time can just be said once").
-  //   fact    one short line beside a dab, with no label.
+  //   fact    one short line beside a dab, with no label; `quiet` for a promise.
+  //   link    with a Meet `url`, the call to join as its own words on any row:
+  //           after a fact on its line ("Thursday 3 September, 17:30 · Join
+  //           Google Meet"), or a line of its own under a lesson's facts. A fact
+  //           with a `url` and no `link` is the link itself (11 November 2026).
   let dabs = 0;
+  const meetLink = (url, text) =>
+    `<a class="pwi-link" href="${escapeHtml(url)}" style="color:${BRAND.blue};font-weight:700;text-decoration:underline;white-space:nowrap">${meetMark()}${escapeRich(text)}</a>`;
   const rowsHtml = rows.length
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${rows
-        .map(({ label, value, url, lesson, quiet, dates, title, fact }, index) => {
+        .map(({ label, value, url, link, lesson, quiet, dates, title, fact }, index) => {
           if (title) {
             return `
         <tr><td colspan="2" style="padding:${index ? 22 : 0}px 0 0"><p class="pwi-label" style="margin:0;${LABEL}">${escapeHtml(title)}</p></td></tr>`;
@@ -250,13 +258,19 @@ function layout({ heading, preheader, intro, hero, heroNote, rows = [], callout,
           const valueColour = quiet ? BRAND.lavenderInk : BRAND.ink;
           const valueClass = quiet ? "pwi-quiet" : "pwi-text";
           // Closer under its title, and one short fact closer to the last.
-          const above = index ? (rows[index - 1].title ? 10 : fact && rows[index - 1].fact ? 8 : 14) : 0;
+          // A labelled row after a titled list of facts starts a group of its own, as a title would.
+          const titled = rows.slice(0, index).findLastIndex((row) => row.title);
+          const endsList = !fact && titled >= 0 && rows.slice(titled + 1, index).every((row) => row.fact);
+          const above = index ? (rows[index - 1].title ? 10 : endsList ? 22 : fact && rows[index - 1].fact ? 8 : 14) : 0;
           const mark = dab(dabs++);
           if (fact) {
+            const text = link
+              ? `${richTogether(fact, "row")} · ${meeting ? meetLink(url, link) : escapeHtml(link)}`
+              : meeting ? meetLink(url, fact) : richTogether(fact, "row");
             return `
         <tr>
           <td width="28" valign="top" style="width:28px;padding:${above + 4}px 0 0;line-height:0">${mark}</td>
-          <td class="pwi-text" valign="top" style="padding:${above}px 0 0;font:400 15px/1.5 ${SANS};color:${BRAND.ink};overflow-wrap:anywhere">${richTogether(fact, "row")}</td>
+          <td class="${valueClass}" valign="top" style="padding:${above}px 0 0;font:400 15px/1.5 ${SANS};color:${valueColour};overflow-wrap:anywhere">${text}</td>
         </tr>`;
           }
           const content = dates
@@ -265,10 +279,12 @@ function layout({ heading, preheader, intro, hero, heroNote, rows = [], callout,
                 .map((line, i) => `<p class="${valueClass}" style="margin:${i ? 4 : 2}px 0 0;font:${valueFont} ${SANS};color:${valueColour};overflow-wrap:anywhere">${richTogether(line, "row")}</p>`)
                 .join("")
             : `<p class="${valueClass}" style="margin:2px 0 0;font:${valueFont} ${SANS};color:${valueColour};overflow-wrap:anywhere">${
-                meeting
-                  ? `<a class="pwi-link" href="${escapeHtml(url)}" style="color:${BRAND.blue};font-weight:700;text-decoration:underline">${meetMark()}${escapeRich(value)}</a>`
-                  : richTogether(value, "row")
-              }</p>`;
+                meeting && !link ? meetLink(url, value) : richTogether(value, "row")
+              }</p>${
+                link
+                  ? `<p class="pwi-text" style="margin:4px 0 0;font:${valueFont} ${SANS};color:${BRAND.ink}">${meeting ? meetLink(url, link) : escapeHtml(link)}</p>`
+                  : ""
+              }`;
           return `
         <tr>
           <td width="28" valign="top" style="width:28px;padding:${above + (lesson ? 3 : 1)}px 0 0;line-height:0">${mark}</td>
@@ -435,10 +451,11 @@ function plainText({ heading, intro, hero, heroNote, rows = [], callout, message
   if (callout) lines.push("", clean(callout));
   if (rows.length) {
     lines.push("");
-    for (const { label, value, url, title, fact } of rows) {
+    for (const { label, value, url, link, title, fact } of rows) {
+      const meeting = `${link ? ` · ${link}` : ""}${safeMeetingLink(url) ? ` — ${url}` : ""}`;
       if (title) lines.push(...(lines[lines.length - 1] === "" ? [] : [""]), title);
-      else if (fact) lines.push(clean(fact));
-      else lines.push(`${label}: ${clean(value)}${safeMeetingLink(url) ? ` — ${url}` : ""}`);
+      else if (fact) lines.push(`${clean(fact)}${meeting}`);
+      else lines.push(`${label}: ${clean(value)}${meeting}`);
     }
   }
   if (steps?.items?.length) lines.push("", steps.title, ...steps.items.map((item, index) => `${index + 1}. ${clean(item)}`));
