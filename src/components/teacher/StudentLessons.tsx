@@ -113,12 +113,16 @@ function lessonFacts(booking: AdminBooking, now: number) {
  * What every one of their lessons shares, such as `In Porto · Added by you`,
  * is said once beside their details, and each lesson keeps only what is its
  * own (9 November 2026, Dan: "we don't need all the information repeating").
- * With a single lesson, its row says it all.
+ * With a single lesson, its row says it all. How long a lesson is never
+ * leaves its row (11 November 2026, Dan, of rows with no length: "why
+ * doesn't it show her time of lesson here? 60 or 90"): one lesson can be 60
+ * and the next 90, and she can now correct either.
  */
 export function sharedFacts(bookings: AdminBooking[], now: number) {
   if (bookings.length < 2) return [];
   const lists = bookings.map(booking => lessonFacts(booking, now));
-  return lists[0].filter(fact => lists.every(facts => facts.includes(fact)));
+  const lengths = new Set(bookings.map(lessonLength));
+  return lists[0].filter(fact => !lengths.has(fact) && lists.every(facts => facts.includes(fact)));
 }
 
 const homeworkState: Record<NoteHomework, string> = { none: "", draft: "Draft", published: "With them", review: "To review", done: "Done" };

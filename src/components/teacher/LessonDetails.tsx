@@ -84,11 +84,13 @@ function keptLine(kept: KeptLesson[]) {
 
 /**
  * Why a lesson can't take another length, as the Worker decides it, or "".
- * Paid, due or being paid lessons keep theirs; a free one keeps it unless the
- * new length is free too.
+ * One a card has paid, or with a payment due or going through, keeps its
+ * length; a free one keeps it unless the new length is free too. Ticked
+ * "Already paid" never holds her back (11 November 2026, Dan: "even if it's
+ * already marked as paid Ines should be able to change it").
  */
 function lengthHeld(lesson: AdminBooking, cents: number) {
-  if (paidByHand(lesson) || lesson.payment_status === "paid") return "it's already paid";
+  if (lesson.payment_status === "paid") return "it's already paid";
   if (lesson.payment_status === "payment_due") return "it has a payment due";
   if (lesson.payment_status === "processing" || lesson.charge_started_at) return "its payment is going through";
   if (lesson.payment_status === "free" && cents > 0) return "it's free";
@@ -107,7 +109,7 @@ function changeHeld(lesson: AdminBooking, length: "single" | "long" | null, cent
  * decides it, or "": only one with nothing on a card can (11 November 2026).
  */
 function pastHeld(lesson: AdminBooking) {
-  if (paidByHand(lesson) || lesson.payment_status === "paid") return "it's already paid";
+  if (lesson.payment_status === "paid") return "it's already paid";
   if (lesson.payment_status === "payment_due") return "it has a payment due";
   if (lesson.payment_status === "processing" || lesson.charge_started_at) return "its payment is going through";
   if (lesson.payment_status === "free") return "it's free";
@@ -244,6 +246,8 @@ export function LessonDetails({
     }
     if (lengthChanges) dabs.push(`${lead("become", "becomes")} ${lengthMinutes} minutes, ${formatPriceCents(lengthCents)}${many > 1 ? " each" : ""}`);
     if (placeChanges) dabs.push(`${lead("move", "moves")} ${place === "online" ? "online" : `to ${TUTOR_CITY}`}`);
+    // The tick is hers and a change never takes it off (11 November 2026).
+    if (lengthChanges && changing.some(paidByHand)) dabs.push(changing.length > 1 ? "Any marked as paid stay marked as paid" : "Stays marked as paid");
     return dabs;
   })();
   const changeDirty = timeMoves || lengthChanges || placeChanges;

@@ -626,7 +626,8 @@ free times and removes selected times that cannot be booked in the new place.
   - Their facts as rows, each its small-capitals name and its value
     beneath: `Details` (email or `No email`, phone, NIF), `Price` (each
     length), `Every lesson` (the facts all their lessons share, such as `In
-    Porto · Added by you`, so no lesson repeats them) and `Plan`, her plan
+    Porto · Added by you`, so no lesson repeats them; never how long they
+    are, which each lesson's row says for itself) and `Plan`, her plan
     for them with their latest level as a chip beside its name. Nothing here
     is changed with a big `Change`, `Edit details` or `Write` button (9
     November 2026, Dan), and there is one tiny lucide pencil for each thing,
@@ -917,7 +918,11 @@ free times and removes selected times that cannot be booked in the new place.
   A fact every one of their lessons shares, such as `In Porto` or `Added by
   you`, is said once on the dashboard's `Every lesson` row, and each lesson
   keeps only what is its own (9 November 2026, Dan: "we don't need all the
-  information repeating"). With a single lesson, its row says it all.
+  information repeating"). With a single lesson, its row says it all. How
+  long a lesson is always stays on its row, `60 mins` or `90 mins`, even when
+  every lesson is the same length (11 November 2026, Dan: "why doesn't it
+  show her time of lesson here? 60 or 90"): one can be 60 and the next 90,
+  and she can correct either.
   Each section uses a responsive grid of lesson rows: three across where
   14.5 rem tiles fit, two as the card narrows, one column on phones, packed so
   a short row leaves no hole under it while still reading in date order (9
@@ -2229,16 +2234,22 @@ Thursdays at 16:00`, `They become 90 minutes, €35 each`, `They move online`,
 which stay as they are and why, `Tue 1 Dec stays as it is: it's already
 paid`, and that one email goes), and `Save changes` waits as the quiet
 outline until something differs. Where the form has room, date sits beside
-time and length beside place. Every week means every later lesson takes the
+time and length beside place, and the buttons sit at the right of the dabs,
+level with the last of them, never on a row of their own beneath
+(11 November 2026, Dan: "there's space on the right so the buttons can go
+there"); on a phone they follow the dabs. Every week means every later lesson takes the
 new day and time in its own week, so the dab is what happens. A lesson
 already had is corrected in the same form (11 November 2026, Dan: "Ines
 should be able to change previous lessons to like from 60 to 90 too"):
 with nothing of it on a card it offers date, time, length and place with
 the same dabs (`Becomes 90 minutes, €30`), no `Every week` choice, a new
-time that stays in the past, and the dab `No email is sent`. One paid,
-ticked `Already paid`, free, a trial or on their card keeps its length and
-place, offers only the date and time, and says why in a dab (`Length and
-place stay: it's on their card`). Both `Change` and
+time that stays in the past, and the dab `No email is sent`. One a card has
+paid, free, a trial or on their card keeps its length and place, offers
+only the date and time, and says why in a dab (`Length and place stay: it's
+on their card`). A lesson ticked `Already paid`, past or to come, is never
+held by its tick ("even if it's already marked as paid Ines should be able
+to change it"): it takes the change and a dab says `Stays marked as paid`.
+Both `Change` and
 `Cancel` start on `This lesson`; cancelling keeps `Cancel this lesson?`, with
 what happens as a dab. Cancelling every week reads `Cancel these lessons?`,
 lists how many and between which days, and confirms with `Yes, cancel 8

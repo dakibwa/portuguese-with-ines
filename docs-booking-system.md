@@ -244,7 +244,9 @@ status:
 - A lesson to come is `not_required` with the mark. Card saving, card removal,
   charging, recovery, chasers and repricing all skip the mark, so it is never
   charged, linked, chased or moved onto a card (the `not_required` pitfall
-  does not reach it), and a student cannot change its length (409). The
+  does not reach it), and a student cannot change its length (409). Inês can
+  (11 November 2026): her change of time, place or length goes through, past
+  or to come, and the lesson stays ticked at the price of what it now is. The
   agreement it carried stays on it, so unticking can restore it.
 - A lesson she records after it happened stays `recorded`, with the mark and
   its price in `amount_cents`, so it keeps every record rule (no email, no
@@ -1321,11 +1323,14 @@ while validation runs. Inês's explicit calendar additions retain their override
   already had changes only on its own (see correcting one, below).
   `POST /admin/bookings/:id/length` takes `lessonType` (`single` or `long`),
   the displayed `expectedPriceCents` (the student's own price for that length,
-  a 90 derived as 1.5× their 60) and `following`. A lesson paid by card or by
-  hand, with a payment due or going through, a free one going to a priced
-  length, or one the longer lesson would run into another lesson, keeps its
-  length and comes back under `kept` with a short reason; her own lessons keep
-  no gap, as when she adds one. The rest change in one JSON-backed write that
+  a 90 derived as 1.5× their 60) and `following`. A lesson a card has paid,
+  with a payment due or going through, a free one going to a priced length,
+  or one the longer lesson would run into another lesson, keeps its length
+  and comes back under `kept` with a short reason; her own lessons keep no
+  gap, as when she adds one. One ticked `Already paid` is no longer held
+  (11 November 2026, Dan: "even if it's already marked as paid Ines should be
+  able to change it"): it changes like any other and stays ticked, at the
+  price of the new length. A student still cannot change the length of one. The rest change in one JSON-backed write that
   checks each row's sequence, length, payment state and price snapshot, that
   the run has gained or lost no lesson since the read, and that nothing
   overlaps: all of them or none. Each keeps its calendar UID with a higher
@@ -1366,7 +1371,8 @@ while validation runs. Inês's explicit calendar additions retain their override
   should be able to change previous lessons to like from 60 to 90 too").
   `/change` and `/length` take a lesson that has started, a record included,
   while nothing of it is on a card: `not_required` or `recorded`, no charge
-  started, not ticked `Already paid`. It takes 60 or 90 minutes at the
+  started, ticked `Already paid` or not (a ticked one stays ticked, at the
+  price of what it now is). It takes 60 or 90 minutes at the
   student's price for the new length now (`expectedPriceCents` checked as for
   a lesson to come), online or in person, and a new day and time that is
   still in the past. It changes on its own: `following: true` answers 400 `A
@@ -1381,8 +1387,7 @@ while validation runs. Inês's explicit calendar additions retain their override
   through`, `it's free`, `it's a trial lesson`, `it would run into another
   lesson`), plus `it's on their card` for one scheduled on a card and not
   yet charged: what a card is about to be charged for is never changed
-  behind the student's back. She unticks `Already paid` first to correct a
-  ticked one. Her page uses `/reschedule` only for a past lesson that keeps
+  behind the student's back. Her page uses `/reschedule` only for a past lesson that keeps
   its length and place for one of those reasons, to move its time as before.
   `POST /admin/bookings/:id/cancel` with `following: true` ends the run first,
   so the nightly top-up cannot add a week, then cancels each confirmed lesson

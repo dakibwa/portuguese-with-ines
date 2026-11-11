@@ -6533,10 +6533,23 @@ async function teacherCancelFollowing(request, env, ctx, row, message, authoriza
   }, 200, request, env);
 }
 
+/**
+ * Paid to her by hand: ticked "Already paid", with nothing on a card. That
+ * never holds her own change back (11 November 2026, Dan: "even if it's
+ * already marked as paid Ines should be able to change it"): the lesson
+ * changes and stays ticked, at the price of what it now is. A student still
+ * cannot change the length of one (`lessonTypeChangeProblem`): another
+ * length is hers to arrange.
+ */
+function paidToHerByHand(row) {
+  return row.payment_consent_version === PAID_BY_HAND_MARK && (row.payment_status === "not_required" || row.payment_status === RECORDED);
+}
+
 /** Why a lesson keeps its length when she changes it, in a few words, or "". */
 function lengthKeptReason(row, currentLessonType, lessonType, amountCents) {
-  // A record changes length as any lesson paid to her directly does.
-  const terms = row.payment_status === RECORDED ? { ...row, payment_status: "not_required" } : row;
+  // A record, or a lesson paid to her by hand, changes length as any lesson
+  // paid to her directly does.
+  const terms = row.payment_status === RECORDED || paidToHerByHand(row) ? { ...row, payment_status: "not_required", payment_consent_version: null } : row;
   if (!lessonTypeChangeProblem(terms, currentLessonType, lessonType) && !freeLengthProblem(terms, amountCents) && !row.charge_started_at) return "";
   if (currentLessonType.id === "trial") return "it's a trial lesson";
   if (row.payment_status === "paid" || row.payment_consent_version === PAID_BY_HAND_MARK) return "it's already paid";
@@ -6549,11 +6562,12 @@ function lengthKeptReason(row, currentLessonType, lessonType, amountCents) {
  * Why a lesson already had can't take her correction, in a few words, or ""
  * (11 November 2026, Dan: "Ines should be able to change previous lessons to
  * like from 60 to 90 too"). Only one with nothing on a card can: paid to her
- * directly or a record, no charge started, not ticked "Already paid". One on
- * a card and not yet charged keeps what the card is about to be charged for.
+ * directly or a record, no charge started, ticked "Already paid" or not. One
+ * on a card and not yet charged keeps what the card is about to be charged
+ * for, and one a card has paid keeps what was paid for.
  */
 function pastChangeProblem(row) {
-  if (row.payment_status === "paid" || row.payment_consent_version === PAID_BY_HAND_MARK) return "it's already paid";
+  if (row.payment_status === "paid") return "it's already paid";
   if (row.payment_status === "payment_due") return "it has a payment due";
   if (row.payment_status === "processing" || row.charge_started_at) return "its payment is going through";
   if (row.payment_status === FREE) return "it's free";
@@ -6571,8 +6585,7 @@ const PAST_STAYS = "A lesson already had stays in the past. Add a new lesson ins
  * In a correction's guarded write: the lesson as read is still one already
  * had with nothing on a card (`current`, bound to now once).
  */
-const PAST_ROW_SQL = `current.starts_at <= ? AND current.payment_status IN ('not_required', '${RECORDED}')
-  AND COALESCE(current.payment_consent_version, '') != '${PAID_BY_HAND_MARK}'`;
+const PAST_ROW_SQL = `current.starts_at <= ? AND current.payment_status IN ('not_required', '${RECORDED}')`;
 
 /**
  * A corrected lesson already had may still be running; the Meet sweep leaves

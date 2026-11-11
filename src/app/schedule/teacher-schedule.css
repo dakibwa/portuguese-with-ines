@@ -1479,6 +1479,20 @@
     grid-column: 1;
   }
 }
+/* Where the form has room, what will happen sits at the left and its buttons
+   at the right, level with its last line, never on a row of their own
+   beneath (11 November 2026, Dan: "there's space on the right so the buttons
+   can go there"). Narrower, they follow it as before. */
+@container (min-width: 34rem) {
+  .teacher-change-form.teacher-change-form > ul {
+    grid-column: 1;
+  }
+  .teacher-change-form.teacher-change-form > .teacher-dialog-actions {
+    grid-column: 2;
+    align-self: end;
+    justify-content: flex-end;
+  }
+}
 /* In a lesson's cream tile a slider's track is the lilac sheet, so it shows. */
 .teacher-lesson-dialog--inline .teacher-change-form .segmented {
   background: var(--sheet);
