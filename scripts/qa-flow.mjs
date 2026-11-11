@@ -674,6 +674,8 @@ const qaStart = new Date(Date.now() + 7 * 86_400_000);
 qaStart.setUTCHours(17, 0, 0, 0);
 qaManagedStart = qaStart;
 const qaEnd = new Date(qaStart.getTime() + 60 * 60_000);
+const qaStartPortoDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Lisbon" }).format(qaStart);
+const seriesReschedulePayloads = [];
 const qaSecondStart = new Date(qaStart.getTime() + 2 * 60 * 60_000);
 const qaSecondEnd = new Date(qaSecondStart.getTime() + 60 * 60_000);
 const qaFreeStart = new Date(qaStart.getTime() + 24 * 60 * 60_000);
@@ -760,12 +762,17 @@ await accountPage.route("**/lesson-types", async (route) => {
   });
 });
 await accountPage.route("**/availability?*", async (route) => {
+  // Moving the weekly run, its own time is free at 90 minutes too, as the
+  // Worker reads it with the run set aside.
+  const query = new URL(route.request().url()).searchParams;
+  const runAtNinety = query.get("series") === "series-qa" && query.get("lessonType") === "longer-90";
   await route.fulfill({
     contentType: "application/json",
     headers: { "Access-Control-Allow-Origin": "*" },
     body: JSON.stringify({
       slotsByDate: {
-        [qaFreeDate]: qaFreeSlots
+        [qaFreeDate]: qaFreeSlots,
+        ...(runAtNinety ? { [qaStartPortoDate]: [{ startAt: qaStart.toISOString(), endAt: new Date(qaStart.getTime() + 90 * 60_000).toISOString() }] } : {})
       },
       timeZone: "Europe/Lisbon",
       minimumNoticeHours: 24,
@@ -1117,6 +1124,30 @@ await accountPage.route("**/bookings/manage-later-*", async (route) => {
       sameDayFeeApplies: false,
       changeLocked: false,
       refundOnCancel: false
+    })
+  });
+});
+await accountPage.route("**/series/series-qa/reschedule", async (route) => {
+  if (route.request().method() === "OPTIONS") {
+    await route.fulfill({ status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" } });
+    return;
+  }
+  const payload = JSON.parse(route.request().postData() || "{}");
+  seriesReschedulePayloads.push(payload);
+  const start = new Date(payload.startAt);
+  await route.fulfill({
+    contentType: "application/json",
+    headers: { "Access-Control-Allow-Origin": "*" },
+    body: JSON.stringify({
+      ok: true,
+      moved: 10,
+      kept: [],
+      bookings: [{
+        reference: "INES-QA01", status: "confirmed", startAt: start.toISOString(), endAt: new Date(start.getTime() + 90 * 60_000).toISOString(),
+        location: "online", studentName: "Ana Martins", studentEmail: "student@example.com", studentTimezone: "Europe/Lisbon", notes: "",
+        rescheduleCount: 1, sameDayFeeCents: 500, paymentStatus: "not_required", amountCents: 3500,
+        lessonType: { id: "longer-90", name: "Longer lesson", durationMinutes: 90, priceCents: 3500 }
+      }]
     })
   });
 });
@@ -1575,7 +1606,6 @@ await upcomingManageDialog.getByText("60 mins · Online", { exact: true }).waitF
 await upcomingManageDialog.locator(".lesson-manage-dialog__series").waitFor();
 await upcomingManageDialog.getByRole("button", { name: "Change", exact: true }).waitFor();
 await upcomingManageDialog.getByRole("button", { name: "Cancel", exact: true }).waitFor();
-await upcomingManageDialog.getByRole("button", { name: "Manage weekly lessons", exact: true }).waitFor();
 if (await accountPage.locator("#lesson-calendar.unified-calendar--managed-overlay").count()) {
   throw new Error("Opening a lesson should not rearrange the calendar into its change layout.");
 }
@@ -1778,9 +1808,9 @@ await desktopManageDialog.getByRole("button", { name: "Change", exact: true }).e
   }, { capture: true, once: true });
 });
 await desktopManageDialog.getByRole("button", { name: "Change", exact: true }).click();
-const desktopChangeDialog = accountPage.getByRole("dialog", { name: "Choose a new date and time", exact: true });
+const desktopChangeDialog = accountPage.getByRole("dialog", { name: "Change your lesson", exact: true });
 await desktopChangeDialog.waitFor({ state: "visible" });
-await desktopChangeDialog.getByRole("heading", { name: "Choose a new date and time", exact: true }).waitFor();
+await desktopChangeDialog.getByRole("heading", { name: "Change your lesson", exact: true }).waitFor();
 await desktopManagePanel.getByRole("radio", { name: /^60-minute lesson/ }).waitFor();
 const ninetyMinuteChoice = desktopManagePanel.getByRole("radio", { name: /^90-minute lesson/ });
 await ninetyMinuteChoice.waitFor();
@@ -2177,9 +2207,9 @@ await mobileManageDialog.getByRole("button", { name: "Change", exact: true }).ev
   }, { capture: true, once: true });
 });
 await mobileManageDialog.getByRole("button", { name: "Change", exact: true }).click();
-const mobileChangeDialog = accountPage.getByRole("dialog", { name: "Choose a new date and time", exact: true });
+const mobileChangeDialog = accountPage.getByRole("dialog", { name: "Change your lesson", exact: true });
 await mobileChangeDialog.waitFor({ state: "visible" });
-await mobileChangeDialog.getByRole("heading", { name: "Choose a new date and time", exact: true }).waitFor();
+await mobileChangeDialog.getByRole("heading", { name: "Change your lesson", exact: true }).waitFor();
 await mobileManagePanel.getByRole("radio", { name: /^60-minute lesson/ }).waitFor();
 await mobileManagePanel.getByRole("radio", { name: /^90-minute lesson/ }).waitFor();
 await waitForOrientation(accountPage);
@@ -2583,113 +2613,151 @@ await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible
 await bookQaLessonAndReturnToUpcoming({ recurring: false });
 await bookQaLessonAndReturnToUpcoming({ recurring: true });
 await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
-// A weekly run is managed from any one of its lessons.
+// A weekly lesson has one Change and one Cancel, each choosing this lesson or
+// every week (11 November 2026), at a desktop and a phone width.
 const nextLessonOpen = accountPage.locator(".lesson-overview__next-open");
 const seriesLessonDialog = accountPage.getByRole("dialog", { name: "Manage this lesson", exact: true });
-await nextLessonOpen.click();
-await seriesLessonDialog.getByRole("button", { name: "Manage weekly lessons", exact: true }).click();
 const sequenceDialog = accountPage.locator(".lesson-manage-dialog");
-await sequenceDialog.getByRole("heading", { name: "Manage weekly lessons", exact: true }).waitFor();
-if (await sequenceDialog.getByText(/Choose whether to keep/i).count()) {
-  throw new Error("The recurrence actions should not repeat what their button labels already explain.");
-}
-const moveRecurrence = sequenceDialog.getByRole("button", { name: "Move weekly time", exact: true });
-const stopRepeating = sequenceDialog.getByRole("button", { name: "Stop repeating", exact: true });
-const cancelAllBooked = sequenceDialog.getByRole("button", { name: "Cancel all booked lessons", exact: true });
-await cancelAllBooked.waitFor();
-await moveRecurrence.click();
-const moveRecurrenceDialog = accountPage.getByRole("dialog", { name: "Choose a new weekly day and time", exact: true });
-await moveRecurrenceDialog.waitFor({ state: "visible" });
-if ((await moveRecurrenceDialog.locator(".segmented").count()) !== 2) {
-  throw new Error("Moving a recurrence should retain the compact length and location sliders.");
-}
-await moveRecurrenceDialog.getByText(/Currently repeats from/i).waitFor();
-await moveRecurrenceDialog.getByRole("button", { name: "Keep current schedule", exact: true }).click();
-await sequenceDialog.getByRole("heading", { name: "Manage weekly lessons", exact: true }).waitFor();
-await stopRepeating.click();
-if (stopRepeatPayloads.length !== 0) throw new Error("Opening the repeat confirmation called the stop endpoint.");
-await sequenceDialog.getByText("Your booked lessons will stay.", { exact: false }).waitFor();
-await sequenceDialog.getByRole("button", { name: "Keep repeating", exact: true }).click();
-if (stopRepeatPayloads.length !== 0) throw new Error("Keeping the repeat called the stop endpoint.");
+// On a phone from the next-lesson row; on a wide page, where the next lesson
+// sits on the calendar, from the lesson's own link.
+const openWeeklyLesson = async (wide) => {
+  await accountPage.goto(`${base}/book/${wide ? "?manage=manage-qa" : ""}`, { waitUntil: "domcontentloaded" });
+  if (!wide) {
+    await accountPanel.waitFor({ state: "visible" });
+    await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
+    await nextLessonOpen.click();
+  }
+  // Its weekly choices wait for the account's read of the run.
+  await seriesLessonDialog.getByText("Weekly lesson", { exact: true }).waitFor();
+  await seriesLessonDialog.getByRole("button", { name: "Change", exact: true }).waitFor();
+  if (await seriesLessonDialog.getByRole("button", { name: /Manage weekly lessons|Stop repeating|Cancel all booked lessons/ }).count()) {
+    throw new Error("A weekly lesson's own dialog should hold only its Change and Cancel.");
+  }
+};
+for (const width of [1440, 390]) {
+  await accountPage.setViewportSize({ width, height: width > 500 ? 1000 : 844 });
+  repeatStopped = false;
+  stopRepeatPayloads.length = 0;
+  seriesReschedulePayloads.length = 0;
+  const lessonMovesBefore = qaReschedulePayloads.length;
 
-await stopRepeating.click();
-await sequenceDialog.getByRole("button", { name: "Yes, stop repeating", exact: true }).click();
-await sequenceDialog.getByText("Your weekly lessons have stopped repeating. The lessons already booked stay in your calendar.", { exact: true }).waitFor();
-if (stopRepeatPayloads.length !== 1 || stopRepeatPayloads[0].cancelRemaining !== false) {
-  throw new Error(`Expected one confirmed stop-and-keep request; received ${JSON.stringify(stopRepeatPayloads)}.`);
-}
-await sequenceDialog.getByRole("button", { name: "Done", exact: true }).click();
-await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
-// A stopped run leaves its booked dates on the calendar as ordinary lessons.
-try {
-  await accountPage.waitForFunction(
-    () =>
-      !document.querySelector("#lesson-calendar .calendar-booking-times .is-weekly, #lesson-calendar .has-weekly-booking") &&
-      !(document.querySelector("#lesson-calendar .unified-calendar__legend")?.textContent ?? "").includes("Weekly lesson"),
-    null,
-    { timeout: 10_000 }
-  );
-} catch {
-  throw new Error("A stopped sequence should no longer appear as weekly lessons.");
-}
-if (
-  !(await qaStartDay.evaluate((day) => day.classList.contains("has-booking"))) ||
-  ((await accountPage.locator(".lesson-overview__next").textContent()) ?? "").includes("Weekly")
-) {
-  throw new Error("Every retained date from a stopped sequence should stay on the calendar as its own lesson.");
-}
-try {
-  await accountPage.waitForFunction(
-    () => /12\s*upcoming$/i.test(document.querySelector("#account-menu button")?.textContent?.trim() ?? ""),
-    null,
-    { timeout: 10_000 }
-  );
-} catch {
-  throw new Error("Your lessons should count each retained date of a stopped weekly run on its own.");
-}
+  // Every week, 90 minutes, same day and time: the price before the press
+  // and the run's request after it.
+  await openWeeklyLesson(width > 500);
+  await seriesLessonDialog.getByRole("button", { name: "Change", exact: true }).click();
+  const weeklyChange = accountPage.getByRole("dialog", { name: "Change your lesson", exact: true });
+  await weeklyChange.waitFor({ state: "visible" });
+  if (!(await weeklyChange.getByRole("radio", { name: "This lesson", exact: true }).isChecked())) {
+    throw new Error("Change should start on This lesson.");
+  }
+  await weeklyChange.getByRole("radio", { name: "Every week", exact: true }).check();
+  await weeklyChange.getByText(/^Currently \w+days at /).waitFor();
+  await weeklyChange.getByRole("radio", { name: "90-minute lesson · €35", exact: true }).check();
+  const changeEveryWeek = weeklyChange.getByRole("button", { name: "Change every week", exact: true });
+  await accountPage.waitForFunction(() => [...document.querySelectorAll(".unified-calendar__move button")]
+    .some((button) => button.textContent?.trim() === "Change every week" && !button.disabled), null, { timeout: 10_000 });
+  await weeklyChange.getByText("Each becomes 90 mins, €35", { exact: true }).waitFor();
+  await weeklyChange.getByText(`, from `, { exact: false }).first().waitFor();
+  if (seriesReschedulePayloads.length || stopRepeatPayloads.length || qaReschedulePayloads.length !== lessonMovesBefore) {
+    throw new Error("Choosing Every week and a length sent a request before the press.");
+  }
+  await changeEveryWeek.click();
+  await sequenceDialog.getByText("Your upcoming weekly lessons have moved.", { exact: false }).waitFor();
+  if (
+    seriesReschedulePayloads.length !== 1 ||
+    seriesReschedulePayloads[0].startAt !== qaStart.toISOString() ||
+    seriesReschedulePayloads[0].lessonType !== "longer-90" ||
+    seriesReschedulePayloads[0].location !== "online" ||
+    seriesReschedulePayloads[0].expectedPriceCents !== 3500
+  ) {
+    throw new Error(`Every week at 90 minutes should keep the day and time at the price shown: ${JSON.stringify(seriesReschedulePayloads)}.`);
+  }
+  await sequenceDialog.getByRole("button", { name: "Done", exact: true }).click();
 
-// Restore the synthetic active series so the separate bulk-cancellation path
-// can still be exercised without creating a second mock student.
-repeatStopped = false;
-stopRepeatPayloads.length = 0;
-await accountPage.goto(`${base}/book/`, { waitUntil: "domcontentloaded" });
-await accountPanel.waitFor({ state: "visible" });
-await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
-await nextLessonOpen.click();
-await seriesLessonDialog.getByRole("button", { name: "Manage weekly lessons", exact: true }).click();
-await sequenceDialog.getByRole("heading", { name: "Manage weekly lessons", exact: true }).waitFor();
-const restoredCancelAllBooked = sequenceDialog.getByRole("button", { name: "Cancel all booked lessons", exact: true });
+  // Cancel, Every week: Stop repeating is the lesser choice in the same step.
+  await openWeeklyLesson(width > 500);
+  await seriesLessonDialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await sequenceDialog.getByRole("button", { name: "Yes, cancel it", exact: true }).waitFor();
+  await sequenceDialog.getByRole("radio", { name: "Every week", exact: true }).check();
+  await sequenceDialog.getByRole("heading", { name: "Cancel weekly lessons?", exact: true }).waitFor();
+  await sequenceDialog.getByText("Any paid lesson that can still be cancelled is refunded automatically", { exact: true }).waitFor();
+  if (stopRepeatPayloads.length !== 0) throw new Error("Choosing Every week under Cancel called the stop endpoint.");
+  await sequenceDialog.getByRole("button", { name: "Stop repeating", exact: true }).click();
+  await sequenceDialog.getByText("Your weekly lessons have stopped repeating. The lessons already booked stay in your calendar.", { exact: true }).waitFor();
+  if (stopRepeatPayloads.length !== 1 || stopRepeatPayloads[0].cancelRemaining !== false) {
+    throw new Error(`Expected one stop-and-keep request; received ${JSON.stringify(stopRepeatPayloads)}.`);
+  }
+  await sequenceDialog.getByRole("button", { name: "Done", exact: true }).click();
+  await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
+  if (width === 390) {
+    // A stopped run leaves its booked dates on the calendar as ordinary lessons.
+    try {
+      await accountPage.waitForFunction(
+        () =>
+          !document.querySelector("#lesson-calendar .calendar-booking-times .is-weekly, #lesson-calendar .has-weekly-booking") &&
+          !(document.querySelector("#lesson-calendar .unified-calendar__legend")?.textContent ?? "").includes("Weekly lesson"),
+        null,
+        { timeout: 10_000 }
+      );
+    } catch {
+      throw new Error("A stopped sequence should no longer appear as weekly lessons.");
+    }
+    if (
+      !(await qaStartDay.evaluate((day) => day.classList.contains("has-booking"))) ||
+      ((await accountPage.locator(".lesson-overview__next").textContent()) ?? "").includes("Weekly")
+    ) {
+      throw new Error("Every retained date from a stopped sequence should stay on the calendar as its own lesson.");
+    }
+    try {
+      await accountPage.waitForFunction(
+        () => /12\s*upcoming$/i.test(document.querySelector("#account-menu button")?.textContent?.trim() ?? ""),
+        null,
+        { timeout: 10_000 }
+      );
+    } catch {
+      throw new Error("Your lessons should count each retained date of a stopped weekly run on its own.");
+    }
+  }
 
-await restoredCancelAllBooked.click();
-if (stopRepeatPayloads.length !== 0) throw new Error("Opening the bulk cancellation confirmation called the stop endpoint.");
-await sequenceDialog.getByText("Any paid lesson that can still be cancelled is refunded automatically.", { exact: false }).waitFor();
-await waitForOrientation(accountPage);
-await accountPage.screenshot({
-  path: path.join(outDir, "booking-sequence-cancel-confirm-mobile.png"),
-  fullPage: true
-});
-const sequenceConfirmationLayout = await accountPage.evaluate(() => ({
-  clientWidth: document.documentElement.clientWidth,
-  scrollWidth: document.documentElement.scrollWidth,
-  panelWidth: document.querySelector(".lesson-manage-dialog")?.getBoundingClientRect().width ?? 0,
-  contentWidth: document.querySelector(".lesson-manage-dialog")?.scrollWidth ?? Infinity
-}));
-if (
-  sequenceConfirmationLayout.scrollWidth > sequenceConfirmationLayout.clientWidth + 1 ||
-  sequenceConfirmationLayout.contentWidth > sequenceConfirmationLayout.panelWidth + 1
-) {
-  throw new Error(`Recurring sequence cancellation should not clip or overflow: ${JSON.stringify(sequenceConfirmationLayout)}.`);
+  // Restore the synthetic active series for Cancel all booked lessons.
+  repeatStopped = false;
+  stopRepeatPayloads.length = 0;
+  await openWeeklyLesson(width > 500);
+  await seriesLessonDialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await sequenceDialog.getByRole("radio", { name: "Every week", exact: true }).check();
+  const cancelAllBooked = sequenceDialog.getByRole("button", { name: "Cancel all booked lessons", exact: true });
+  await cancelAllBooked.waitFor();
+  await waitForOrientation(accountPage);
+  if (width === 390) {
+    await accountPage.screenshot({ path: path.join(outDir, "booking-sequence-cancel-confirm-mobile.png"), fullPage: true });
+  }
+  const sequenceConfirmationLayout = await accountPage.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    panelWidth: document.querySelector(".lesson-manage-dialog")?.getBoundingClientRect().width ?? 0,
+    contentWidth: document.querySelector(".lesson-manage-dialog")?.scrollWidth ?? Infinity
+  }));
+  if (
+    sequenceConfirmationLayout.scrollWidth > sequenceConfirmationLayout.clientWidth + 1 ||
+    sequenceConfirmationLayout.contentWidth > sequenceConfirmationLayout.panelWidth + 1
+  ) {
+    throw new Error(`Cancelling every week should not clip or overflow: ${JSON.stringify(sequenceConfirmationLayout)}.`);
+  }
+  await sequenceDialog.getByRole("button", { name: "Keep lessons", exact: true }).click();
+  if (stopRepeatPayloads.length !== 0) throw new Error("Keeping the lessons called the stop endpoint.");
+  await seriesLessonDialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  // Cancel opens on This lesson each time.
+  await sequenceDialog.getByRole("button", { name: "Yes, cancel it", exact: true }).waitFor();
+  await sequenceDialog.getByRole("radio", { name: "Every week", exact: true }).check();
+  await cancelAllBooked.click();
+  await cancelAllBooked.waitFor({ state: "hidden" });
+  if (stopRepeatPayloads.length !== 1 || stopRepeatPayloads[0].cancelRemaining !== true) {
+    throw new Error(`Expected one bulk cancellation request; received ${JSON.stringify(stopRepeatPayloads)}.`);
+  }
+  await sequenceDialog.getByText("4 lessons were cancelled.", { exact: false }).waitFor();
+  await sequenceDialog.getByRole("button", { name: "Done", exact: true }).click();
 }
-await sequenceDialog.getByRole("button", { name: "Keep booked lessons", exact: true }).click();
-if (stopRepeatPayloads.length !== 0) throw new Error("Keeping booked lessons called the stop endpoint.");
-await restoredCancelAllBooked.click();
-await sequenceDialog.getByRole("button", { name: "Yes, cancel all", exact: true }).click();
-await restoredCancelAllBooked.waitFor({ state: "hidden" });
-if (stopRepeatPayloads.length !== 1 || stopRepeatPayloads[0].cancelRemaining !== true) {
-  throw new Error(`Expected one confirmed bulk cancellation request; received ${JSON.stringify(stopRepeatPayloads)}.`);
-}
-await sequenceDialog.getByText("4 lessons were cancelled.", { exact: false }).waitFor();
-await sequenceDialog.getByRole("button", { name: "Done", exact: true }).click();
+await accountPage.setViewportSize({ width: 390, height: 844 });
 
 // Reading the terms must never accept them or discard an unfinished booking.
 qaPostpay = true;

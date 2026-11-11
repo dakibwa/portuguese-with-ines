@@ -47,7 +47,7 @@ for (const width of [390, 1440]) {
   await signedOut.route("**/availability?**", (route) => route.fulfill({ json: { slotsByDate: {}, horizonDays: 56 } }));
   await signedOut.goto(`${base}/book/?manage=manage-upcoming`, { waitUntil: "domcontentloaded" });
   await signedOut.getByRole("button", { name: /^Change/ }).first().click();
-  await signedOut.getByRole("heading", { name: "Choose a new date and time" }).waitFor();
+  await signedOut.getByRole("heading", { name: "Change your lesson" }).waitFor();
   assert.equal(await signedOut.locator("#booking-lessons-sign-in").count(), 0, "A manage link must not ask for an account to change its lesson");
   await signedOut.close();
   const diary = await browser.newPage({ viewport: { width, height: 1000 } });

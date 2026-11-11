@@ -50,9 +50,8 @@ export function NextLesson({
         </p>
         <button className="teacher-next__lesson" type="button" onClick={() => onOpen(next)}>
           <strong>{next.student_name}</strong>
-          {/* Happening now says when already; its times are enough. */}
           <span>
-            {live ? null : `${when}, `}{formatSlotTime(next.starts_at)}–{formatSlotTime(next.ends_at)}
+            {when}, {formatSlotTime(next.starts_at)}–{formatSlotTime(next.ends_at)}
           </span>
           <span className="teacher-next__place">
             {porto ? (
