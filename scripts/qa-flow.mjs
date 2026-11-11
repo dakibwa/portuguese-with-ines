@@ -2343,9 +2343,10 @@ await accountPage.waitForFunction(
 if (await accountPage.locator("#lesson-calendar .unified-calendar__grid").isVisible()) {
   throw new Error("On a phone, a chosen day's times should take the calendar's place.");
 }
-// A day with times either side of 14:00 shows one part at a time; when the
-// day mixes start minutes each part is a small timetable, one row per hour,
-// each start minute in its own column, and otherwise its times sit side by side.
+// A day's few times show together; only a day with loads of them shows one
+// part at a time, divided at 14:00. Either way they sit side by side in order
+// with no holes: each row starts at the left edge and is filled before the
+// next begins (11 November 2026, Dan).
 const timePicker = accountPage.locator("#lesson-calendar .unified-calendar__availability .time-picker");
 const partInputs = timePicker.locator(".time-picker__parts input");
 const partCount = await partInputs.count();
@@ -2359,26 +2360,40 @@ for (let index = 0; index < Math.max(partCount, 1); index++) {
       return { part, hour: time.slice(0, 2), minute: time.slice(3, 5), top: Math.round(box.top), left: Math.round(box.left), height: box.height };
     }), index));
 }
-const mixedMinutes = new Set(shownTimes.map((time) => time.minute)).size > 1;
-const timesShareHourRows = !mixedMinutes || shownTimes.every((a) => shownTimes.every((b) =>
-  a.part !== b.part || (a.hour === b.hour) === (Math.abs(a.top - b.top) <= 1)));
-const timesShareMinuteColumns = !mixedMinutes || shownTimes.every((a) => shownTimes.every((b) => a.minute !== b.minute || Math.abs(a.left - b.left) <= 1));
-// Times on one minute never stand one per line: the first two of a part share a row.
-const timesSideBySide = mixedMinutes || [0, 1].every((part) => {
+// The columns the grid has, by where its times start from the left.
+const columnLefts = [...new Set(shownTimes.map((time) => time.left))].sort((a, b) => a - b);
+const timesFlowWithoutHoles = [0, 1].every((part) => {
+  const inPart = shownTimes.filter((time) => time.part === part);
+  // A time under the pointer lifts a pixel, so a row is the times within two of each other.
+  const rows = [];
+  for (const time of [...inPart].sort((a, b) => a.top - b.top || a.left - b.left)) {
+    const row = rows.at(-1);
+    if (row && Math.abs(row[0].top - time.top) <= 2) row.push(time);
+    else rows.push([time]);
+  }
+  for (const row of rows) row.sort((a, b) => a.left - b.left);
+  // In time order, each row holding the first columns from the left, and only the last row short.
+  return inPart.every((time, index) => index === 0 || `${inPart[index - 1].hour}:${inPart[index - 1].minute}` < `${time.hour}:${time.minute}`) &&
+    rows.every((row, index) => row.every((time, place) => Math.abs(time.left - columnLefts[place]) <= 1) &&
+      (index === rows.length - 1 || row.length === rows[0].length));
+});
+// Never one per line: the first two of a part share a row.
+const timesSideBySide = [0, 1].every((part) => {
   const inPart = shownTimes.filter((time) => time.part === part);
   return inPart.length < 2 || Math.abs(inPart[0].top - inPart[1].top) <= 1;
 });
 const headingCount = await timePicker.evaluate((picker) => picker.parentElement?.querySelectorAll("h3, h4").length ?? -1);
 if (
   shownTimes.length !== 5 ||
-  shownTimes.some((time) => (time.hour < "14") !== (partCount < 2 ? shownTimes[0].hour < "14" : time.part === 0)) ||
+  // Split only when there are more than a dozen, and then at 14:00.
+  (partCount >= 2) !== (shownTimes.length > 12) ||
+  (partCount >= 2 && shownTimes.some((time) => (time.hour < "14") !== (time.part === 0))) ||
   headingCount !== 0 ||
   shownTimes.some((time) => time.height < 44 || time.height > 54) ||
-  !timesShareHourRows ||
-  !timesShareMinuteColumns ||
+  !timesFlowWithoutHoles ||
   !timesSideBySide
 ) {
-  throw new Error(`A free day's times should split at 14:00, each part a small timetable: ${JSON.stringify({ partCount, shownTimes })}.`);
+  throw new Error(`A free day's few times should show together, in order with no holes: ${JSON.stringify({ partCount, shownTimes })}.`);
 }
 if (partCount) await partInputs.first().check();
 if (

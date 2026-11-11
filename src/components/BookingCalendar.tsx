@@ -142,17 +142,25 @@ function calendarMonths(weeks: BookingWeek[]) {
     : { long: `${monthYear.format(first)} – ${monthYear.format(last)}`, short: `${shortMonthYear.format(first)} – ${shortMonthYear.format(last)}` };
 }
 
+/** How many of a day's free times sit together before they are split in two. */
+const TIMES_TOGETHER = 12;
+
 /**
- * A day's free times in two fixed halves, divided where Inês's day divides
- * (14:00 in Porto) and named by the same span every day (from her earliest
- * start to the divide, and from it to her latest), so a full day of quarter
- * hours is never one wall of buttons and the choice never shifts under the
- * student. It reads the clock the calendar shows (`zone`). A half with nothing
- * free that day says so. When the day mixes start minutes each half is a
- * small timetable, one row per hour and each start minute in its own column,
- * so a gap reads as a gap; when every time starts on the same minute they
- * sit side by side. It opens on the half holding the time already chosen, or
- * the first with free times.
+ * A day's free times. A few are simply shown together; only a day with
+ * loads of them is split (11 November 2026, Dan: "keep it dynamic … I only
+ * split them out before because you might end up with loads of times"), into
+ * two fixed halves divided where Inês's day divides (14:00 in Porto) and named
+ * by the same span every day (from her earliest start to the divide, and from
+ * it to her latest), so a full day of quarter hours is never one wall of
+ * buttons. It reads the clock the calendar shows (`zone`). A half with nothing
+ * free that day says so, and the picker opens on the half holding the time
+ * already chosen, or the first with free times.
+ *
+ * Times sit side by side in order, with as many to a row as the day has
+ * start minutes (four for quarter hours, never fewer than three), and no
+ * holes: a time taken leaves no empty place, so one free time before a full
+ * hour never stands alone at the end of an empty row (Dan: "this looks
+ * weird").
  */
 function TimePicker({ halves, listLabel, renderTime, selected = "", slots, zone }: {
   /** Where the day divides and the span its halves are named by; null keeps one list. */
@@ -182,18 +190,18 @@ function TimePicker({ halves, listLabel, renderTime, selected = "", slots, zone 
   );
   const [chosen, setChosen] = useState(selected ? partOf(selected) : "");
   if (!slots.length) return null;
-  const current = halves
+  const split = Boolean(halves) && slots.length > TIMES_TOGETHER;
+  const current = split
     ? parts.find((part) => part.id === chosen) ?? parts.find((part) => part.slots.length) ?? parts[0]
     : { id: "all", label: "", slots };
   const minutes = [...new Set(slots.map((slot) => clock(slot.startAt).slice(3, 5)))].sort();
-  const hours = [...new Set(current.slots.map((slot) => clock(slot.startAt).slice(0, 2)))];
-  // A timetable only helps when the day mixes start minutes (:00, :15, :30);
-  // times that all start on the same minute simply sit side by side, three
-  // to a row, rather than one per line (13 October 2026, Dan).
-  const timetable = minutes.length > 1 && minutes.length <= 4;
+  // A day that mixes start minutes (:00, :15, :30) gets a column for each, so
+  // a full hour is one row; times that all start on the same minute sit
+  // three to a row, rather than one per line (13 October 2026, Dan).
+  const columns = minutes.length > 1 && minutes.length <= 4 ? Math.max(minutes.length, 3) : 0;
   return (
     <div className="time-picker">
-      {halves ? (
+      {split ? (
         <div
           aria-label={`Part of the day, ${timeZoneName(zone)}`}
           className={`segmented time-picker__parts segmented--position-${current.id === "late" ? 1 : 0}`}
@@ -216,12 +224,9 @@ function TimePicker({ halves, listLabel, renderTime, selected = "", slots, zone 
           role={listLabel ? "list" : undefined}
           // At least three columns, so one free time is a time, not a bar
           // across the dialog (13 October 2026, Dan).
-          style={timetable ? { gridTemplateColumns: `repeat(${Math.max(minutes.length, 3)}, minmax(0, 1fr))` } : undefined}
+          style={columns ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined}
         >
-          {current.slots.map((slot) => renderTime(slot, timetable ? {
-            gridColumn: minutes.indexOf(clock(slot.startAt).slice(3, 5)) + 1,
-            gridRow: hours.indexOf(clock(slot.startAt).slice(0, 2)) + 1
-          } : undefined))}
+          {current.slots.map((slot) => renderTime(slot, undefined))}
         </div>
       ) : (
         <p className="booking-state-note time-picker__empty">Nothing free {current.id === "early" ? "before" : "from"} {divide} on this day.</p>
