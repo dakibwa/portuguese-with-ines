@@ -172,6 +172,8 @@ ${darkRules.split("\n").filter((rule) => !rule.startsWith(".pwi-dab")).map((rule
 .pwi-pad{padding-left:22px!important;padding-right:22px!important}
 .pwi-h1{font-size:22px!important}
 .pwi-panel-pad{padding:16px 18px!important}
+.pwi-steps-head{padding:16px 18px 0!important}
+.pwi-steps-item{padding-left:18px!important;padding-right:18px!important}
 .pwi-btn-wrap{width:100%!important}
 .pwi-btn{padding:15px 18px!important}
 }
@@ -231,14 +233,32 @@ function layout({ heading, preheader, intro, hero, heroNote, rows = [], callout,
   //   quiet   a value that is only a promise ("Online link will appear ...").
   //   dates   one date per line, each its own paragraph so a wrapped date still
   //           reads as one item.
+  //   title   a small label over the rows beneath it, with no dab: what they
+  //           are and, said once, the clock their times are on (11 November
+  //           2026, Dan: "porto time can just be said once").
+  //   fact    one short line beside a dab, with no label.
+  let dabs = 0;
   const rowsHtml = rows.length
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${rows
-        .map(({ label, value, url, lesson, quiet, dates }, index) => {
+        .map(({ label, value, url, lesson, quiet, dates, title, fact }, index) => {
+          if (title) {
+            return `
+        <tr><td colspan="2" style="padding:${index ? 22 : 0}px 0 0"><p class="pwi-label" style="margin:0;${LABEL}">${escapeHtml(title)}</p></td></tr>`;
+          }
           const meeting = safeMeetingLink(url);
           const valueFont = lesson || dates ? "400 14px/1.5" : "400 15px/1.5";
           const valueColour = quiet ? BRAND.lavenderInk : BRAND.ink;
           const valueClass = quiet ? "pwi-quiet" : "pwi-text";
-          const above = index ? 14 : 0;
+          // Closer under its title, and one short fact closer to the last.
+          const above = index ? (rows[index - 1].title ? 10 : fact && rows[index - 1].fact ? 8 : 14) : 0;
+          const mark = dab(dabs++);
+          if (fact) {
+            return `
+        <tr>
+          <td width="28" valign="top" style="width:28px;padding:${above + 4}px 0 0;line-height:0">${mark}</td>
+          <td class="pwi-text" valign="top" style="padding:${above}px 0 0;font:400 15px/1.5 ${SANS};color:${BRAND.ink};overflow-wrap:anywhere">${richTogether(fact, "row")}</td>
+        </tr>`;
+          }
           const content = dates
             ? String(value ?? "")
                 .split(/\r?\n/)
@@ -251,7 +271,7 @@ function layout({ heading, preheader, intro, hero, heroNote, rows = [], callout,
               }</p>`;
           return `
         <tr>
-          <td width="28" valign="top" style="width:28px;padding:${above + (lesson ? 3 : 1)}px 0 0;line-height:0">${dab(index)}</td>
+          <td width="28" valign="top" style="width:28px;padding:${above + (lesson ? 3 : 1)}px 0 0;line-height:0">${mark}</td>
           <td valign="top" style="padding:${above}px 0 0">
             <p class="${lesson ? "pwi-text" : "pwi-label"}" style="margin:0;${lesson ? `font:600 15px/20px ${SANS};color:${BRAND.ink}` : LABEL}">${escapeHtml(label)}</p>
             ${content}
@@ -329,12 +349,12 @@ ${STYLE}
         // should be beautiful and simple to understand).
         steps?.items?.length
           ? section(`<table class="pwi-panel" role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${BRAND.lavenderWash}" style="${PANEL}">
-          <tr><td class="pwi-panel-pad" style="padding:18px 22px 6px">
+          <tr><td class="pwi-steps-head" style="padding:18px 22px 0">
             <p class="pwi-date" style="margin:0;font:600 16px/1.4 ${SANS};color:${BRAND.blue}">${escapeHtml(steps.title)}</p>
           </td></tr>
           ${steps.items
             .map(
-              (item, index) => `<tr><td style="padding:10px 22px ${index === steps.items.length - 1 ? 18 : 0}px">
+              (item, index) => `<tr><td class="pwi-steps-item" style="padding:10px 22px ${index === steps.items.length - 1 ? 18 : 0}px">
             <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>
               <td width="26" valign="top" style="width:26px;padding-top:1px">
                 <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:separate"><tr>
@@ -415,7 +435,11 @@ function plainText({ heading, intro, hero, heroNote, rows = [], callout, message
   if (callout) lines.push("", clean(callout));
   if (rows.length) {
     lines.push("");
-    for (const { label, value, url } of rows) lines.push(`${label}: ${clean(value)}${safeMeetingLink(url) ? ` — ${url}` : ""}`);
+    for (const { label, value, url, title, fact } of rows) {
+      if (title) lines.push(...(lines[lines.length - 1] === "" ? [] : [""]), title);
+      else if (fact) lines.push(clean(fact));
+      else lines.push(`${label}: ${clean(value)}${safeMeetingLink(url) ? ` — ${url}` : ""}`);
+    }
   }
   if (steps?.items?.length) lines.push("", steps.title, ...steps.items.map((item, index) => `${index + 1}. ${clean(item)}`));
   if (action) lines.push("", `${action.label}: ${action.url}`);

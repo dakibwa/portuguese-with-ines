@@ -629,32 +629,37 @@ nothing about them changes.
 The welcome's lessons (14 October 2026, Dan: "all their lessons and prices
 already done properly") are read from the lessons themselves, so they are right
 whenever she added them and whatever she has since changed. Each of a student's
-upcoming confirmed lessons becomes a line, in the site's email design (its
-words were cut to the fewest plain ones on 11 November 2026; see
-`design/README.md`): a weekly run is **one** line (`Weekly ·
-Online`, `Every Tuesday, 17:00 · Porto time`, `From 20 October 2026 until 8
-December 2026`, or `…, until you stop it` for a run with no end, and `60
-minutes · €22 a lesson`), a lesson on its own is one line (`Lesson · Online`,
-its date and time, `60 minutes · €22`, or `…· €22 paid` once it is paid), and the
-trial is named. A lesson belongs to its run while it still sits on the run's own
-Porto slot, length (lesson type) and place, and keeps its time on the student's
-own clock; one that was moved, lengthened or put elsewhere reads as the lesson it
-now is, never as a second run. A run never hides a week it has no lesson: for a
-student she set up, the welcome is the only email they will have, because the
-emails about a skipped week (her day off) or a cancelled one were held. So a run
-line names the weeks between its first and last lesson that have none
-(`No lesson on 22 September or 6 October`), unless the run has a lesson on that
-day that now reads as its own line. A run with no end says `until you stop it`
-only while it is active and only for its latest stretch; a stopped one says
-`until` its last remaining lesson. The price is the lesson's own `amount_cents`,
-which `repriceStudent` keeps on the student's own rate for lessons still to come
-(a run's line uses the next lesson whose price is still open, never one she
-marked paid by hand), and the length is the lesson type's. Times are on the
-student's own clock, their timezone (Porto by default) for an online lesson and
-Porto's for one in Porto, each time naming its clock as every email to them
-does (`17:00 · Porto time`). Their own `Your price · 60 / 90 minutes` rows still
-lead when she has set a price. Past twelve lines an `And more` line says how
-many lessons are left to the website.
+upcoming confirmed lessons becomes a bullet of two short lines, in the site's
+email design (11 November 2026, Dan: "retain all the info easily and clearly
+and concisely"): when it is, then its place, length and price. A weekly run is
+**one** bullet (`Every Tuesday, 17:00` over `Online · 60 minutes · €22 a
+lesson`, then `From 20 October`, or `From 20 October to 8 December` for one
+that ends), a lesson on its own is one bullet (`Tuesday 20 October, 17:00` over
+`Online · 60 minutes · €22`, or `… · €22 paid` once it is paid), and the trial
+is named (`Trial lesson · In Porto · …`). Dates leave the year out: every
+lesson here is still to come. A lesson belongs to its run while it still sits
+on the run's own Porto slot, length (lesson type) and place, and keeps its time
+on the student's own clock; one that was moved, lengthened or put elsewhere
+reads as the lesson it now is, never as a second run. A run never hides a week
+it has no lesson: for a student she set up, the welcome is the only email they
+will have, because the emails about a skipped week (her day off) or a cancelled
+one were held. So a run names the weeks between its first and last lesson that
+have none (`No lesson on 22 September or 6 October`), unless the run has a
+lesson on that day that now reads as its own bullet. A run with no end names
+only its start, and only while it is active and for its latest stretch; a
+stopped one says `to` its last remaining lesson. The price is the lesson's own
+`amount_cents`, which `repriceStudent` keeps on the student's own rate for
+lessons still to come (a run uses the next lesson whose price is still open,
+never one she marked paid by hand), and the length is the lesson type's. Times
+are on the student's own clock, their timezone (Porto by default) for an online
+lesson and Porto's for one in Porto. The clock is said once, in the title over
+the list (`Lessons · Porto time`), when every line shares it, and on each line
+(`17:00 · New York time`, under a plain `Lessons`) when they differ. Their own
+prices follow under `Your price`, one bullet for each length she has priced
+(`60 minutes: €22`). Past twelve lines one more bullet says how many lessons
+are left to the website. The layout's rows carry this as `title` rows (a small
+label with no dab) and `fact` rows (one line beside a dab), beside the labelled
+rows every other email uses.
 How they pay is as before: a link that adds their card where the site takes
 cards, or the plain sign-in link.
 
