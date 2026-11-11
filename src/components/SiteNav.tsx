@@ -150,8 +150,8 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
 
       {/* The way into an account, in the booking page's bar (11 November
           2026, Dan: "can they just sign in immediately too?"): beside the
-          menu button, and on a row of its own beneath it on a phone. A
-          student's page has their own menu instead. */}
+          menu button; on a phone, where there is no room, it leads the menu
+          below. A student's page has their own menu instead. */}
       {signInHere ? <a className="site-header__sign-in" href={publicAssetPath("/book/?view=lessons")}>Sign in</a> : null}
 
       <button
@@ -222,6 +222,21 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
             </button>
             {bar ? <AssetMark asset={bar.mark} className="site-header__mark" /> : null}
           </div>
+          {signInHere ? <div className="nav-mobile__account">
+            <a
+              aria-describedby="nav-mobile-note-account"
+              aria-label="Sign in"
+              className="nav-mobile__link nav-mobile__link--account"
+              href={publicAssetPath("/book/?view=lessons")}
+              onClick={() => setOpen(false)}
+            >
+              <AssetMark asset="/visuals/v2-splats/built-around-you-splat-v2.svg" className="nav-mobile__mark" lands />
+              <span className="nav-mobile__text">
+                <span className="nav-mobile__label">Sign in</span>
+                <span className="nav-mobile__note" id="nav-mobile-note-account">See or change your lessons</span>
+              </span>
+            </a>
+          </div> : null}
           <div className="nav-mobile__links">
             {navigation.map((item) => {
               const Destination = item.id === "book" ? "a" : Link;

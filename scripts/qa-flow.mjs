@@ -347,16 +347,17 @@ for (const route of routes) {
 
     if (route.id === "booking") {
       // A visitor's booking page is the one blue bar: the wordmark beside
-      // Book a Lesson, their Sign in and the menu button, with no band.
+      // Book a Lesson and the menu button, with no band. Their Sign in is in
+      // the bar where there is room, and leads the menu on a phone.
       const bar = page.locator(".site-header.is-bar");
       const titles = bar.locator(".site-header__title span:visible");
       const signIn = bar.getByRole("link", { name: "Sign in", exact: true });
       const band = await page.locator(".booking-intro").boundingBox();
       if ((await titles.count()) !== 1 || (await titles.innerText()).trim() !== "Book a Lesson" ||
-          !await signIn.isVisible() || !(await signIn.getAttribute("href")).endsWith("/book/?view=lessons") ||
+          (await signIn.isVisible()) !== (viewport.id === "desktop") || !(await signIn.getAttribute("href")).endsWith("/book/?view=lessons") ||
           !await bar.getByRole("button", { name: "Open menu", exact: true }).isVisible() ||
           await page.locator(".site-nav").count() || (band && band.height > 2)) {
-        throw new Error(`${viewport.id}: booking should be headed by the one bar, Book a Lesson with Sign in and the menu, and no band.`);
+        throw new Error(`${viewport.id}: booking should be headed by the one bar, Book a Lesson with the menu and (wide) Sign in, and no band.`);
       }
     }
 
@@ -632,8 +633,13 @@ if (bookingCalendar) {
   if (lockedOverflow.body !== "hidden" || lockedOverflow.html !== "hidden") {
     throw new Error(`The mobile menu should lock both scroll roots: ${JSON.stringify(lockedOverflow)}.`);
   }
-  if ((await page.locator("#site-nav-mobile .nav-mobile__link").count()) !== 4) {
+  if ((await page.locator("#site-nav-mobile .nav-mobile__links .nav-mobile__link").count()) !== 4) {
     throw new Error("The mobile menu should contain the four primary destinations once each.");
+  }
+  // On a phone the bar has no room for it, so a visitor's Sign in leads the menu.
+  const menuSignIn = page.locator("#site-nav-mobile").getByRole("link", { name: "Sign in", exact: true });
+  if (!await menuSignIn.isVisible() || !(await menuSignIn.getAttribute("href")).endsWith("/book/?view=lessons")) {
+    throw new Error("On a phone the booking page's menu should lead with Sign in.");
   }
   await page.getByRole("button", { name: "Close menu", exact: true }).click();
   await page.waitForTimeout(250);
@@ -2883,9 +2889,10 @@ if (!(await accountPage.evaluate(() => window.localStorage.getItem("ines-account
 // are already open on wide cards; Sign out is always in Your details.
 await chooseAccountAction("Edit details");
 await accountPanel.locator(".my-lessons__details").getByRole("button", { name: "Sign out", exact: true }).click();
-// Signed out, the way back in is the bar's Sign in.
-const headerSignIn = accountPage.locator(".site-header").getByRole("link", { name: "Sign in", exact: true });
-await headerSignIn.waitFor();
+// Signed out, the way back in is the bar's Sign in again (shown beside the
+// menu button where there is room; this phone-width page has it in the menu).
+const headerSignIn = accountPage.locator(".site-header .site-header__sign-in");
+await headerSignIn.waitFor({ state: "attached" });
 const signInHref = new URL(await headerSignIn.getAttribute("href"), base);
 if (`${signInHref.pathname}${signInHref.search}` !== "/book/?view=lessons") {
   throw new Error(`The bar's Sign in should open Your lessons: ${signInHref}`);

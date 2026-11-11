@@ -1052,8 +1052,8 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 }
 
 /* A visitor's way in, in the booking page's bar: beside the menu button,
-   on a slim row of its own beneath it on a phone, and gone once the page is
-   a student's, whose own menu holds their lessons. Underlined because it is
+   leading the menu instead on a phone, and gone once the page is a
+   student's, whose own menu holds their lessons. Underlined because it is
    not a page; never a button of its own. */
 .site-header__sign-in {
   position: relative;
@@ -1253,24 +1253,35 @@ html:active-view-transition-type(document)::view-transition-new(root) {
     margin-right: 0;
   }
 
-  /* No room beside the menu button on a phone: the way in takes a slim row
-     of its own inside the bar, at its right, and the row above keeps its
-     places (the wordmark still gives way first). */
-  :root:not([data-booking-account]) .is-bar:has(.site-header__sign-in) :is(.site-header__inner, .nav-mobile__heading) {
-    padding-bottom: 2.3rem;
-  }
-
+  /* No room beside the menu button on a phone, and a row of its own was
+     "very ugly" (11 November 2026, Dan): there the way in leads the menu. */
   .site-header__sign-in {
-    position: absolute;
-    right: var(--page-pad);
-    bottom: 0.1rem;
-    min-height: 36px;
-    margin: 0;
-    font-size: 0.68rem;
+    display: none;
   }
 
   .is-bar .site-header__sign-in + :is(.nav-toggle, .nav-mobile__close) {
     margin-left: auto;
+  }
+}
+
+/* The menu's first row on a phone, for a visitor to Booking: Sign in, drawn
+   as its places are, with the sign-in card's own mark. */
+.nav-mobile__account {
+  padding: 0.35rem var(--page-pad) 0;
+}
+
+/* It is the first of the rows, so it keeps its rule and they follow at once. */
+.nav-mobile__account > .nav-mobile__link {
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.nav-mobile__account + .nav-mobile__links {
+  padding-top: 0;
+}
+
+@media (min-width: 561px) {
+  .nav-mobile__account {
+    display: none;
   }
 }
 

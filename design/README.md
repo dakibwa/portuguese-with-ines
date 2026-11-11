@@ -1358,11 +1358,12 @@ confirmation never takes away the trial being booked. The bar's head offers
 signs in from the page's one bar (11 November 2026, Dan: "can they just sign
 in immediately too?", then of a coral `Already booked? Sign in` in the card:
 "I don't like this"): `Sign in` sits beside the bar's menu button in small
-capitals, cream and underlined because it is not a page, and takes a slim
-row of its own at the bar's right on a phone, where there is no room beside
-the button. It opens `/book/?view=lessons`, and the open menu's heading
-carries the same word so nothing moves. A student's page has their own menu
-instead. Booking still asks for an account only at the confirmation.
+capitals, cream and underlined because it is not a page. A phone's bar has
+no room for it, and a row of its own under the button was "very ugly", so
+there it is the menu's first row, drawn as the menu's places are with the
+sign-in card's mark and `See or change your lessons`. It opens
+`/book/?view=lessons`, and the open menu's heading carries what the bar
+does so nothing moves. A student's page has their own menu instead. Booking still asks for an account only at the confirmation.
 Signing in to view lessons shows the `Your account`
 card on its own, with no `Back` above it: the header's `Booking` starts
 afresh (27 October 2026, Dan). On wide screens the
