@@ -1,6 +1,6 @@
-# Keep old links in the booking flow. All fragments open the combined notice.
-/terms /book/#terms-privacy 301
-/terms/ /book/#terms-privacy 301
+# /terms is handled by PolicyRedirect so section fragments survive.
+# An edge redirect cannot see the incoming fragment and would overwrite it.
+# Keep the section-specific legacy URLs in the booking flow.
 /booking-terms /book/#booking 301
 /booking-terms/ /book/#booking 301
 /privacy /book/#privacy 301

@@ -1,12 +1,24 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 
 const base = (process.env.QA_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const out = "tmp/qa/navigation";
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ viewport: { width: 1920, height: 1100 }, timezoneId: "Europe/Lisbon" });
+// The release's static server does not apply Pages rules. Honour its exact
+// redirects here too, so a rule that overwrites an old fragment fails locally.
+if (["localhost", "127.0.0.1"].includes(new URL(base).hostname)) {
+  const redirects = (await readFile(new URL("../public/_redirects", import.meta.url), "utf8"))
+    .split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith("#"))
+    .map(line => line.split(/\s+/));
+  const origin = new URL(base).origin;
+  for (const [source, destination, status = 302] of redirects) {
+    await context.route(url => url.origin === origin && url.pathname === source,
+      route => route.fulfill({ status: Number(status), headers: { location: new URL(destination, base).href } }));
+  }
+}
 const student = { id: "navigation-preview", name: "Ana Martins", email: "preview@example.invalid", phone: "", timezone: "Europe/Lisbon", role: "student" };
 const lessonType = { id: "single-60", name: "Single lesson", durationMinutes: 60, priceCents: 2500 };
 // Public calendar reads are fixtures too, so navigation can be checked without
