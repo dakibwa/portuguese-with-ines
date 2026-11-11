@@ -181,7 +181,8 @@ permissions), with Stripe and email isolated. `test:teacher-calendar` proves
 Porto times across the clock changes and how hours and time off are stored.
 
 The release then runs fourteen customer journeys against the built export it
-publishes, at desktop and phone widths, in about three minutes: `qa-flow`
+publishes, at desktop and phone widths, shared between four machines so they
+take about two minutes: `qa-flow`
 (public pages and a real booking, move and cancel), `qa-workspace-navigation`,
 `qa-booking-selection`, `qa-payment-recovery`, `qa-teacher-calendar` (Inês's
 schedule), `qa-homework`, `qa-transition-kit` (sign-in links and saving a card),
@@ -390,6 +391,14 @@ domains serve. There is no GitHub Pages preview any more: it needed the root of
 `dakibwa.github.io`, which went when the repository was renamed from
 `dakibwa/dakibwa.github.io` to `dakibwa/portuguese-with-ines` on
 17 September 2026.
+
+A release takes about four minutes (11 November 2026, Dan: "I like fast
+relsases"; it had grown to ten). Three things start together: the booking
+Worker's tests and its deploy, the build, and the types, lint and unit tests.
+Once the Worker is live, its health is checked and the customer journeys run
+against the build, shared between four machines. The site publishes only when
+all of it has passed. Each run's summary page lists how long every journey
+took, which is where to look when a release slows down.
 
 **Pull requests get a static website preview.** `.github/workflows/preview.yml`
 builds pull requests to `main` from branches in this repository and publishes
