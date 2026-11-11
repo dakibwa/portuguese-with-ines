@@ -119,8 +119,13 @@ jobs:
       - name: Run release check
         run: npm run check:release
 
+      # The browser alone, from Playwright's own store. `--with-deps` asked
+      # Ubuntu's servers for nine fallback font packages and nothing else: the
+      # runner already has every library Chromium needs, and the site draws
+      # with its own bundled fonts. On 11 November 2026 five releases in a row
+      # failed at that step when the runner could not resolve those servers.
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       - name: Check Akibwa portfolio entry
         run: npm run test:portfolio-banner
