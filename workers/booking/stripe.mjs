@@ -233,6 +233,57 @@ export function createStudentCardSession(env, { student, successUrl, cancelUrl, 
   );
 }
 
+/**
+ * A card added from a lesson's own link, for that lesson or its weekly run
+ * (10 November 2026, Dan: "Pay by card" straight from the lesson's page).
+ * Always Stripe's hosted page. The reference names the lesson with a prefix,
+ * so it can never be read as a booking's own setup (a bare booking id) or as
+ * the account card (`student:`). The metadata is what was agreed, so the
+ * webhook applies exactly that.
+ */
+export function createLessonCardSession(env, { booking, student, scope, seriesId = null, successUrl, cancelUrl }) {
+  return stripeRequest(
+    env,
+    "/checkout/sessions",
+    {
+      integration_identifier: INTEGRATION_IDENTIFIER,
+      mode: "setup",
+      currency: currency(),
+      payment_method_types: { 0: "card" },
+      client_reference_id: `lesson-card:${booking.id}`,
+      ...(student.stripe_customer_id
+        ? { customer: student.stripe_customer_id }
+        : { customer_creation: "always", customer_email: realEmail(student.email) || undefined }),
+      setup_intent_data: { metadata: { booking_reference: booking.reference, student_id: student.id } },
+      ...uiModeFields(env, { successUrl, cancelUrl, forceHosted: true }),
+      metadata: {
+        purpose: "lesson_card",
+        booking_id: booking.id,
+        booking_reference: booking.reference,
+        scope,
+        ...(scope === "run" ? { series_id: seriesId } : {}),
+        student_id: student.id,
+        starts_at: booking.starts_at,
+        ends_at: booking.ends_at,
+        amount_cents: booking.amount_cents,
+        card_setup_version: student.card_setup_version ?? 0
+      }
+    },
+    // Each press is its own attempt; nothing is held while it is open.
+    { idempotencyKey: `ines:lesson-card:${booking.id}:${crypto.randomUUID()}` }
+  );
+}
+
+export function lessonCardSessionProblem(session) {
+  if (session?.mode !== "setup") return "session is not a card setup";
+  if (session?.status !== "complete") return "card setup is not complete";
+  const bookingId = session?.metadata?.booking_id;
+  if (!bookingId || session?.client_reference_id !== `lesson-card:${bookingId}`) return "session does not match";
+  if (!session?.setup_intent || typeof session.setup_intent !== "string") return "setup intent is missing";
+  if (!session?.customer || typeof session.customer !== "string") return "customer is missing";
+  return "";
+}
+
 export function studentCardSessionProblem(session, student) {
   if (session?.mode !== "setup") return "session is not a card setup";
   if (session?.status !== "complete") return "card setup is not complete";

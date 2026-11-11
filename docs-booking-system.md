@@ -32,6 +32,7 @@ Student on /book                                     (browse without an account)
   → GET  /bookings/:token                            one lesson; HMAC-signed token
   → POST /bookings/:token/reschedule | /cancel       → optional lessonType, sequence++, updated ICS
   → POST /bookings/:token/rebook                     a lesson they cancelled, booked again as a new lesson
+  → POST /bookings/:token/card                       → Stripe's page: a lesson Inês added, or its weekly run, goes on a card
   → POST /series/:id/reschedule | /stop (Bearer)     → move or end an owned weekly sequence
 Legacy /my-lessons and /booking links resolve into /book without losing state
 Inês on /schedule                     (her own account, role=teacher)
@@ -185,7 +186,9 @@ someone registered first never pays for the owner's lessons, and taking an
 unproven account back clears its agreement. `Your lessons` asks once, above
 the calendar, while a lesson she added is still unpaid; `Your details` has a
 `Card` row with `Remove card` (`POST /me/card/remove`), which puts her lessons
-still to come back to being paid by hand and stops her weekly slots charging.
+still to come back to being paid by hand and stops her weekly slots charging
+(those a student put on a card from a lesson's own link too, see *Paying by
+card from a lesson's link*).
 Removal also increments `students.card_setup_version` (migration 0033), so a
 setup already open at Stripe cannot restore the agreement, even if no card had
 yet been confirmed. Each setup records that generation and the account's
@@ -754,7 +757,8 @@ used to be emails to her (16 October 2026, Dan) come from `GET /admin/students`:
 still `payment_due`, listed with the payments until it is paid, `Open` going to
 the student) and `cardAdded` (for `CARD_ADDED_NOTICE_DAYS`, 7, after a card is
 saved: the lessons she added that it now pays for, so one already paid by hand
-can be ticked `Already paid`). Declined cards also stay in Receipts. Nothing is dismissed: items clear
+can be ticked `Already paid`; lessons a student put on a card from a lesson's
+own link are listed the same way, from when they agreed). Declined cards also stay in Receipts. Nothing is dismissed: items clear
 when done, after 72 hours, or once the lesson begins; the windows are
 `NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. `studentWorkspace()` groups operational notices by student ID, or an
 unambiguous real email for legacy bookings. Payments match through their
@@ -2216,6 +2220,77 @@ is offered `Email me a sign-in link` (the existing `/auth/email-link`, to the
 booking's own address): the way into the account, where the card step puts
 every lesson she booked on their card. Nothing signs anyone in from a manage
 link.
+
+### Paying by card from a lesson's link
+
+A student Inês set up by hand can start paying by card from a lesson's own
+page, with no sign-in (10 November 2026, Dan: "can you put the allowance for
+the student to subscribe and pay for that lesson if they want from there?";
+he chose straight from the page, and charged at the end of the lesson as
+every card lesson is today).
+
+- **Who is offered it.** `GET /bookings/:token` adds `cardOffer { priceCents,
+  everyWeek, replacesCard }` only for a lesson Inês added that is confirmed,
+  still to come, `not_required` without the paid-by-hand mark, priced above
+  €0, with no charge started or payment on it and attendance as expected,
+  whose student account exists and has no standing agreement, while cards are
+  taken (`postpay` and Stripe ready). `everyWeek` says its weekly run is
+  hers, active and not yet `automatic_payment`. `replacesCard` says the
+  student already has a card saved.
+- **Never beside a standing agreement.** A card saved from the account was
+  saved signed in and pays for every lesson Inês adds. A link proves less, so
+  it is neither offered to such a student nor allowed to replace that card if
+  one is saved while Stripe's page is open. Any other saved card (from a
+  booking's own checkout, or an earlier link) is replaced by the new one, as
+  a booking's checkout replaces it. A student has one card, so lessons
+  already on a card are then charged to the new one, which is why the page
+  says `This card replaces the one saved before` before the press.
+- **Starting.** `POST /bookings/:token/card` with `{ scope: "lesson" | "run",
+  expectedPriceCents }`. The link is the authority, as for cancelling and
+  booking again; 8 presses a quarter-hour per student. It checks the offer
+  again (and `everyWeek` for `run`) and the price, then opens Stripe's hosted
+  page in setup mode: `metadata.purpose = lesson_card`,
+  `client_reference_id = lesson-card:<booking id>` (never a bare booking id
+  or `student:`), the student's existing Stripe customer or a new one with
+  their real address, and metadata naming the lesson, scope, run, student,
+  start, end, amount and `card_setup_version`. Nothing is written and nothing
+  is charged. Stripe returns the browser to the lesson's page with
+  `card=lesson` or `card=weekly`, which only tells the page what to say.
+- **Confirming.** The signed webhook verifies the session (setup mode,
+  complete, its reference matching its metadata, a succeeded SetupIntent with
+  a payment method for the same customer, the booking still that student's)
+  and then writes one all-or-nothing batch. The card is kept on the student.
+  The lesson, or for `run` every week of the run still to come at the agreed
+  amount, becomes `scheduled` with `payment_consent_at` set to when the
+  session was created (the press) and `PAYMENT_CONSENT_VERSION`. For `run`
+  the series turns `automatic_payment` on with the same consent, so weeks the
+  nightly top-up adds are on the card. It writes only while the opened lesson
+  is still exactly what was agreed (same start, end and amount, still to
+  come, untouched by any payment), the run still qualifies, the student has
+  no standing agreement, cards are still taken and no `Remove card` has
+  retired the setup (`card_setup_version`). Otherwise nothing goes on a card
+  and the card is not kept. A week at another amount, or one already paid by
+  hand, stays paid to her directly. `card_consent_at`, `card_setup_version`
+  and `email_verified_at` are never written. A replayed or repeated event
+  changes nothing.
+- **Charged like any card lesson.** Nothing new charges. The existing sweep
+  takes each lesson's `amount_cents` when it ends, or the no-show fee
+  instead, and a late move or cancellation takes the late fee, exactly as for
+  a lesson the student booked. A price Inês raises later never raises a
+  lesson already agreed (`repriceLessons` follows only a lower price under
+  this agreement); a week added to an automatic run later takes the student's
+  price on that day, as every automatic run does.
+- **Stopping.** `Remove card` (signed in) returns these lessons, while not
+  yet charging, to being paid to her directly and stops the run charging,
+  with her standing-card lessons. Inês ticking `Already paid` takes one
+  lesson off the card; unticked, it is paid to her directly again. Cancelled
+  with notice and booked again, the new lesson is paid to her directly until
+  it is put on a card again.
+- **Who is told.** Inês sees `… added a card` in Needs you for a week, with
+  the lessons it now pays for (`cardAdded`), so one already paid by hand can
+  be ticked `Already paid`. The student gets no separate email (there is none
+  for a saved card); the page says the card is saved, and each charge is
+  emailed as usual.
 
 ### A student's own price, private codes and security
 

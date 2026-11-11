@@ -22,12 +22,14 @@ import {
   checkoutSessionProblem,
   createCardSetupSession,
   createCheckoutSession,
+  createLessonCardSession,
   createStudentCardSession,
   expireCheckoutSession,
   refundPayment,
   retrieveCheckoutSession,
   retrieveRefund,
   retrieveSetupIntent,
+  lessonCardSessionProblem,
   setupSessionProblem,
   studentCardSessionProblem,
   stripeConfigured,
@@ -1577,6 +1579,19 @@ async function teacherStudentList(env) {
   ).bind(noticeFrom, now).all();
   const onCard = {};
   for (const row of onCardRows ?? []) (onCard[row.student_id] ??= []).push({ bookingId: row.id, startsAt: row.starts_at });
+  // Lessons of hers a student put on a card from the lesson's own link
+  // (10 November 2026): the same card in Needs you, from when they agreed.
+  const { results: linkCardRows } = await env.DB.prepare(
+    `SELECT id, student_id, starts_at, payment_consent_at FROM bookings
+     WHERE added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'scheduled' AND payment_consent_version = ?
+       AND payment_consent_at > ? AND starts_at > ? ORDER BY starts_at`
+  ).bind(PAYMENT_CONSENT_VERSION, noticeFrom, now).all();
+  const linkCard = {};
+  for (const row of linkCardRows ?? []) {
+    const entry = (linkCard[row.student_id] ??= { at: row.payment_consent_at, lessons: [] });
+    if (row.payment_consent_at > entry.at) entry.at = row.payment_consent_at;
+    entry.lessons.push({ bookingId: row.id, startsAt: row.starts_at });
+  }
   const { results: rates } = await env.DB.prepare("SELECT student_id, duration_minutes, amount_cents FROM student_recurring_rates").all();
   const own = {};
   for (const rate of rates ?? []) (own[rate.student_id] ??= {})[rate.duration_minutes] = rate.amount_cents;
@@ -1607,7 +1622,9 @@ async function teacherStudentList(env) {
     cardDeclined: declined[row.id] ?? [],
     cardAdded: row.has_card && row.card_consent_at && row.card_consent_at > noticeFrom
       ? { at: row.card_consent_at, lessons: (onCard[row.id] ?? []).slice(0, 30) }
-      : null
+      : row.has_card && linkCard[row.id]
+        ? { at: linkCard[row.id].at, lessons: linkCard[row.id].lessons.slice(0, 30) }
+        : null
   }));
 }
 
@@ -1832,11 +1849,13 @@ async function handleRemoveStudentCard(request, env) {
       .bind(student.id, student.session_version ?? 0, await sessionHash(bearer)),
     env.DB.prepare("INSERT INTO request_limits (key, window, attempts) SELECT ?, ?, 1 WHERE changes() > 0")
       .bind(marker, Math.floor(Date.now() / 900000)),
+    // Her lessons on the card under the standing agreement, and those put on
+    // it from their own link (10 November 2026), which carry the per-lesson one.
     env.DB.prepare(
       `UPDATE bookings SET payment_status = 'not_required', payment_consent_at = NULL, payment_consent_version = NULL, updated_at = ?
        WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'scheduled'
-         AND payment_consent_version = ? AND EXISTS (SELECT 1 FROM request_limits WHERE key = ?)`
-    ).bind(now, student.id, STUDENT_CARD_CONSENT_VERSION, marker),
+         AND payment_consent_version IN (?, ?) AND EXISTS (SELECT 1 FROM request_limits WHERE key = ?)`
+    ).bind(now, student.id, STUDENT_CARD_CONSENT_VERSION, PAYMENT_CONSENT_VERSION, marker),
     env.DB.prepare(
       `UPDATE booking_series SET automatic_payment = 0, payment_consent_at = NULL, payment_consent_version = NULL, updated_at = ?
        WHERE student_id = ? AND added_by_teacher = 1 AND status = 'active'
@@ -2195,6 +2214,9 @@ async function answer(request, env, ctx) {
 
     const rebook = path.match(/^\/bookings\/([^/]+)\/rebook$/);
     if (rebook && request.method === "POST") return await handleRebook(request, env, ctx, rebook[1]);
+
+    const lessonCard = path.match(/^\/bookings\/([^/]+)\/card$/);
+    if (lessonCard && request.method === "POST") return await handleLessonCard(request, env, lessonCard[1]);
 
     const payment = path.match(/^\/bookings\/([^/]+)\/payment$/);
     if (payment && request.method === "POST") return await handlePaymentRecovery(request, env, payment[1]);
@@ -4230,11 +4252,14 @@ async function handleGetBooking(request, env, token) {
   const policy = changePolicy(row, new Date(), settings.minimumNoticeHours);
   // Only a cancelled lesson is ever offered Book again; the write decides for real.
   const offer = row.status === "cancelled" ? await rebookOffer(env, row, settings) : { canRebook: false };
+  // Only a lesson Inês added and is paid to her directly is offered a card here.
+  const card = await lessonCardOffer(env, row, settings);
 
   return json(
     {
       booking: managedBooking(row, lessonType, settings),
       ...offer,
+      ...(card ? { cardOffer: { priceCents: card.priceCents, everyWeek: card.everyWeek, replacesCard: card.replacesCard } } : {}),
       isPast: new Date(row.starts_at) <= new Date(),
       // The field keeps its original name for the site; it now means "inside
       // the 14-hour window". A saved-card booking charges the fee automatically.
@@ -4809,6 +4834,186 @@ async function handleRebook(request, env, ctx, token) {
   );
 }
 
+// --- Paying by card from a lesson's link (10 November 2026) -----------------
+
+/**
+ * A lesson Inês added that a card may still take on from its own link: paid
+ * to her directly and untouched by any payment, as `CARD_LESSON_TERMS` asks
+ * of one approved from the account. `b` is the booking. The webhook writes
+ * only while this still holds.
+ */
+const LINK_CARD_LESSON_TERMS = `b.added_by_teacher = 1 AND b.status = 'confirmed'
+  AND b.payment_status = 'not_required' AND b.charge_started_at IS NULL AND b.stripe_payment_intent IS NULL
+  AND b.attendance_status = 'expected' AND COALESCE(b.payment_consent_version, '') != '${PAID_BY_HAND_MARK}'`;
+
+/** Her weekly run that a card may still take on: `s` is the series. */
+const LINK_CARD_RUN_TERMS = `s.added_by_teacher = 1 AND s.status = 'active' AND s.automatic_payment = 0 AND COALESCE(s.prepaid, 0) = 0`;
+
+/**
+ * Whether this lesson's link may put it on a card (10 November 2026, Dan:
+ * "Pay by card" from the lesson's page, no sign-in), and its run with it.
+ * Null when not: cards are not taken now, the lesson is not one Inês added
+ * that is still to come and paid to her directly at a price, or it has no
+ * student account. The agreement is the per-lesson one a student's own
+ * booking makes, never the standing one.
+ *
+ * A student with a standing agreement is never offered it: that card was
+ * saved signed in, and it pays for every lesson Inês adds, so a link (which
+ * proves less) must not put another card in its place. Any other saved card
+ * is replaced by the one added here, and `replacesCard` lets the page say so
+ * before the press, since lessons already on a card are then charged to it.
+ */
+async function lessonCardOffer(env, row, settings, now = new Date()) {
+  if (!cardsTaken(env, settings)) return null;
+  if (row.status !== "confirmed" || !(Date.parse(row.starts_at) > now.getTime()) || Number(row.added_by_teacher) !== 1) return null;
+  if (row.payment_status !== "not_required" || row.payment_consent_version === PAID_BY_HAND_MARK) return null;
+  if (!Number.isSafeInteger(row.amount_cents) || row.amount_cents <= 0) return null;
+  if (row.charge_started_at || row.stripe_payment_intent || row.attendance_status !== "expected" || !row.student_id) return null;
+  const student = await env.DB.prepare(`SELECT * FROM students WHERE id = ? AND ${studentLikeSql()}`).bind(row.student_id).first();
+  if (!student || student.card_consent_at) return null;
+  const series = row.series_id
+    ? await env.DB.prepare(`SELECT * FROM booking_series s WHERE s.id = ? AND s.student_id = ? AND ${LINK_CARD_RUN_TERMS}`)
+      .bind(row.series_id, row.student_id).first()
+    : null;
+  return { priceCents: row.amount_cents, everyWeek: Boolean(series), replacesCard: Boolean(student.stripe_payment_method), student, series };
+}
+
+/**
+ * Start paying by card from a lesson's link: Stripe's hosted page to add a
+ * card, for this lesson or its weekly run. The link is the authority, as for
+ * cancelling and booking again. Nothing is written and nothing is charged
+ * here; the webhook puts the lessons on the card once Stripe has it, and the
+ * existing sweep charges each when it ends.
+ */
+async function handleLessonCard(request, env, token) {
+  const row = await getBookingByToken(env, token);
+  if (!row) return fail("That booking link is not valid.", 404, request, env);
+  if (!await takeRateLimit(env, `lesson-card:${row.student_id ?? row.id}`, 8)) return fail("Please wait 15 minutes before trying again.", 429, request, env);
+
+  const body = await readJson(request);
+  if (body.scope !== "lesson" && body.scope !== "run") return fail("Choose this lesson or every week.", 400, request, env);
+  const settings = await loadSettings(env);
+  const tutor = tutorOf(env);
+  if (!cardsTaken(env, settings)) return fail("Cards can't be added just now. Please try again later.", 503, request, env);
+  const offer = await lessonCardOffer(env, row, settings);
+  if (!offer) return fail(`This lesson can't be paid by card here, so please message ${tutor.shortName}.`, 409, request, env);
+  if (body.scope === "run" && !offer.everyWeek) {
+    return fail(`Your weekly lessons can't be paid by card here, so please message ${tutor.shortName}.`, 409, request, env);
+  }
+  if (body.expectedPriceCents !== offer.priceCents) {
+    return fail("Your lesson price has changed, so please reload and check it before adding your card.", 409, request, env);
+  }
+
+  try {
+    const session = await createLessonCardSession(env, {
+      booking: row, student: offer.student, scope: body.scope, seriesId: offer.series?.id ?? null,
+      // Read by the page to say what was saved; it confirms nothing itself.
+      successUrl: `${studentManageUrl(env, token)}&card=${body.scope === "run" ? "weekly" : "lesson"}`,
+      cancelUrl: studentManageUrl(env, token)
+    });
+    if (!session?.url) throw new Error("Stripe returned no card page");
+    return json({ url: session.url }, 200, request, env);
+  } catch (error) {
+    console.error("stripe-lesson-card", String(error?.message ?? error));
+    return fail("We couldn't open the card form just now. Please try again in a moment.", 502, request, env);
+  }
+}
+
+/**
+ * Stripe has saved the card a lesson's link opened. In one guarded batch the
+ * card is kept and the lesson, or every week of its run at the agreed price,
+ * becomes an ordinary card lesson under the per-lesson agreement, given when
+ * the session was created; for a run, weeks added later are too. All of it
+ * or none: if the lesson is no longer exactly what was agreed, or the
+ * student has since saved a card from their account, nothing goes on the
+ * card and the card is not kept. The standing agreement and the proven
+ * address are never written: a link proves less than a sign-in. Nothing is
+ * charged here.
+ */
+async function confirmLessonCard(env, session) {
+  const problem = lessonCardSessionProblem(session);
+  const metadata = session?.metadata ?? {};
+  const agreed = {
+    bookingId: String(metadata.booking_id ?? ""), studentId: String(metadata.student_id ?? ""), scope: metadata.scope,
+    seriesId: metadata.series_id ? String(metadata.series_id) : null, startAt: String(metadata.starts_at ?? ""),
+    endAt: String(metadata.ends_at ?? ""), amountCents: Number(metadata.amount_cents), setupVersion: String(metadata.card_setup_version ?? "")
+  };
+  if (problem || !BOOKING_ID.test(agreed.bookingId) || !agreed.studentId || !["lesson", "run"].includes(agreed.scope) ||
+      (agreed.scope === "run") !== Boolean(agreed.seriesId) || !Number.isSafeInteger(agreed.amountCents) || agreed.amountCents <= 0 ||
+      !Number.isFinite(Date.parse(agreed.startAt)) || !Number.isFinite(Date.parse(agreed.endAt)) || !/^\d+$/.test(agreed.setupVersion)) {
+    console.warn("stripe-lesson-card-rejected", problem || "metadata does not match");
+    return new Response("Session does not match lesson.", { status: 400 });
+  }
+  const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(agreed.bookingId).first();
+  if (!row) return new Response("Unknown booking.", { status: 200 });
+  if (row.student_id !== agreed.studentId) return new Response("Session does not match lesson.", { status: 400 });
+  if (agreed.seriesId && row.series_id !== agreed.seriesId) return new Response("Session does not match lesson.", { status: 400 });
+
+  let intent;
+  try {
+    intent = await retrieveSetupIntent(env, session.setup_intent);
+  } catch (error) {
+    console.error("retrieve-lesson-card", row.reference, String(error?.message ?? error));
+    return new Response("Card setup could not be verified.", { status: 502 });
+  }
+  const paymentMethod = typeof intent?.payment_method === "string" ? intent.payment_method : intent?.payment_method?.id;
+  const customer = typeof intent?.customer === "string" ? intent.customer : intent?.customer?.id;
+  if (intent?.status !== "succeeded" || !paymentMethod || customer !== session.customer) {
+    return new Response("Card setup is not complete.", { status: 409 });
+  }
+
+  // Cards switched off since the page was opened: nothing goes on one.
+  if (!cardsTaken(env, await loadSettings(env))) {
+    console.warn("stripe-lesson-card-skipped", row.reference, "cards are off");
+    return new Response("ok", { status: 200 });
+  }
+
+  const now = new Date().toISOString();
+  // As for the account's card: pressing `Agree & add card` is the agreement.
+  const consentedAt = Number.isFinite(session.created) ? new Date(session.created * 1000).toISOString() : now;
+  const run = agreed.scope === "run";
+  const marker = `lesson-card-confirm:${crypto.randomUUID()}`;
+  const opened = `EXISTS (SELECT 1 FROM bookings b WHERE b.id = ? AND b.student_id = ? AND ${LINK_CARD_LESSON_TERMS}
+      AND b.starts_at > ? AND b.starts_at = ? AND b.ends_at = ? AND b.amount_cents = ?
+      ${run ? `AND b.series_id = ? AND EXISTS (SELECT 1 FROM booking_series s WHERE s.id = b.series_id AND s.student_id = b.student_id AND ${LINK_CARD_RUN_TERMS})` : ""})`;
+  const openedValues = [row.id, agreed.studentId, now, agreed.startAt, agreed.endAt, agreed.amountCents, ...(run ? [agreed.seriesId] : [])];
+  const marked = "EXISTS (SELECT 1 FROM request_limits WHERE key = ?)";
+  const [saved] = await env.DB.batch([
+    // The card, kept as a booking's checkout keeps it: the last to arrive is
+    // the student's card. Never beside a standing agreement, and not once
+    // removing a card has retired this setup.
+    env.DB.prepare(
+      `UPDATE students SET stripe_customer_id = ?, stripe_payment_method = ?
+       WHERE id = ? AND ${studentLikeSql()} AND card_setup_version = ? AND card_consent_at IS NULL AND ${opened}`
+    ).bind(customer, paymentMethod, agreed.studentId, Number(agreed.setupVersion), ...openedValues),
+    env.DB.prepare("INSERT INTO request_limits (key, window, attempts) SELECT ?, ?, 1 WHERE changes() > 0")
+      .bind(marker, Math.floor(Date.now() / 1000)),
+    env.DB.prepare(
+      `UPDATE bookings SET payment_status = 'scheduled', payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
+       WHERE id IN (SELECT b.id FROM bookings b WHERE b.student_id = ? AND ${LINK_CARD_LESSON_TERMS} AND b.starts_at > ? AND b.amount_cents = ?
+         AND ${run ? "b.series_id = ?" : "b.id = ? AND b.starts_at = ? AND b.ends_at = ?"})
+         AND ${marked}`
+    ).bind(consentedAt, PAYMENT_CONSENT_VERSION, now, agreed.studentId, now, agreed.amountCents,
+      ...(run ? [agreed.seriesId] : [row.id, agreed.startAt, agreed.endAt]), marker),
+    ...(run ? [env.DB.prepare(
+      `UPDATE booking_series SET automatic_payment = 1, payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
+       WHERE id = ? AND student_id = ? AND added_by_teacher = 1 AND status = 'active' AND automatic_payment = 0 AND COALESCE(prepaid, 0) = 0
+         AND ${marked}`
+    ).bind(consentedAt, PAYMENT_CONSENT_VERSION, now, agreed.seriesId, agreed.studentId, marker)] : []),
+    env.DB.prepare("DELETE FROM request_limits WHERE key = ?").bind(marker)
+  ]);
+  if (!(saved?.meta?.changes > 0)) {
+    console.warn("stripe-lesson-card-skipped", row.reference);
+    return new Response("ok", { status: 200 });
+  }
+  /*
+   * Inês sees the lessons the card now pays for in Needs you, as for a card
+   * saved from the account (`cardAdded` on GET /admin/students). There is no
+   * card-saved email to the student to send.
+   */
+  return new Response("ok", { status: 200 });
+}
+
 
 // --- Stripe -----------------------------------------------------------------
 
@@ -4852,6 +5057,12 @@ async function handleStripeWebhook(request, env, ctx) {
   // A card saved from a student's account names the student, not a booking.
   if (session.metadata?.purpose === "student_card") {
     const saved = await confirmStudentCard(env, session);
+    if (saved.status >= 400) return saved;
+    return recordStripeEvent(env, event, saved);
+  }
+  // A card added from a lesson's link names that lesson with its own prefix.
+  if (session.metadata?.purpose === "lesson_card") {
+    const saved = await confirmLessonCard(env, session);
     if (saved.status >= 400) return saved;
     return recordStripeEvent(env, event, saved);
   }

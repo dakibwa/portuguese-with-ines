@@ -16,6 +16,8 @@ const cases = [
   { reference: "UNSAFE", location: "online", status: "confirmed", meetingUrl: "https://meet.google.com.example.invalid/abc-defg-hij" },
   { reference: "LATE", location: "online", status: "confirmed", meetingUrl: null },
   { reference: "PENDING", location: "online", status: "confirmed", meetingUrl: null },
+  // A weekly lesson Inês added, paid to her directly, that a card can pay for from its link.
+  { reference: "CARD", location: "porto", status: "confirmed", meetingUrl: null, addedByTeacher: true, paymentStatus: "not_required", amountCents: 2500 },
 ];
 const bookings = cases.map((entry, index) => ({
   ...entry, startAt: `2026-09-${String(15 + index).padStart(2, "0")}T14:00:00Z`,
@@ -42,6 +44,9 @@ try {
     const rebooked = { ...porto, reference: "REBOOKED", manageToken: "REBOOKED", paymentStatus: "not_required" };
     let freed = false;
     const oldPollStarted = deferred(), oldPollWaiting = deferred();
+    // Pay by card: the card page is a local stand-in, and back from it the lesson reads as on the card after a couple of reads.
+    let cardStarted = null, cardReturnReads = null;
+    await page.route("https://checkout.stripe.com/**", route => route.fulfill({ contentType: "text/html", body: "<title>Card fixture</title>" }));
     page.on("pageerror", error => errors.push(error.message));
     await page.clock.setFixedTime(new Date("2026-09-14T10:00:00Z"));
     await page.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-meet-fixture"));
@@ -80,6 +85,17 @@ try {
           return route.fulfill({ status: 201, json: { booking: rebooked, manageToken: "REBOOKED", emailed: true } });
         }
         if (path === "/bookings/REBOOKED") return route.fulfill({ json: { booking: rebooked, isPast: false, sameDayFeeApplies: false } });
+        if (path === "/bookings/CARD/card") {
+          cardStarted = route.request().postDataJSON();
+          return route.fulfill({ json: { url: "https://checkout.stripe.com/c/pay/fixture" } });
+        }
+        if (path === "/bookings/CARD") {
+          const card = bookings.find(entry => entry.reference === "CARD");
+          const saved = cardReturnReads !== null && ++cardReturnReads > 2;
+          return route.fulfill({ json: saved
+            ? { booking: { ...card, paymentStatus: "scheduled" }, isPast: false, sameDayFeeApplies: false, recurring: true }
+            : { booking: card, isPast: false, sameDayFeeApplies: false, recurring: true, cardOffer: { priceCents: 2500, everyWeek: true, replacesCard: true } } });
+        }
         const booking = bookings.find(entry => entry.manageToken === path.split("/")[2]);
         // Once cancelled, its own read says the time can be booked again, and how it would be paid.
         if (booking.reference === "PORTO" && freed) {
@@ -142,6 +158,35 @@ try {
         assert.equal(new URL(page.url()).searchParams.get("manage"), "REBOOKED");
         await dialog.screenshot({ path: `tmp/qa/meet/booked-again-${width}.png` });
       }
+      if (booking.reference === "CARD") {
+        // Pay by card, then Every week: the dabs say what is agreed, here with
+        // a card already saved, and the press sends that and follows the card
+        // page's address.
+        await dialog.getByRole("button", { name: "Pay by card", exact: true }).click();
+        await expect(dialog.getByRole("heading", { name: "Pay by card" })).toBeVisible();
+        await expect(dialog.getByRole("radio", { name: "This lesson" })).toBeChecked();
+        await expect(dialog.locator(".booking-payment-facts li")).toHaveText([
+          "€25, charged to your card at the end of the lesson", "Free to change or cancel a lesson up to 14\u00a0hours before",
+          "€5 to move or cancel later, or if you don’t show up", "This card replaces the one saved before", "The full rules are in terms & privacy"]);
+        await dialog.locator("label").filter({ hasText: "Every week" }).click();
+        await expect(dialog.locator(".booking-payment-facts li")).toHaveText([
+          "€25 a lesson, charged at the end of each lesson", "Free to change or cancel a lesson up to 14\u00a0hours before",
+          "€5 to move or cancel later, or if you don’t show up", "Weekly lessons carry on until you stop them",
+          "This card replaces the one saved before", "The full rules are in terms & privacy"]);
+        await dialog.screenshot({ path: `tmp/qa/meet/pay-by-card-${width}.png` });
+        await dialog.getByRole("button", { name: "Agree & add card", exact: true }).click();
+        await page.waitForURL("https://checkout.stripe.com/c/pay/fixture");
+        assert.deepEqual(cardStarted, { scope: "run", expectedPriceCents: 2500 });
+        // Back from the card page: confirming, then saved once the lesson reads as on the card.
+        cardReturnReads = 0;
+        await page.goto(`${base}/book/?manage=CARD&card=weekly`);
+        const back = page.getByRole("dialog").filter({ has: page.locator(".lesson-manage-dialog__lesson") });
+        await expect(back.locator(".booking-outcome")).toHaveText("Confirming your card…");
+        await expect(back.locator(".booking-outcome")).toHaveText("Card saved. Your weekly lessons are charged at the end of each lesson.", { timeout: 15000 });
+        await expect(back.getByRole("button", { name: "Pay by card", exact: true })).toHaveCount(0);
+        assert.deepEqual([new URL(page.url()).searchParams.get("manage"), new URL(page.url()).searchParams.has("card")], ["CARD", false]);
+        await back.screenshot({ path: `tmp/qa/meet/card-saved-${width}.png` });
+      }
       if (booking.reference === "PENDING") {
         // Hold a missing-link poll across an accepted online move. Its older
         // booking snapshot must not put the lesson back on the original date.
@@ -172,7 +217,7 @@ try {
     assert.deepEqual(errors, []);
     await page.close();
   }
-  console.log("Google Meet links: online upcoming/details, automatic late arrival, Porto, cancelled, pending and unsafe URLs passed at desktop/mobile widths.");
+  console.log("Google Meet links: online upcoming/details, automatic late arrival, Porto, cancelled, pending, unsafe URLs and paying by card from a lesson's link passed at desktop/mobile widths.");
 } finally {
   await browser.close();
 }
