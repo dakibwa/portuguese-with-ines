@@ -554,8 +554,9 @@ free times and removes selected times that cannot be booked in the new place.
   headed in the small eyebrow with its count and one hint: `Needs you`
   (payments to check, recent lesson changes, first lessons, homework), `To do`
   (`Send each their link.`), `Waiting on them` (`Link sent. They haven’t
-  finished yet.`) and `All set` (`Signed in, card saved, nothing open.`), then
-  `Dormant`. Lanes sit side by side where 15.5 rem each fit (no wider than
+  finished yet.`) and `All set` (`Fully set up and paying for their own
+  lessons.`; 11 November 2026, Dan: "all set is there fully set up on the
+  website just paying for their own lessons"), then `Dormant`. Lanes sit side by side where 15.5 rem each fit (no wider than
   26 rem a lane), wrap into fewer on a narrower screen and stack on a phone
   with no sideways scroll; cards stack down a lane. A lane reads how far its
   students have got, so nothing is dragged and nothing writes a status. Within
@@ -589,7 +590,10 @@ free times and removes selected times that cannot be booked in the new place.
   checks are `Signed in` (or `Link sent 5 Sept`, or `Not signed in`), `Card
   saved` (or `No card yet`, or `Lessons not on card` when a saved card doesn't
   yet cover lessons she added to come; a saved card with none of those counts
-  as done, 9 November 2026, Dan: no `Ask for card` for someone already paying)
+  as done, 9 November 2026, Dan: no `Ask for card` for someone already paying;
+  and no agreement stands in for the lessons themselves, so one of hers still
+  off the card reads `Lessons not on card` whatever they have agreed to,
+  11 November 2026)
   and `Paid up` (or `€70 open` in coral, counting
   past lessons she added that were neither charged nor ticked paid); a
   blue dab marks each one done. Card and paid are omitted when cards are

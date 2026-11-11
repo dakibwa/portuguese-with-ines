@@ -261,7 +261,13 @@ newest of their sign-in links still unspent and unexpired was made (`null`
 once each is used or expired), so her list can say `Link sent 5 Sept` (2
 November 2026). `Students` on `/schedule` groups them by whose move it is:
 `To do` (her link to send), `Waiting on them` (a link out, not yet used) and
-`All set` (signed in, card saved, nothing open), after `Needs you`. Her link is
+`All set`, after `Needs you`. All set is a student fully set up and paying for
+their own lessons (11 November 2026, Dan): signed in, nothing open from the
+past, and a card saved with no lesson she added to come still paid by hand.
+The standing agreement does not stand in for that last part: while
+`unpaidUpcoming` is above zero they are not all set, whatever they have agreed
+to. Someone who books and pays for their own lessons, with none of hers
+waiting, is all set without it (9 November 2026). Her link is
 a WhatsApp message, or for someone with an email `Email instead`, which is the
 welcome email (`POST /admin/students/:id/welcome`, three an hour per
 student). It is only ever sent by her press: nothing sends it on its own.
