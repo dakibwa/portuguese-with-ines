@@ -35,6 +35,7 @@ import {
   stripeConfigured,
   stripeMode,
   stripeProblemIsRetryable,
+  stripeRefused,
   stripeReady,
   verifyWebhook
 } from "./stripe.mjs";
@@ -42,6 +43,7 @@ import {
   NO_SHOW_WINDOW_HOURS,
   PAID_BY_HAND_MARK,
   PAYMENT_CONSENT_VERSION,
+  studentConsentVersionAt,
   STUDENT_CARD_CONSENT_VERSION,
   changePolicy,
   lessonTypeChangeProblem,
@@ -322,6 +324,17 @@ async function awaitingWelcomeAt(env, email) {
   }
 }
 
+/**
+ * Whether an email about a student's lesson goes to anyone, for her page to
+ * say: there is an address, and nothing is held for their welcome. A student
+ * set up by name alone who has since signed in from her invite is not held,
+ * and still has nowhere to be emailed: saying they had been left her sure a
+ * moved or cancelled lesson had reached them.
+ */
+async function studentIsEmailed(env, email) {
+  return Boolean(realEmail(email)) && !await awaitingWelcomeAt(env, email);
+}
+
 /** What she sends by her own press, and brings the student in, is never held. */
 const SENT_BEFORE_WELCOME = new Set(["student_welcome", "student_dormant_invite"]);
 
@@ -398,9 +411,11 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const isFree = row.payment_status === FREE;
   // Ticked "Already paid": paid to Inês by hand, so nothing is owed.
   const isPaidByHand = row.payment_consent_version === PAID_BY_HAND_MARK;
-  // A lesson of hers booked again is paid to her as before, as her own booking email said.
+  // A lesson of hers is paid to her as before, as her own booking email said,
+  // whoever's change this email is about: one the student moved from their
+  // link used to say "Pay on the day, in person", of an online lesson too.
   const priceTerms = isFree ? "free" : isPaid || isPaidByHand ? "paid" : isOnCard ? "card" : welcome?.card ? "untilCard"
-    : byTeacher || (again && row.added_by_teacher) ? "asUsual" : "onTheDay";
+    : byTeacher || row.added_by_teacher ? "asUsual" : "onTheDay";
   const price = event === "cancelled" ? null : priceValue({ tutor: tutorOf(env), terms: priceTerms, amount: formatEuros(lessonType.price_cents) });
   const uid = calendarUid(row.id);
   const method = event === "cancelled" ? "CANCEL" : "REQUEST";
@@ -594,7 +609,10 @@ function reminderEmail({ tutor, row, lessonType, settings, manageUrl, meetingLin
  * key, written before the send (see deliver in email.mjs).
  *
  * Left out, in the query: a lesson cancelled, outside the window, or created
- * (or whose current version was announced) in the 36 hours before it starts;
+ * (or whose current version was announced) in the 36 hours before it starts.
+ * A whole-run email (a move, her change, her change of length) announces the
+ * weeks from the lesson it began from on, so only those count as announced:
+ * an earlier week it never touched keeps its reminder. Also left out:
  * a student still waiting for their welcome, so held lessons can't fill the
  * batch every minute; and a student set up without an email, who has nowhere
  * to receive it.
@@ -617,8 +635,11 @@ export async function sendLessonReminders(env, now = new Date()) {
          WHERE julianday(t.created_at) > julianday(b.starts_at) - ?4
            AND (t.dedupe_key = 'student:rescheduled:' || b.id || ':' || b.sequence
              OR (b.series_id IS NOT NULL
-               AND t.dedupe_key >= 'student:series-moved:' || b.series_id || ':'
-               AND t.dedupe_key < 'student:series-moved:' || b.series_id || ';')))
+               AND ((t.dedupe_key >= 'student:series-moved:' || b.series_id || ':'
+                     AND t.dedupe_key < 'student:series-moved:' || b.series_id || ';')
+                 OR (t.dedupe_key >= 'student:series-length:' || b.series_id || ':'
+                     AND t.dedupe_key < 'student:series-length:' || b.series_id || ';'))
+               AND EXISTS (SELECT 1 FROM bookings began WHERE began.id = t.booking_id AND began.starts_at <= b.starts_at))))
        AND NOT EXISTS (
          SELECT 1 FROM email_log e
          WHERE e.dedupe_key = 'student:reminder:' || b.id || ':' || b.sequence
@@ -752,7 +773,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   const rowTerms = row => row.payment_status === FREE ? "free"
     : row.payment_status === "paid" || row.payment_consent_version === PAID_BY_HAND_MARK ? "paid"
     : ["scheduled", "payment_due", "processing"].includes(row.payment_status) ? "card"
-    : welcome?.card ? "untilCard" : byTeacher ? "asUsual" : "onTheDay";
+    : welcome?.card ? "untilCard" : byTeacher || row.added_by_teacher ? "asUsual" : "onTheDay";
   const mixedPrices = new Set(rows.map(row => JSON.stringify([row.amount_cents ?? lessonType.price_cents, rowTerms(row)]))).size > 1;
 
   // Each copy lists the dates on its reader's clock. Different agreed amounts
@@ -775,11 +796,18 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   const seriesFree = rows.every((row) => row.payment_status === FREE);
   const price = mixedPrices ? null : priceValue({ tutor: tutorOf(env),
     run: true, amount: formatEuros(lessonType.price_cents),
-    terms: seriesFree ? "free" : seriesOnCard ? "card" : welcome?.card ? "untilCard" : byTeacher ? "asUsual" : "onTheDay"
+    terms: seriesFree ? "free" : seriesOnCard ? "card" : welcome?.card ? "untilCard" : byTeacher || first.added_by_teacher ? "asUsual" : "onTheDay"
   });
-  const slotWeekday = new Intl.DateTimeFormat("en-GB", { timeZone: studentClock, weekday: "long" }).format(new Date(first.starts_at));
-  const slotTime = new Intl.DateTimeFormat("en-GB", { timeZone: studentClock, hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
-    .format(new Date(first.starts_at));
+  const weekdayOnTheirClock = new Intl.DateTimeFormat("en-GB", { timeZone: studentClock, weekday: "long" });
+  const timeOnTheirClock = new Intl.DateTimeFormat("en-GB", { timeZone: studentClock, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const slotWeekday = weekdayOnTheirClock.format(new Date(first.starts_at));
+  const slotTime = timeOnTheirClock.format(new Date(first.starts_at));
+  // "Every Tuesday, 13:30" is only true where their clock keeps step with
+  // Porto's. A student in São Paulo was told one time for a run whose later
+  // weeks, after Portugal's clocks change, are an hour on by theirs; a run
+  // like that lists each date with its own time instead.
+  const oneSlot = rows.every((row) => weekdayOnTheirClock.format(new Date(row.starts_at)) === slotWeekday &&
+    timeOnTheirClock.format(new Date(row.starts_at)) === slotTime);
   // Inês changed how long they are, at the same times (9 November 2026, Dan).
   const lengthChanged = reason === "length";
   // Her one change of when, how long and where, from a week on (10 November 2026).
@@ -803,7 +831,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
     when: lessonWhen(new Date(first.starts_at), studentClock), shortWhen: formatShort(new Date(first.starts_at), studentClock),
     policy: seriesFree ? "free" : seriesOnCard ? "card" : "unpaid",
     lessonsUrl: siteUrl(env, "/book/?view=lessons"),
-    run: { ...runOn(studentClock), slot: reason === "booked" ? { weekday: slotWeekday, time: slotTime } : null },
+    run: { ...runOn(studentClock), slot: reason === "booked" && oneSlot ? { weekday: slotWeekday, time: slotTime } : null },
     change: change(studentClock)
   };
 
@@ -814,7 +842,13 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   // emailing the student on every top-up would turn one booking into a weekly
   // stream of confirmations. A move, cancellation or payment remains a real
   // lifecycle event and continues through its own notification path.
-  if (reason !== "extended") {
+  if (reason === "extended") {
+    // So its Meet link has no email to follow either: left unsent, the link
+    // sweep emailed "Your online lesson link" for the week just added, twelve
+    // weeks off, early on the morning of that day's own lesson, every week.
+    // The day-before reminder carries each lesson's link, as their page does.
+    await Promise.all(rows.map((row) => markMeetingNotified(env, row)));
+  } else {
     const { subject, content } = moved ? studentMoved(studentFacts) : studentBooked(studentFacts);
     sends.push(
       deliver(env, {
@@ -825,10 +859,13 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
         lifecycle: emailLifecycle(rows),
         dedupeKey: lengthChanged
           ? `student:series-length:${series.id}:${first.id}:${first.sequence}`
-          // Within the weekly-move keys, so the day-before reminder stays quiet as after one.
-          : changed ? `student:series-moved:${series.id}:${first.id}:${first.sequence}`
+          // A student's move and her change share the weekly-move keys, so the
+          // day-before reminder stays quiet after either. Each names the lesson
+          // it starts from: a run's sequences begin again at 0 with every week
+          // added, so the run and a sequence alone repeat, and a second move
+          // months later was taken for the first and never emailed.
           : moved
-          ? `student:series-moved:${series.id}:${first.sequence}`
+          ? `student:series-moved:${series.id}:${first.id}:${first.sequence}`
           : `student:series:${series.id}:${rows[0].id}`,
         replyTo,
         calendar: { body: invite({ name: first.student_name, email: first.student_email }, true), method: "REQUEST" },
@@ -857,9 +894,8 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
         lifecycle: emailLifecycle(rows),
         dedupeKey: lengthChanged
           ? `teacher:series-length:${series.id}:${first.id}:${first.sequence}`
-          : changed ? `teacher:series-moved:${series.id}:${first.id}:${first.sequence}`
           : moved
-          ? `teacher:series-moved:${series.id}:${first.sequence}`
+          ? `teacher:series-moved:${series.id}:${first.id}:${first.sequence}`
           : `teacher:series:${series.id}:${rows[0].id}`,
         replyTo: first.student_email,
         calendar: await calendarOwnsTeacherInvites(env) ? null : { body: invite({ name: settings.teacherName, email: teacherEmail }), method: "REQUEST" },
@@ -1279,7 +1315,15 @@ async function untickedTerms(env, row) {
     return { status: "scheduled", amount, consentAt: student.card_consent_at, version: STUDENT_CARD_CONSENT_VERSION, standingCardStudent: student, priceSnapshot };
   }
   if (!teacher && row.payment_consent_at && student?.stripe_customer_id && student?.stripe_payment_method && cardsTaken(env, settings)) {
-    return { status: "scheduled", amount, consentAt: row.payment_consent_at, version: PAYMENT_CONSENT_VERSION, priceSnapshot };
+    // The tick wrote its mark over the wording they agreed to, so it takes
+    // that again: its run's, or the one in force when they agreed. A lesson
+    // booked on earlier terms (free to change until the lesson's day) came
+    // back on today's, so a tick and untick made a cancellation the student
+    // had been promised free cost the fee.
+    const run = row.series_id
+      ? await env.DB.prepare("SELECT payment_consent_version FROM booking_series WHERE id = ?").bind(row.series_id).first() : null;
+    return { status: "scheduled", amount, consentAt: row.payment_consent_at,
+      version: run?.payment_consent_version || studentConsentVersionAt(row.payment_consent_at), priceSnapshot };
   }
   return { status: "not_required", amount, consentAt: null, version: null, priceSnapshot };
 }
@@ -2307,7 +2351,7 @@ function sweep(event, env, ctx) {
   ctx.waitUntil(retryPaymentRecovery(env));
   ctx.waitUntil(retryRefunds(env));
   ctx.waitUntil(resendFailedEmails(env));
-  ctx.waitUntil(syncPendingMeetings(env, row => notifyMeetingReady(env, row)));
+  ctx.waitUntil(syncPendingMeetings(env, row => notifyMeetingReady(env, row), { leadHours: REMINDER_LEAD_HOURS, quietHours: REMINDER_QUIET_HOURS }));
   ctx.waitUntil(sendLessonReminders(env));
   // Homework whose marking was interrupted, or whose notice failed to send.
   ctx.waitUntil(homeworkNotices(env));
@@ -3717,6 +3761,26 @@ async function insertOccurrence(env, { series, key, student, lessonType, timezon
  * a skipped week is never reconsidered on the next top-up and the run cannot
  * stall on it forever.
  */
+/**
+ * The weekly runs Inês has placed herself: a student's own run whose day,
+ * time or place she has since changed for every week. Kept as a list of run
+ * ids in settings, as online-only periods are, so no database needs a
+ * migration; it is rewritten with only the runs still going each time one is
+ * added. `added_by_teacher` cannot say this: it says who pays how.
+ */
+const TEACHER_PLACED_RUNS = "teacher_placed_runs";
+
+async function placedByTeacher(env, seriesId) {
+  try {
+    return Boolean(await env.DB.prepare(
+      `SELECT 1 FROM settings s, json_each(s.value) placed
+       WHERE s.key = '${TEACHER_PLACED_RUNS}' AND json_valid(s.value) AND placed.value = ? LIMIT 1`
+    ).bind(seriesId).first());
+  } catch {
+    return false;
+  }
+}
+
 async function fillSeries(env, { series, student, lessonType, fromKey, count, now, paymentState = "none", holdExpiresAt = null, sessionIdentity = null, priceSnapshot = null, authorization = null, availabilityRevision = null }) {
   // New bookings retain the quote already accepted. A nightly extension takes
   // a fresh price, then binds it to both its occurrence and its bookmark.
@@ -3725,6 +3789,12 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
     priceSnapshot = lessonPriceSnapshot(student.id, lessonType);
   }
   const teacher = Boolean(series.added_by_teacher);
+  // A run she placed is planned as one she added is: held only by her days
+  // off and her other lessons. A student's own run she had moved outside her
+  // published hours, or next to another lesson, was still planned by the
+  // student's rules, so every new week was skipped and the run ran out with
+  // nobody told. Its weeks stay the student's own in how they are paid.
+  const hers = teacher || await placedByTeacher(env, series.id);
   const checkedSettings = await loadSettings(env);
   const { lessonBufferMinutes } = checkedSettings;
   availabilityRevision ??= checkedSettings.availabilityRevision;
@@ -3735,7 +3805,7 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
     count,
     lessonType,
     now,
-    teacher
+    teacher: hers
   });
 
   const rows = [];
@@ -3768,9 +3838,9 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
       paymentConsentVersion: series.payment_consent_version ?? null,
       // Her own weekly slot keeps the spacing she chose, as a single lesson
       // she adds does.
-      bufferMinutes: teacher ? 0 : lessonBufferMinutes,
+      bufferMinutes: hers ? 0 : lessonBufferMinutes,
       teacher,
-      sessionIdentity, priceSnapshot, authorization, availabilityRevision, minimumNoticeHours: teacher ? null : checkedSettings.minimumNoticeHours
+      sessionIdentity, priceSnapshot, authorization, availabilityRevision, minimumNoticeHours: hers ? null : checkedSettings.minimumNoticeHours
     });
 
     if (!current) break;
@@ -3918,7 +3988,7 @@ async function handleStopSeries(request, env, ctx, seriesId) {
       if (refund) {
         if (!await claimRefund(env, row, "student", null, identity, null, cancellationAvailabilityRevision)) { kept++; continue; }
         const updated = await completeRefund(env, row.id);
-        if (!updated) { kept++; pendingRefunds++; continue; }
+        if (!updated || updated.refused) { kept++; if (!updated) pendingRefunds++; continue; }
         cancelledRows.push(updated); cancelled++; refunded++;
         continue;
       }
@@ -4032,12 +4102,31 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
   }
 
   const requestedSlot = slotOf(requestedStart);
-  const occurrences = occurrenceInstants({
-    fromKey: requestedSlot.dateKey,
+  // Each lesson keeps its own week of the run, counted from the first one
+  // moving as her every-week change counts them (the week it sits nearest, a
+  // lesson moved on its own included), so a week the student cancelled, or
+  // one skipped when the run was booked, stays out. Laid out one after
+  // another, the lessons closed every gap: cancelled weeks were booked again
+  // and the run's last weeks dropped, for the nightly top-up to add back.
+  // Never two in one week: a lesson the count would double up takes the next.
+  const anchorKey = slotOf(rows[0].starts_at).dateKey;
+  const weekOf = (key) => Math.round(daysBetweenKeys(anchorKey, key) / 7);
+  const weeks = [];
+  for (const row of rows) {
+    weeks.push(Math.max(weekOf(slotOf(row.starts_at).dateKey), weeks.length ? weeks[weeks.length - 1] + 1 : 0));
+  }
+  const occurrences = weeks.map((week) => occurrenceInstants({
+    fromKey: addDaysToKey(requestedSlot.dateKey, week * 7),
     minuteOfDay: requestedSlot.minuteOfDay,
-    count: rows.length
-  });
-  if (occurrences.length !== rows.length) return fail("That weekly schedule could not be understood.", 400, request, env);
+    count: 1
+  })[0]);
+  if (occurrences.some((occurrence) => !occurrence)) return fail("That weekly schedule could not be understood.", 400, request, env);
+  // The bookmark keeps its week as well, so the top-up carries on from where
+  // it had got to and never adds again a week it had already considered.
+  const lastWeek = weeks[weeks.length - 1];
+  const filledTo = addDaysToKey(requestedSlot.dateKey, 7 * (
+    series.filled_to && parseDateKey(series.filled_to) ? Math.max(weekOf(series.filled_to), lastWeek) : lastWeek
+  ));
 
   const planned = [];
   for (let index = 0; index < rows.length; index += 1) {
@@ -4214,7 +4303,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     location,
     requestedSlot.weekday,
     requestedSlot.minuteOfDay,
-    planned[planned.length - 1].key,
+    filledTo,
     nowIso,
     seriesId,
     student.id,
@@ -4224,7 +4313,13 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     planned.length
   );
 
-  const [bookingResult, seriesResult] = await env.DB.batch([moveBookings, updateSeries]);
+  // Moved by the student, the run is on a time they chose within her hours
+  // again, so it is no longer one she placed (see `fillSeries`).
+  const forgetPlaced = env.DB.prepare(
+    `UPDATE settings SET value = (SELECT json_group_array(placed.value) FROM json_each(settings.value) placed WHERE placed.value != ?)
+     WHERE key = '${TEACHER_PLACED_RUNS}' AND json_valid(value) AND changes() = 1`
+  ).bind(seriesId);
+  const [bookingResult, seriesResult] = await env.DB.batch([moveBookings, updateSeries, forgetPlaced]);
   if (
     (bookingResult?.meta?.changes ?? 0) !== planned.length ||
     (seriesResult?.meta?.changes ?? 0) !== 1
@@ -4549,6 +4644,11 @@ async function claimRefund(env, row, requestedBy, cancellationMessage = null, id
   return (results[0]?.meta?.changes ?? 0) > 0 && (results[1]?.meta?.changes ?? 0) > 0;
 }
 
+/**
+ * Finish a claimed refund: the cancelled lesson once the money is back, null
+ * while Stripe's answer is still to come, or `{ refused }` with Stripe's
+ * words when it will not refund, the lesson then booked and paid as before.
+ */
 async function completeRefund(env, bookingId, now = new Date()) {
   const operation = await env.DB.prepare("SELECT * FROM booking_refunds WHERE booking_id = ? AND status = 'pending'").bind(bookingId).first();
   if (!operation) return null;
@@ -4560,22 +4660,55 @@ async function completeRefund(env, bookingId, now = new Date()) {
   const claimed = await env.DB.prepare("UPDATE booking_refunds SET attempted_at = ? WHERE booking_id = ? AND status = 'pending' AND (attempted_at IS NULL OR attempted_at < ?)")
     .bind(now.toISOString(), bookingId, stale).run();
   if (!(claimed?.meta?.changes > 0)) return null;
-  try {
-    const refund = operation.stripe_refund_id ? await retrieveRefund(env, operation.stripe_refund_id) : await refundPayment(env, JSON.parse(operation.request));
-    if (!refund.id) return null;
-    if (refund.id) await env.DB.prepare("UPDATE booking_refunds SET stripe_refund_id = ? WHERE booking_id = ?").bind(refund.id, bookingId).run();
-    if (refund.status !== "succeeded") return null;
+  // The money is back with the student, so the lesson is cancelled. Her own
+  // cancellation never costs them anything, so it also waives a late change
+  // fee still owed or about to be charged, as cancelling an unpaid lesson
+  // does; `teacherCancelLesson` has checked its payment page can take nothing.
+  const settle = async () => {
     await env.DB.batch([
       env.DB.prepare(`UPDATE bookings SET status = 'cancelled', cancelled_at = ?, cancelled_by = ?, sequence = sequence + 1,
-        same_day_change = 0, payment_status = 'refunded', updated_at = ?
+        same_day_change = 0, payment_status = 'refunded', updated_at = ?,
+        same_day_fee_status = CASE WHEN ? = 'teacher' AND same_day_fee_status IN ('scheduled', 'payment_due') THEN 'not_required' ELSE same_day_fee_status END
         WHERE id = ? AND status = 'confirmed' AND payment_status = 'processing'`)
-        .bind(now.toISOString(), operation.requested_by, now.toISOString(), bookingId),
+        .bind(now.toISOString(), operation.requested_by, now.toISOString(), operation.requested_by, bookingId),
       env.DB.prepare(`UPDATE booking_refunds SET status = 'completed' WHERE booking_id = ?
         AND EXISTS (SELECT 1 FROM bookings WHERE id = booking_refunds.booking_id AND status = 'cancelled' AND payment_status = 'refunded')`).bind(bookingId)
     ]);
     const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(bookingId).first();
     return row?.status === "cancelled" && row.payment_status === "refunded" ? row : null;
-  } catch {
+  };
+  try {
+    const refund = operation.stripe_refund_id ? await retrieveRefund(env, operation.stripe_refund_id) : await refundPayment(env, JSON.parse(operation.request));
+    if (!refund.id) return null;
+    if (refund.id) await env.DB.prepare("UPDATE booking_refunds SET stripe_refund_id = ? WHERE booking_id = ?").bind(refund.id, bookingId).run();
+    if (refund.status !== "succeeded") return null;
+    return await settle();
+  } catch (error) {
+    // Stripe's plain refusal of a new refund is its last word: every retry is
+    // answered the same, so the lesson used to wait on it for good, booked,
+    // "processing" and closed to every other change. A payment already
+    // refunded in full (from Stripe's own dashboard, say) has nothing left to
+    // return, so the lesson is cancelled as refunded. Any other refusal gives
+    // the lesson back as it was, paid and booked, and says so.
+    if (!operation.stripe_refund_id && stripeRefused(error)) {
+      try {
+        if (error.stripeCode === "charge_already_refunded") return await settle();
+        const [released] = await env.DB.batch([
+          env.DB.prepare(`UPDATE bookings SET payment_status = 'paid', cancellation_message = NULL, updated_at = ?
+            WHERE id = ? AND status = 'confirmed' AND payment_status = 'processing'
+              AND EXISTS (SELECT 1 FROM booking_refunds WHERE booking_id = bookings.id AND status = 'pending' AND stripe_refund_id IS NULL)`)
+            .bind(now.toISOString(), bookingId),
+          env.DB.prepare(`DELETE FROM booking_refunds WHERE booking_id = ? AND status = 'pending' AND stripe_refund_id IS NULL
+            AND EXISTS (SELECT 1 FROM bookings WHERE id = booking_refunds.booking_id AND status = 'confirmed' AND payment_status = 'paid')`).bind(bookingId)
+        ]);
+        if (released?.meta?.changes > 0) {
+          console.warn("refund-refused", bookingId, error.stripeCode || error.stripeStatus);
+          return { refused: String(error.message ?? "").slice(0, 200) };
+        }
+      } catch {
+        // Left pending below, for the sweep to ask again.
+      }
+    }
     console.warn("refund-reconciliation-pending", bookingId);
     return null;
   }
@@ -4589,7 +4722,7 @@ export async function retryRefunds(env, now = new Date()) {
     .bind(cutoff, new Date(now.getTime() - 10 * 60000).toISOString()).all();
   for (const operation of results ?? []) {
     const row = await completeRefund(env, operation.booking_id, now);
-    if (!row) continue;
+    if (!row || row.refused) continue;
     const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
     await notify(env, { event: "cancelled", row, lessonType, settings: await loadSettings(env), manageUrl: "", byTeacher: row.cancelled_by === "teacher" });
   }
@@ -4626,6 +4759,7 @@ async function handleCancel(request, env, ctx, token) {
     if (!await claimRefund(env, row, "student", null, null, null, settings.availabilityRevision)) return fail("That lesson or its change terms have just changed. Please reload.", 409, request, env);
     const updated = await completeRefund(env, row.id);
     if (!updated) return fail("Your cancellation request is recorded. The refund is being confirmed; the lesson stays reserved and locked until then. Please check back shortly.", 503, request, env);
+    if (updated.refused) return fail(`This lesson's payment couldn't be refunded, so it hasn't been cancelled. Please message ${tutorOf(env).shortName}.`, 409, request, env);
     const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
     ctx.waitUntil(notify(env, { event: "cancelled", row: updated, lessonType, settings, manageUrl: "" }));
     return json({ booking: publicBooking(updated, lessonType, settings), sameDayFeeApplied: false }, 200, request, env);
@@ -4735,6 +4869,13 @@ async function rebookTerms(env, row, settings, now = new Date(), known = {}) {
   const student = known.student?.id === row.student_id && isStudentLike(known.student) ? known.student
     : row.student_id ? await env.DB.prepare(`SELECT * FROM students WHERE id = ? AND ${studentLikeSql()}`).bind(row.student_id).first() : null;
   if (!student) return refuse(`This lesson can't be booked again here, so please message ${tutor.shortName}.`);
+  // The trial is a first lesson, here as when booking: once they have another
+  // lesson the claim refuses it, so it is not offered and says why if asked.
+  if (row.lesson_type_id === "trial" && await env.DB.prepare(
+    "SELECT 1 FROM bookings WHERE student_id = ? AND status != 'cancelled' LIMIT 1"
+  ).bind(student.id).first()) {
+    return refuse(`The trial is for your first lesson with ${tutor.shortName}. You've already had a lesson, so choose a single lesson instead.`);
+  }
   const priced = known.lessonTypes?.get(row.lesson_type_id) ??
     loadLessonType(env, row.lesson_type_id).then((type) => type ? studentLessonType(env, student.id, type) : null);
   known.lessonTypes?.set(row.lesson_type_id, priced);
@@ -4836,8 +4977,12 @@ async function handleRebook(request, env, ctx, token) {
   const claimed = await claimSlot(env, {
     columns: LESSON_CLAIM_COLUMNS,
     values: [
-      id, bookingReference(tutorOf(env).bookings.referencePrefix), lessonType.id, student.id, row.student_name, row.student_email,
-      row.student_phone, row.student_timezone, row.location, row.notes, row.starts_at, row.ends_at, "confirmed", 0, timestamp,
+      // Addressed as the account is now, not as the cancelled lesson was: a
+      // cancelled lesson keeps the address it was taken under, so copying it
+      // sent the new lesson's emails and manage link to an address the
+      // student had since replaced.
+      id, bookingReference(tutorOf(env).bookings.referencePrefix), lessonType.id, student.id, student.name, student.email,
+      student.phone, student.timezone, row.location, row.notes, row.starts_at, row.ends_at, "confirmed", 0, timestamp,
       timestamp, payment.status, lessonType.price_cents, null, seriesId, payment.consentAt, payment.version, terms.teacher ? 1 : 0
     ],
     startAt: row.starts_at,
@@ -5394,6 +5539,9 @@ async function confirmSelectionCardSetup(env, ctx, session, anchor) {
  * ignores an expired hold, so this is only housekeeping to stop the table
  * filling with dead rows.
  */
+/** How long a recipe with no lessons yet is left for the request still writing it. */
+const EMPTY_SERIES_GRACE_MINUTES = 10;
+
 async function releaseExpiredHolds(env) {
   await env.DB.prepare(
     "DELETE FROM bookings WHERE status = 'pending_payment' AND hold_expires_at IS NOT NULL AND hold_expires_at < ?"
@@ -5403,13 +5551,18 @@ async function releaseExpiredHolds(env) {
 
   // A saved-card run whose setup was abandoned leaves a series row with no
   // bookings once the holds above are swept; without this it lingers forever.
+  // A recipe is written a moment before its first lesson is tied to it, and
+  // this runs on anyone's look at the calendar, so one only just made is left
+  // alone: taking it then failed that booking part way, with its first lesson
+  // booked and no run. Holds outlast the wait, so an abandoned setup's recipe
+  // still goes in the sweep that takes its holds.
   await env.DB.prepare(
     `DELETE FROM booking_series WHERE id IN (
        SELECT s.id FROM booking_series s
        LEFT JOIN bookings b ON b.series_id = s.id
-       WHERE b.id IS NULL
+       WHERE b.id IS NULL AND s.created_at < ?
      )`
-  ).run();
+  ).bind(new Date(Date.now() - EMPTY_SERIES_GRACE_MINUTES * 60000).toISOString()).run();
 }
 
 /**
@@ -6155,10 +6308,18 @@ async function handleConfirmEmailChange(request, env) {
       // Lessons to come, and any whose money is still to settle: a card is
       // charged after the lesson, so its receipt or pay-now email must reach
       // the new address. Settled past lessons keep the one they were taken under.
+      // Still to settle includes a lesson already had and open to pay her: a
+      // link she sends can put it on a card, and its receipt once went to the
+      // address they had replaced, or nowhere for a student who had just
+      // given their first one. The stand-in for no address is no record of
+      // anything, so it goes from every lesson.
       env.DB.prepare(`UPDATE bookings SET student_email = ?, updated_at = ?
         WHERE student_id = ? AND ((status IN ('confirmed', 'pending_payment') AND starts_at > ?)
             OR payment_status IN ('scheduled', 'processing', 'payment_due')
-            OR same_day_fee_status IN ('scheduled', 'processing', 'payment_due'))
+            OR same_day_fee_status IN ('scheduled', 'processing', 'payment_due')
+            OR (status = 'confirmed' AND payment_status IN ('not_required', '${RECORDED}')
+              AND COALESCE(payment_consent_version, '') != '${PAID_BY_HAND_MARK}')
+            OR student_email LIKE '${NO_EMAIL_YET}%')
           AND EXISTS (SELECT 1 FROM students WHERE id = ? AND email = ? AND session_version = ?)`)
         .bind(pending.new_email, now, student.id, now, student.id, pending.new_email, (student.session_version ?? 0) + 1)
     ]);
@@ -6441,9 +6602,17 @@ function availabilityRevisionBump(env, authorization) {
 async function teacherCancelLesson(env, row, cancellationMessage, authorization) {
   const changed = { problem: "That lesson has just changed. Please reload.", status: 409 };
   if (row.payment_status === "paid" && row.stripe_payment_intent) {
+    // A late change fee still owed goes with her cancellation (see the unpaid
+    // lesson below), once its page can no longer take a payment.
+    if (row.same_day_fee_status === "payment_due" && row.same_day_fee_session_id && !await checkoutSessionExpired(env, row.same_day_fee_session_id)) {
+      return { problem: "A payment for this lesson may be going through. Please reload in a few minutes.", status: 409 };
+    }
     if (!await claimRefund(env, row, "teacher", cancellationMessage, null, authorization)) return changed;
     await authorization.assert();
     const updated = await completeRefund(env, row.id);
+    if (updated?.refused) {
+      return { problem: `Stripe wouldn't refund this lesson's payment, so it is still booked and paid. Stripe said: “${updated.refused.replace(/\.$/, "")}”. Check the payment in Stripe.`, status: 409 };
+    }
     return updated ? { row: updated } : {
       problem: "The cancellation request is recorded. Its refund is awaiting confirmation; the lesson stays reserved and locked. Review the payment in Stripe before any further action.",
       status: 503, pendingRefund: true
@@ -6529,7 +6698,7 @@ async function teacherCancelFollowing(request, env, ctx, row, message, authoriza
   return json({
     cancelled: cancelled.map((lesson) => lesson.starts_at),
     kept,
-    emailed: !await awaitingWelcomeAt(env, row.student_email)
+    emailed: await studentIsEmailed(env, row.student_email)
   }, 200, request, env);
 }
 
@@ -6728,7 +6897,7 @@ async function teacherChangeLength(request, env, ctx, bookingId, body, authoriza
   return json({
     changed: updated.map((lesson) => lesson.starts_at),
     kept,
-    emailed: !await awaitingWelcomeAt(env, row.student_email)
+    emailed: await studentIsEmailed(env, row.student_email)
   }, 200, request, env);
 }
 
@@ -6961,6 +7130,18 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
       lessonType?.id ?? null, location, nowIso,
       row.series_id, planned.length, ...authorization.values
     ));
+    // Where and when it is are now hers, so the weeks added later are planned
+    // by her rules (`fillSeries`). Written with the recipe or not at all.
+    if (timeMoves || location) {
+      statements.push(env.DB.prepare(
+        `INSERT INTO settings (key, value)
+         SELECT '${TEACHER_PLACED_RUNS}', (SELECT json_group_array(s.id) FROM booking_series s WHERE s.status = 'active'
+           AND (s.id = ? OR s.id IN (SELECT value FROM json_each(COALESCE(
+             (SELECT CASE WHEN json_valid(value) THEN value END FROM settings WHERE key = '${TEACHER_PLACED_RUNS}'), '[]')))))
+         WHERE changes() = 1 AND (${authorization.sql})
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+      ).bind(row.series_id, ...authorization.values));
+    }
   }
   const [changed] = await env.DB.batch(statements);
   if ((changed?.meta?.changes ?? 0) !== planned.length) {
@@ -7009,7 +7190,7 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
   return json({
     changed: updated.map((lesson) => lesson.starts_at),
     kept: keptReply,
-    emailed: !await awaitingWelcomeAt(env, row.student_email)
+    emailed: await studentIsEmailed(env, row.student_email)
   }, 200, request, env);
 }
 
@@ -7212,6 +7393,20 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     const body = adminBody;
     if (!Array.isArray(body.rules)) return fail("Expected a rules array.", 400, request, env);
     if (body.rules.length > 100) return fail("Use at most 100 weekly time ranges.", 400, request, env);
+    // This replaces the whole week with what one page holds. A page says
+    // which hours it last read (`expected`), and is refused if they are no
+    // longer the hours: her phone may have closed an afternoon since her
+    // laptop read them, and the laptop's next save would open it again. A
+    // page from before this sends none and saves as it always did.
+    if (body.expected !== undefined) {
+      if (!Array.isArray(body.expected)) return fail("Invalid weekly time range. No hours were changed.", 400, request, env);
+      const { results: held } = await env.DB.prepare("SELECT weekday, start_minute, last_start_minute FROM availability_rules").all();
+      const week = (rules) => rules.map((rule) => rule.join(":")).sort().join("|");
+      if (week((held ?? []).map((rule) => [rule.weekday, rule.start_minute, rule.last_start_minute])) !==
+          week(body.expected.map((rule) => [rule?.weekday, rule?.startMinute, rule?.lastStartMinute]))) {
+        return fail("Your weekly hours have changed since this page read them, on another device. Reload the page to see them before saving again.", 409, request, env);
+      }
+    }
 
     const statements = [env.DB.prepare(`DELETE FROM availability_rules WHERE (${authorization.sql})`).bind(...authorization.values)];
     for (const rule of body.rules) {
@@ -7278,6 +7473,19 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     const extra = "extra" in body ? extraStartRanges(body.extra, (await loadSettings(env)).slotIntervalMinutes) : undefined;
     if (blocks === null || extra === null) return fail("Those times could not be saved. Please reload and try again.", 400, request, env);
     if (dayOff === undefined && blocks === undefined && extra === undefined) return fail("Nothing to change.", 400, request, env);
+    // As with her weekly hours: the date's whole set is replaced by what one
+    // page holds, so the page names the rows it last read for this date
+    // (`expectedIds`) and is refused once another device has changed them.
+    if (body.expectedIds !== undefined) {
+      if (!Array.isArray(body.expectedIds) || !body.expectedIds.every(Number.isInteger)) {
+        return fail("Those times could not be saved. Please reload and try again.", 400, request, env);
+      }
+      const { results: held } = await env.DB.prepare("SELECT id FROM availability_exceptions WHERE date = ? AND weekday IS NULL").bind(body.date).all();
+      const rows = (ids) => [...ids].sort((a, b) => a - b).join(",");
+      if (rows((held ?? []).map((row) => row.id)) !== rows(body.expectedIds)) {
+        return fail("It has changed on another device since this page read it, and is shown as it is now.", 409, request, env);
+      }
+    }
 
     const oneOff = "date = ? AND weekday IS NULL AND kind = 'blocked'";
     const wholeDay = "(start_minute IS NULL OR start_minute <= 0) AND (end_minute IS NULL OR end_minute >= 1440)";
@@ -7423,12 +7631,17 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     const student = await env.DB.prepare(`SELECT * FROM students WHERE id = ? AND ${studentLikeSql()}`).bind(detailedStudent[1]).first();
     if (!student) return fail("That student could not be found.", 404, request, env);
     const body = adminBody;
-    const name = cleanText(body.name, 120);
+    // Only what she sends is written, as a student's own save is: her page
+    // holds their details as her list last read them, and sending them all
+    // back blanked a NIF or phone the student had added in the meantime.
+    const name = "name" in body ? cleanText(body.name, 120) : student.name;
     if (!name) return fail("Please give the student's name.", 400, request, env);
     const details = studentDetails(body);
     if (details.problem) return fail(details.problem, 400, request, env);
+    if (!("phone" in body)) details.phone = student.phone;
+    if (!("nif" in body)) details.nif = student.nif;
     const current = hasEmail(student) ? student.email : "";
-    const email = normaliseEmail(body.email);
+    const email = "email" in body ? normaliseEmail(body.email) : current;
     if (email && !isEmail(email)) return fail("Please check the student's email address.", 400, request, env);
     const moving = email !== current;
     if (moving && (student.password_hash || student.google_sub || student.last_login_at)) {
@@ -7576,8 +7789,11 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     const welcome = await issueWelcome(env, settings, student, { always: true, authorization: owner });
     // First welcomes share a durable provider request. A racing or interrupted
     // request reuses its original sign-in link and cannot send a second email.
+    // By the day, as her come-back email is: an attempt that failed and was
+    // never retried in time is closed for good, and under one lasting key
+    // every later press met that closed attempt and could never send.
     const dedupeKey = onlyIfWaiting
-      ? `welcome-first:${student.id}:${student.session_version ?? 0}:${await sessionHash(student.email)}` : null;
+      ? `welcome-first:${student.id}:${student.session_version ?? 0}:${dateKey(new Date(), homeZone())}:${await sessionHash(student.email)}` : null;
     const sent = await sendWelcome(env, { student, settings, welcome, lessons: await welcomeLessons(env, student.id), dedupeKey, authorization: owner });
     if (!sent.ok) {
       await owner.assert();
@@ -7707,8 +7923,9 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     }
     if (wantsRepeat && lessonType.id === "trial") return fail("A trial is one first lesson and cannot repeat.", 400, request, env);
 
+    // A time is its text: `new Date(null)` is 1970, which was recorded as an unpaid lesson.
     const start = new Date(body.startAt);
-    if (Number.isNaN(start.getTime())) return fail("That time could not be understood.", 400, request, env);
+    if (typeof body.startAt !== "string" || Number.isNaN(start.getTime())) return fail("That time could not be understood.", 400, request, env);
     const endsAt = new Date(start.getTime() + lessonType.duration_minutes * 60000);
 
     /*
@@ -7887,7 +8104,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       return json({
         booking: publicBooking(first, lessonType, settings),
         series: { id: seriesId, weeks: repeatWeeks, booked: rows.length, skipped: filled.skipped },
-        emailed: !held
+        emailed: !held && Boolean(realEmail(student.email))
       }, 201, request, env);
     }
 
@@ -7904,7 +8121,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       })
     );
 
-    return json({ booking: publicBooking(row, lessonType, settings), emailed: !held }, 201, request, env);
+    return json({ booking: publicBooking(row, lessonType, settings), emailed: !held && Boolean(realEmail(student.email)) }, 201, request, env);
   }
 
   const adminReschedule = path.match(/^\/admin\/bookings\/([^/]+)\/reschedule$/);
@@ -7914,7 +8131,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
 
     const body = adminBody;
     const start = new Date(body.startAt);
-    if (Number.isNaN(start.getTime())) return fail("That time could not be understood.", 400, request, env);
+    if (typeof body.startAt !== "string" || Number.isNaN(start.getTime())) return fail("That time could not be understood.", 400, request, env);
     // A record stays a record: a lesson to come is added, and announced, as one.
     if (row.payment_status === RECORDED && start > new Date()) {
       return fail("A recorded lesson stays in the past. Add a new lesson instead.", 409, request, env);
@@ -7985,7 +8202,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       })
     );
 
-    return json({ booking: publicBooking(updated, lessonType, settings), emailed: !await awaitingWelcomeAt(env, updated.student_email) }, 200, request, env);
+    return json({ booking: publicBooking(updated, lessonType, settings), emailed: await studentIsEmailed(env, updated.student_email) }, 200, request, env);
   }
 
   const adminCancel = path.match(/^\/admin\/bookings\/([^/]+)\/cancel$/);
@@ -8022,7 +8239,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       notify(env, { event: "cancelled", row: updated, lessonType, settings, manageUrl: "", byTeacher: true })
     );
 
-    return json({ booking: publicBooking(updated, lessonType, settings), emailed: !await awaitingWelcomeAt(env, updated.student_email) }, 200, request, env);
+    return json({ booking: publicBooking(updated, lessonType, settings), emailed: await studentIsEmailed(env, updated.student_email) }, 200, request, env);
   }
 
   const adminLength = path.match(/^\/admin\/bookings\/([^/]+)\/length$/);
@@ -8100,8 +8317,15 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
            AND COALESCE(payment_consent_version, '') != ? AND (${authorization.sql})`
       ).bind(price, PAID_BY_HAND_MARK, now, row.id, row.sequence, PAID_BY_HAND_MARK, ...authorization.values).run();
     } else if (!body.paid && ticked) {
+      // A lesson of hers already had is open again as it stood, at its own
+      // price and off the card, as a record is: one already had goes on a card
+      // only when a link names it. Billed "as it would be booked now" it went
+      // onto the student's standing card at today's price, and the next sweep
+      // charged it, from one untick.
+      const had = Boolean(row.added_by_teacher) && Date.parse(row.starts_at) <= Date.now();
       const terms = row.payment_status === RECORDED
         ? { status: RECORDED, amount: row.amount_cents ?? null, consentAt: null, version: null }
+        : had ? { status: "not_required", amount: row.amount_cents ?? null, consentAt: null, version: null }
         : await untickedTerms(env, row);
       changed = await env.DB.prepare(
         `UPDATE bookings SET payment_status = ?, amount_cents = ?, payment_consent_at = ?, payment_consent_version = ?, updated_at = ?

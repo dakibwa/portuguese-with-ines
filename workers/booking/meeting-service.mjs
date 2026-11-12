@@ -204,7 +204,13 @@ export async function markMeetingNotified(env, row) {
   }
 }
 
-export async function syncPendingMeetings(env, notifyReady) {
+/**
+ * `reminder`, when given, is the day-before reminder's timing (`leadHours`
+ * before a lesson, for one made at least `quietHours` before it starts): a
+ * lesson its student was never emailed about then leaves its link to that
+ * reminder, below.
+ */
+export async function syncPendingMeetings(env, notifyReady, reminder = null) {
   if (!enabled(env)) return;
   const account = await completeCalendarSetup(env);
   if (!account || account.status !== "active" || !account.calendar_id) return;
@@ -219,13 +225,25 @@ export async function syncPendingMeetings(env, notifyReady) {
   // A student with no email yet, or still awaiting their welcome, is left
   // out: their email is held, never marked sent, and six of them would fill
   // every batch ahead of everyone else.
+  // The link email follows a confirmation that went without its link. A
+  // lesson its student was never emailed about (added while they awaited
+  // their welcome, or had no address) has no such email to follow, so its
+  // link waits for the day-before reminder, which carries it: sent for each,
+  // a student just welcomed to a weekly slot got a link email for every week
+  // at once. One too near for a reminder still gets its link by itself.
+  const waits = reminder ? `AND NOT (b.starts_at > ? AND julianday(b.created_at) <= julianday(b.starts_at) - ?
+      AND NOT EXISTS (SELECT 1 FROM email_log told
+        WHERE told.kind IN ('student_booked', 'student_rescheduled', 'student_series_booked', 'student_series_moved')
+          AND (told.booking_id = b.id OR (b.series_id IS NOT NULL AND instr(told.dedupe_key, ':' || b.series_id || ':') > 0))))` : "";
   const { results: ready } = await env.DB.prepare(`SELECT * FROM bookings b WHERE status = 'confirmed' AND location = 'online'
     AND meeting_url IS NOT NULL AND meeting_notified_at IS NULL AND ends_at > ? AND created_at < ?
     AND student_email NOT LIKE 'no-email:%'
     AND NOT EXISTS (SELECT 1 FROM students s WHERE s.email = lower(trim(b.student_email)) AND s.role = 'student' AND s.awaiting_welcome = 1
       AND COALESCE(s.password_hash, '') = '' AND COALESCE(s.google_sub, '') = '' AND s.last_login_at IS NULL)
+    ${waits}
     ORDER BY starts_at LIMIT 6`)
-    .bind(now, new Date(Date.now() - 120000).toISOString()).all();
+    .bind(now, new Date(Date.now() - 120000).toISOString(),
+      ...(reminder ? [new Date(Date.now() + reminder.leadHours * 3600000).toISOString(), reminder.quietHours / 24] : [])).all();
   for (const row of ready ?? []) {
     if (!meetingUrl(row)) continue;
     const leaseUntil = new Date(Date.now() + 300000).toISOString();

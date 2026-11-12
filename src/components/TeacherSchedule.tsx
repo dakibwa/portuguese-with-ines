@@ -20,6 +20,7 @@ import { ScheduleLoading, WeekLoading } from "@/components/teacher/ScheduleLoadi
 import { ReceiptsTab } from "@/components/teacher/ReceiptsTab";
 import { ExpressionsTab } from "@/components/teacher/ExpressionsTab";
 import {
+  AdminApiError,
   dismissNeedsYou,
   fetchBookings,
   fetchSchedule,
@@ -34,6 +35,7 @@ import {
   type OnlineOnlyPeriod,
   type GoogleMeetConnection,
   type PaymentReview,
+  type WeeklyRule,
 } from "@/lib/admin-api";
 import { clearSession, fetchMe, readSession, subscribeToSession, type Student } from "@/lib/auth-api";
 import { forgetAvailability, portoTimeToUtc } from "@/lib/booking-api";
@@ -310,6 +312,25 @@ export function TeacherSchedule() {
     };
   }, [authAttempt]);
 
+  // Her week and each date's rows exactly as last read, or as last saved from
+  // here. Every save names them, so the Worker can refuse one made over a
+  // change from another device that this page has not seen.
+  const rulesRead = useRef<WeeklyRule[]>([]);
+  const exceptionsRead = useRef<AvailabilityException[]>([]);
+  const showSchedule = useCallback((schedule: Awaited<ReturnType<typeof fetchSchedule>>) => {
+    const hours = hoursFromRules(schedule.rules);
+    rulesRead.current = schedule.rules.map((rule) => ({ weekday: rule.weekday, startMinute: rule.start_minute, lastStartMinute: rule.last_start_minute }));
+    exceptionsRead.current = schedule.exceptions;
+    setSavedHours(hours);
+    setDraftHours(hours);
+    setExceptions(schedule.exceptions);
+    savedPeriods.current = schedule.settings?.onlineOnlyPeriods ?? [];
+    wantedPeriods.current = null;
+    onlineRevision.current = schedule.settings?.onlineOnlyRevision ?? "0";
+    setOnlineOnlyPeriods(savedPeriods.current);
+    setIntervalMinutes(schedule.settings?.slotIntervalMinutes ?? 30);
+  }, []);
+
   useEffect(() => {
     if (!token || renewedSession.current === token) return;
     let active = true;
@@ -317,15 +338,7 @@ export function TeacherSchedule() {
     fetchSchedule(token)
       .then((schedule) => {
         if (!active || readSession() !== token) return;
-        const hours = hoursFromRules(schedule.rules);
-        setSavedHours(hours);
-        setDraftHours(hours);
-        setExceptions(schedule.exceptions);
-        savedPeriods.current = schedule.settings?.onlineOnlyPeriods ?? [];
-        wantedPeriods.current = null;
-        onlineRevision.current = schedule.settings?.onlineOnlyRevision ?? "0";
-        setOnlineOnlyPeriods(savedPeriods.current);
-        setIntervalMinutes(schedule.settings?.slotIntervalMinutes ?? 30);
+        showSchedule(schedule);
         setInitialised(true);
       })
       .catch((caught) => {
@@ -339,7 +352,24 @@ export function TeacherSchedule() {
     return () => {
       active = false;
     };
-  }, [token, scheduleAttempt]);
+  }, [token, scheduleAttempt, showSchedule]);
+
+  // Her hours and time off as another device may have left them. A save sends
+  // the whole week, or a date's whole set, as this page holds it, so a page
+  // that read them this morning would put back hours she has since closed on
+  // her phone. Never over anything she has not saved, or is saving, here; a
+  // read that fails is left for the next return.
+  const scheduleUnsaved = useRef(false);
+  scheduleUnsaved.current = hoursDirty || dayChanges.size > 0 || savingOnline || savingHours || savingDays;
+  const refreshSchedule = useCallback(async () => {
+    if (!token || readSession() !== token || scheduleUnsaved.current) return;
+    try {
+      const schedule = await fetchSchedule(token);
+      if (readSession() === token && !scheduleUnsaved.current) showSchedule(schedule);
+    } catch {
+      // Nothing to say: what she sees is what she had.
+    }
+  }, [token, showSchedule]);
 
   const reloadStudents = useCallback(async () => {
     if (!token || readSession() !== token) return;
@@ -422,10 +452,11 @@ export function TeacherSchedule() {
       setNow(new Date());
       void reloadBookings(true);
       void reloadStudents();
+      void refreshSchedule();
     };
     document.addEventListener("visibilitychange", returned);
     return () => document.removeEventListener("visibilitychange", returned);
-  }, [reloadBookings, reloadStudents]);
+  }, [reloadBookings, reloadStudents, refreshSchedule]);
 
   /** A notice that only tells her something, gone at once; a failed save puts it back and says so. */
   async function dismissNotice(key: string) {
@@ -486,18 +517,17 @@ export function TeacherSchedule() {
     setError("");
     setStatus("");
     const submitted = draftHours;
+    const rules = Object.entries(submitted).flatMap(([day, windows]) =>
+      windows.map((window) => ({
+        weekday: Number(day),
+        startMinute: window.start,
+        lastStartMinute: window.lastStart,
+      })),
+    );
     try {
-      await saveRules(
-        token,
-        Object.entries(submitted).flatMap(([day, windows]) =>
-          windows.map((window) => ({
-            weekday: Number(day),
-            startMinute: window.start,
-            lastStartMinute: window.lastStart,
-          })),
-        ),
-      );
+      await saveRules(token, rules, rulesRead.current);
       if (account !== accountGeneration.current) return;
+      rulesRead.current = rules;
       setSavedHours(submitted);
       setStatus(`Weekly hours saved. Students can now book these times.${stayBooked(affectedLessons.length)}`);
     } catch (caught) {
@@ -529,13 +559,16 @@ export function TeacherSchedule() {
     const account = accountGeneration.current;
     sendingDays.current = true;
     setSavingDays(true);
+    let changedElsewhere = false;
     try {
       while (dayChangesRef.current.size) {
         if (account !== accountGeneration.current) return;
         const [date, change] = dayChangesRef.current.entries().next().value!;
         try {
-          const result = await saveDayOff(token, date, change);
+          const result = await saveDayOff(token, date, change,
+            exceptionsRead.current.filter((row) => row.date === date && (row.weekday === null || row.weekday === undefined)).map((row) => row.id));
           if (account !== accountGeneration.current) return;
+          exceptionsRead.current = [...exceptionsRead.current.filter((row) => row.date !== date), ...result.exceptions];
           setExceptions((current) => [
             ...current.filter((row) => row.date !== date),
             ...result.exceptions,
@@ -548,6 +581,7 @@ export function TeacherSchedule() {
           if (account !== accountGeneration.current) return;
           // A failed earlier save does not own a newer choice for this date.
           // Keep that choice queued so the next request can save it in full.
+          if (caught instanceof AdminApiError && caught.status === 409) changedElsewhere = true;
           if (dayChangesRef.current.get(date)?.version === change.version) {
             updateDayChanges((changes) => changes.delete(date));
             setDayNote({
@@ -555,6 +589,18 @@ export function TeacherSchedule() {
               text: `${shortDate(date)} was not changed. ${caught instanceof Error ? caught.message : "Please try again."}`,
             });
           }
+        }
+      }
+      // A date changed on another device: show her days as they now are, so
+      // her next press starts from them. Nothing of hers is waiting by now.
+      if (changedElsewhere) {
+        try {
+          const schedule = await fetchSchedule(token);
+          if (account !== accountGeneration.current || dayChangesRef.current.size) return;
+          exceptionsRead.current = schedule.exceptions;
+          setExceptions(schedule.exceptions);
+        } catch {
+          // Her next save is refused the same way, and reads again.
         }
       }
     } finally {
@@ -689,7 +735,7 @@ export function TeacherSchedule() {
     // Extra hours are lesson starts, so they cover the times their starts do.
     const span = kind === "extra" ? extraSpan(chosen, interval) : chosen;
     const current = { off: dateBlocks(shownExceptions, date), online: onlineOnlyHours(latestPeriods(), date), extra: dateExtras(shownExceptions, date, interval) };
-    const next = chooseHours(current, original, kind, span);
+    const next = chooseHours(current, original, kind, span, interval);
     const same = (a: Span[], b: Span[]) => JSON.stringify(a) === JSON.stringify(b);
     const when = `${spanLabel(span)} on ${shortDate(date)}`;
     const text = kind === "off" ? `${when} is off.${stayBooked(lessonsDuring(date, span))}`
@@ -825,7 +871,7 @@ export function TeacherSchedule() {
             setActiveTab("profile");
           }}
           onWelcome={(student) => void sendWelcome(student)}
-          onStudent={student => openStudent(student, "lessons")}
+          onStudent={(student, panel = "lessons") => openStudent(student, panel)}
           onDismiss={key => void dismissNotice(key)}
           onSeeAll={() => { setActiveTab("students"); document.getElementById("teacher-tab-students")?.focus({ preventScroll: true }); }}
         />

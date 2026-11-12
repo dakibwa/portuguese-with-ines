@@ -51,7 +51,7 @@ type Details = { name: string; email: string; phone: string; nif: string };
  * as fields, each named at its left, saved by the one tick. A signed-in
  * student's email is theirs to change, so it is only read here.
  */
-function DetailsEdit({ student, onSave, onClose, onBusy }: { student: AdminStudent; onSave: (details: Details) => Promise<void>; onClose: () => void; onBusy: (busy: boolean) => void }) {
+function DetailsEdit({ student, onSave, onClose, onBusy }: { student: AdminStudent; onSave: (details: Partial<Details>) => Promise<void>; onClose: () => void; onBusy: (busy: boolean) => void }) {
   const saved: Details = { name: student.name, email: student.email ?? "", phone: student.phone ?? "", nif: student.nif ?? "" };
   const [draft, setDraft] = useState(saved);
   const [busy, setBusy] = useState(false);
@@ -65,9 +65,12 @@ function DetailsEdit({ student, onSave, onClose, onBusy }: { student: AdminStude
       event.preventDefault();
       if (busy) return;
       const next: Details = { name: draft.name.trim(), email: draft.email.trim(), phone: draft.phone.trim(), nif: draft.nif.trim() };
-      if ((Object.keys(next) as (keyof Details)[]).every(key => next[key] === saved[key])) { onClose(); return; }
+      // Only what she changed is sent: the rest is as her list last read it,
+      // and sending that back would undo what the student has saved since.
+      const changed = (Object.keys(next) as (keyof Details)[]).filter(key => next[key] !== saved[key]);
+      if (!changed.length) { onClose(); return; }
       setBusy(true); onBusy(true); setError("");
-      try { await onSave(next); onClose(); }
+      try { await onSave(Object.fromEntries(changed.map(key => [key, next[key]]))); onClose(); }
       catch (caught) { setError(caught instanceof Error ? caught.message : "Their details couldn’t be saved."); }
       finally { setBusy(false); onBusy(false); }
     }}>
@@ -268,9 +271,10 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
   const help: string[] = step === "invite" ? ["Signs them in once, within 14 days."]
     : step === "lessons" ? [
       ...(!hasLessons(student) ? ["No lessons added yet."] : []),
-      student.awaitingWelcome ? "Lesson emails wait for the welcome email." : "Lessons to come email the student.",
+      student.awaitingWelcome ? "Lesson emails wait for the welcome email."
+        : student.email ? "Lessons to come email the student." : "No email yet, so nothing is emailed.",
     ] : step === "come-back" ? ["Ends with a button to sign in and book.", comeBackSent ? `Last sent ${comeBackSent}.` : "Not sent yet."] : [];
-  async function saveDetails(details: Details) {
+  async function saveDetails(details: Partial<Details>) {
     setNotice(""); setProblem("");
     const { student: updated } = await updateStudentDetails(token, student.id, details);
     onChanged?.(updated);

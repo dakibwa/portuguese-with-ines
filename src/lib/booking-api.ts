@@ -547,7 +547,12 @@ export function startLessonCard(token: string, scope: "lesson" | "run", expected
 /** The student's own zone, so times can be shown in it alongside Porto time. */
 export function browserTimeZone() {
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || BOOKING_TIME_ZONE;
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || BOOKING_TIME_ZONE;
+    // A device whose zone the browser cannot name reports "Etc/Unknown", which
+    // no date can then be formatted in: the booking page threw as it drew and
+    // showed nothing at all. Refused here, such a zone reads as Porto's clock.
+    new Intl.DateTimeFormat("en", { timeZone: zone });
+    return zone;
   } catch {
     return BOOKING_TIME_ZONE;
   }

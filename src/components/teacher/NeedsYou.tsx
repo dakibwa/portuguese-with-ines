@@ -55,7 +55,8 @@ export function NeedsYou({ items, sending, onMeet, onWelcome, onStudent, onDismi
   sending: string;
   onMeet: () => void;
   onWelcome: (student: AdminStudent, again?: boolean) => void;
-  onStudent: (student: AdminStudent) => void;
+  /** Opens a student's card: on Add a lesson, or on their profile, where their lessons are. */
+  onStudent: (student: AdminStudent, panel?: "lessons" | "history") => void;
   onDismiss: (key: string) => void;
   /** The Timetable shows only the first few notices. */
   onSeeAll?: () => void;
@@ -135,7 +136,7 @@ export function NeedsYou({ items, sending, onMeet, onWelcome, onStudent, onDismi
         "they’ve been sent a payment link",
         payment.reference,
       );
-      action = <button className="teacher-quiet" type="button" onClick={() => onStudent(student)}>
+      action = <button className="teacher-quiet" type="button" onClick={() => onStudent(student, "history")}>
         Open<span className="visually-hidden"> {student.name}</span>
       </button>;
     } else if (item.kind === "card") {
@@ -147,8 +148,10 @@ export function NeedsYou({ items, sending, onMeet, onWelcome, onStudent, onDismi
       detail = count
         ? `${count} ${count === 1 ? "lesson" : "lessons"} you added ${count === 1 ? "is" : "are"} now charged after each one. Paid by hand? Open it and tick “Already paid”`
         : "Lessons you add are now charged to it after each one";
-      // Only lessons she may have been paid for by hand give her something to do.
-      action = count ? <button className="teacher-quiet" type="button" onClick={() => onStudent(student)}>
+      // Only lessons she may have been paid for by hand give her something to
+      // do, and they are on the student's profile: this opened the empty Add
+      // a lesson form, with nothing in it to tick.
+      action = count ? <button className="teacher-quiet" type="button" onClick={() => onStudent(student, "history")}>
         See lessons<span className="visually-hidden"> for {student.name}</span>
       </button> : null;
     } else if (item.kind === "lessons") {

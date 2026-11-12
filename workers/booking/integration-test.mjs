@@ -22,6 +22,8 @@ const refunds = [];
 let duringRefund = null;
 let refundUnavailable = false;
 let refundStatus = "succeeded";
+// Stripe's error code for a refund it refuses outright, when a test sets one.
+let refundRefusal = "";
 let refundLookups = 0;
 let checkoutStatus = "open";
 let chargeError = null;
@@ -53,6 +55,7 @@ globalThis.fetch = async (url, options) => {
   if (String(url) === "https://api.stripe.com/v1/refunds") {
     refunds.push({ body: options.body, key: options.headers["Idempotency-Key"] });
     await duringRefund?.();
+    if (refundRefusal) return Response.json({ error: { message: "Isolated refusal.", type: "invalid_request_error", code: refundRefusal } }, { status: 400 });
     if (refundUnavailable) return Response.json({ error: { message: "Isolated refund response loss" } }, { status: 503 });
     return Response.json({ id: `re_${refunds.length}`, status: refundStatus });
   }
@@ -585,6 +588,9 @@ await test("a cancellation inside 14 hours records and charges just one separate
   assert.equal(row.same_day_fee_status, "paid");
   assert.equal(charges.filter((charge) => charge.key.includes(id)).length, 1);
   assert.equal(charges.find((charge) => charge.key.includes(id)).amount, 500);
+  // The fee is charged beside the cancellation's own email, which must still
+  // go: it once waited for a fee that had already moved on, and never went.
+  assert.equal(db.prepare("SELECT status FROM email_log WHERE booking_id=? AND kind='student_cancelled'").get(id).status, "dry-run");
   const boundary = linkedBooking("notice-boundary", { start: "2026-09-06T00:00:00.000Z", end: "2026-09-06T01:00:00.000Z" });
   const originalPrepare = DB.prepare;
   const before = clock;
@@ -1397,6 +1403,25 @@ await test("pending provider refunds reconcile by id, never create another refun
   assert.equal(refundLookups, lookups + 1);
   assert.equal(db.prepare("SELECT status FROM bookings WHERE reference='refund-pending'").get().status, "cancelled");
 });
+await test("a refund Stripe refuses outright gives the lesson back, or cancels it when the money was already returned", async () => {
+  const id = linkedBooking("refund-refused", { payment: "paid" });
+  db.prepare("UPDATE bookings SET stripe_payment_intent='pi_refund_refused', same_day_fee_status='payment_due', same_day_fee_cents=500 WHERE id=?").run(id);
+  const lesson = () => ({ ...db.prepare("SELECT status, payment_status, same_day_fee_status FROM bookings WHERE id=?").get(id) });
+  try {
+    // A refusal no retry can change once left the lesson booked and "processing" for good.
+    refundRefusal = "charge_disputed";
+    const refused = await call(`/admin/bookings/${id}/cancel`, { user: "teacher" });
+    assert.equal(refused.status, 409, await refused.clone().text());
+    assert.match(await refused.text(), /still booked and paid/);
+    assert.deepEqual(lesson(), { status: "confirmed", payment_status: "paid", same_day_fee_status: "payment_due" });
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM booking_refunds WHERE booking_id=?").get(id).n, 0);
+    // Refunded in full from Stripe itself, there is nothing left to return: it
+    // is cancelled as refunded, and her cancellation waives the late fee still owed.
+    refundRefusal = "charge_already_refunded";
+    assert.equal((await call(`/admin/bookings/${id}/cancel`, { user: "teacher" })).status, 200);
+    assert.deepEqual(lesson(), { status: "cancelled", payment_status: "refunded", same_day_fee_status: "not_required" });
+  } finally { refundRefusal = ""; }
+});
 await test("whole-series duration changes require the displayed rate while unchanged durations preserve mixed prices", async () => {
   db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES ('mixed-series','alice','single',1,660,?,?)").run(new Date().toISOString(), new Date().toISOString());
   booking("mixed-a", { series: "mixed-series", start: "2026-10-05T10:00:00.000Z", end: "2026-10-05T11:00:00.000Z" });
@@ -1913,11 +1938,26 @@ await test("two ongoing times create 24 lessons and an abandoned checkout releas
   const response = await call("/bookings", { user, body: selectionBody({ repeat: null }) });
   assert.equal(response.status, 201, await response.clone().text());
   assert.equal((await response.json()).selection.booked.length, 24);
-  db.prepare("UPDATE bookings SET hold_expires_at='2026-09-05T09:00:00.000Z' WHERE student_id=?").run(user);
-  await call("/availability?lessonType=single&from=2026-09-14&to=2026-09-15", { method: "GET", user: null });
-  await drain();
-  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=?").get(user).n, 0);
-  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM booking_series WHERE student_id=?").get(user).n, 0);
+  const look = async () => { await call("/availability?lessonType=single&from=2026-09-14&to=2026-09-15", { method: "GET", user: null }); await drain(); };
+  const recipes = () => db.prepare("SELECT COUNT(*) AS n FROM booking_series WHERE student_id=?").get(user).n;
+  // The holds lapse as they really do, by time passing.
+  const startedAt = clock;
+  try {
+    clock += 36 * 60000;
+    await look();
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=?").get(user).n, 0);
+    assert.equal(recipes(), 0);
+    // A recipe only just written, its first lesson not yet tied to it, is left
+    // for the booking still writing it: anyone's look at the calendar used to
+    // take it, failing that booking with its first lesson booked and no run.
+    const now = new Date().toISOString();
+    db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES ('mid-creation',?,'single',1,600,?,?)").run(user, now, now);
+    await look();
+    assert.equal(recipes(), 1);
+    clock += 11 * 60000;
+    await look();
+    assert.equal(recipes(), 0);
+  } finally { clock = startedAt; }
 });
 
 await test("Meet settings require teacher identity and keep disabled setup inert", async () => {
@@ -2271,7 +2311,12 @@ await test("weekly hours refuse malformed replacements without erasing or partly
     const saved = await save([valid]);
     assert.equal(saved.status, 200);
     assert.equal((await saved.json()).count, 1);
-    assert.equal((await save([])).status, 200, "an intentional empty timetable is allowed");
+    // A page names the week it last read. One that has not seen a change made
+    // on another device is refused, and writes nothing.
+    const read = (rules, expected) => call("/admin/availability", { user: "teacher", body: { rules, expected } });
+    assert.equal((await read([], [{ ...valid, lastStartMinute: 1080 }])).status, 409);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM availability_rules").get().n, 1);
+    assert.equal((await read([], [valid])).status, 200, "an intentional empty timetable is allowed");
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM availability_rules").get().n, 0);
   } finally {
     db.exec("DELETE FROM availability_rules");
@@ -2306,10 +2351,14 @@ await test("the teacher calendar replaces one date's time off and extra hours, e
     const saved = await day({ blocks: [{ startMinute: 870, endMinute: 900 }, { startMinute: 840, endMinute: 870 }, { startMinute: 600, endMinute: 630 }] });
     assert.equal(saved.status, 200);
     assert.deepEqual(rows(), ["blocked:-:Holiday", "blocked:600-630", "blocked:840-900", "extra:1200-1200"]);
-    assert.equal((await saved.json()).exceptions.length, 4, "returns the date's rows so the calendar can reconcile");
+    const { exceptions: held } = await saved.json();
+    assert.equal(held.length, 4, "returns the date's rows so the calendar can reconcile");
     assert.deepEqual(await starts(), [], "the day off still wins");
 
-    assert.equal((await day({ dayOff: false })).status, 200);
+    // A page that last read the date before another device changed it is refused, and writes nothing.
+    assert.equal((await day({ dayOff: false, expectedIds: held.slice(1).map((row) => row.id) })).status, 409);
+    assert.deepEqual(rows(), ["blocked:-:Holiday", "blocked:600-630", "blocked:840-900", "extra:1200-1200"]);
+    assert.equal((await day({ dayOff: false, expectedIds: held.map((row) => row.id) })).status, 200);
     assert.deepEqual(rows(), ["blocked:600-630", "blocked:840-900", "extra:1200-1200"], "reopening the day keeps its blocked hours");
     const open = await starts();
     // 14:00-15:00 Porto (UTC+1) is off: a 60-minute lesson may not start at 13:30 or 14:30, but may at 15:00.
@@ -2763,6 +2812,10 @@ await test("moving a recurrence leaves a lesson inside 14 hours where it is and 
   for (const [id, start] of [["keep-late-1", "2026-09-05T18:00:00.000Z"], ["keep-late-2", "2026-09-12T18:00:00.000Z"], ["keep-late-3", "2026-09-19T18:00:00.000Z"]]) {
     booking(id, { series: "keep-late", start, end: new Date(Date.parse(start) + 3600000).toISOString() });
   }
+  // An earlier move of this run, begun from a lesson since had, is on record
+  // at the same sequence. This move is still emailed: named for the run and
+  // a sequence alone, it was taken for that one and told to nobody.
+  db.prepare("INSERT INTO email_log (booking_id,kind,recipient,dedupe_key,status,created_at) VALUES ('keep-late-1','student_series_moved','alice@example.invalid','student:series-moved:keep-late:1','sent',?)").run(at);
   Object.assign(env, { RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0" });
   let moved;
   try {
@@ -2831,6 +2884,26 @@ await test("a time claimed while a recurrence is being moved moves none of it", 
   assert.equal(moved.status, 409, await moved.clone().text());
   assert.deepEqual(db.prepare("SELECT starts_at FROM bookings WHERE series_id='move-race' ORDER BY starts_at").all().map((row) => row.starts_at),
     ["2026-11-17T15:00:00.000Z", "2026-11-24T15:00:00.000Z"]);
+});
+await test("a whole-run move keeps each lesson in its own week, so weeks the student cancelled stay out", async () => {
+  const at = new Date().toISOString();
+  // Tuesdays at 15:00, booked to 15 December; 24 November and 15 December were
+  // cancelled. The run moves to Wednesdays at 17:00.
+  db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,filled_to,created_at,updated_at) VALUES ('move-gap','alice','single',2,900,'2026-12-15',?,?)").run(at, at);
+  for (const day of ["2026-11-17", "2026-12-01", "2026-12-08"]) {
+    booking(`move-gap-${day}`, { series: "move-gap", start: `${day}T15:00:00.000Z`, end: `${day}T16:00:00.000Z` });
+  }
+  try {
+    const moved = await call("/series/move-gap/reschedule", { body: { startAt: "2026-11-18T17:00:00.000Z" } });
+    assert.equal(moved.status, 200, await moved.clone().text());
+    assert.deepEqual(db.prepare("SELECT starts_at FROM bookings WHERE series_id='move-gap' ORDER BY starts_at").all().map((row) => row.starts_at),
+      ["2026-11-18T17:00:00.000Z", "2026-12-02T17:00:00.000Z", "2026-12-09T17:00:00.000Z"], "laid out one after another, 25 November was booked again");
+    assert.equal(db.prepare("SELECT filled_to FROM booking_series WHERE id='move-gap'").get().filled_to, "2026-12-16",
+      "the top-up carries on after the last week it had considered, cancelled or not");
+  } finally {
+    db.prepare("DELETE FROM bookings WHERE series_id='move-gap'").run();
+    db.prepare("DELETE FROM booking_series WHERE id='move-gap'").run();
+  }
 });
 // Registration proves nothing about an address; Inês's booking for it must not
 // reach whoever registered it first.
@@ -3037,6 +3110,8 @@ await test("the day-before reminder goes once per lesson version, on its own clo
     db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES ('rem-series','alice','single',2,870,?,?)").run(N.toISOString(), N.toISOString());
     lesson("rem-series", "2026-11-03T14:30:00.000Z", { series_id: "rem-series", sequence: 3 });
     logged("rem-series", "student:series-moved:rem-series:3", "sent", "2026-11-02T08:00:00.000Z", "student_series_moved");
+    // A week of the same run before the one that change began from was not in it.
+    lesson("rem-series-before", "2026-11-03T13:30:00.000Z", { series_id: "rem-series" });
     lesson("rem-retry", "2026-11-03T15:00:00.000Z", { location: "porto", sequence: 2, payment_status: "paid" });
     lesson("rem-recent", "2026-11-03T15:30:00.000Z");
     logged("rem-recent", "student:reminder:rem-recent:0", "failed", "2026-11-02T17:58:00.000Z");
@@ -3099,6 +3174,7 @@ await test("the day-before reminder goes once per lesson version, on its own clo
     assert.equal(remindersFor("rem-race").length, 0);
     assert.equal(db.prepare("SELECT meeting_notified_at FROM bookings WHERE id='rem-race'").get().meeting_notified_at, null, "a reminder that did not go does not mark the link sent");
     for (const id of ["rem-cancelled", "rem-fresh", "rem-moved", "rem-series", "rem-recent", "rem-near", "rem-far", "rem-noemail"]) assert.equal(remindersFor(id).length, 0, id);
+    assert.equal(remindersFor("rem-series-before").length, 1, "her change from a later week on once silenced the reminder for a week it never touched");
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log WHERE booking_id = 'rem-noemail'").get().n, 0);
     assert.ok(!sentEmails.some((sent) => sent.to[0].startsWith("no-email:") || sent.to[0] === "ines@example.invalid"), "nothing to the placeholder, and no copy for Inês");
 
@@ -3232,6 +3308,10 @@ await test("a confirmed address change proves the new address, so Inês's bookin
   const { student: account, session } = await registered.json();
   // A lesson that has ended is still to be charged, so its receipt follows them.
   booking("moving-past", { owner: account.id, start: "2026-09-05T07:00:00.000Z", end: "2026-09-05T08:00:00.000Z" });
+  // So is one still open to pay her, which a link of hers can put on a card.
+  // One a card has paid is settled, and keeps the address it was taken under.
+  booking("moving-open", { owner: account.id, payment: "not_required", start: "2026-09-04T07:00:00.000Z", end: "2026-09-04T08:00:00.000Z" });
+  booking("moving-settled", { owner: account.id, payment: "paid", start: "2026-09-03T07:00:00.000Z", end: "2026-09-03T08:00:00.000Z" });
   captureEmail();
   try {
     assert.equal((await call("/me/email", { token: session, body: { email: "moving-to@example.invalid" } })).status, 200);
@@ -3242,6 +3322,8 @@ await test("a confirmed address change proves the new address, so Inês's bookin
     const moved = await confirmed.json();
     assert.ok(db.prepare("SELECT email_verified_at FROM students WHERE id=?").get(account.id).email_verified_at, "the new address proved itself");
     assert.equal(db.prepare("SELECT student_email FROM bookings WHERE id='moving-past'").get().student_email, "moving-to@example.invalid");
+    assert.equal(db.prepare("SELECT student_email FROM bookings WHERE id='moving-open'").get().student_email, "moving-to@example.invalid");
+    assert.equal(db.prepare("SELECT student_email FROM bookings WHERE id='moving-settled'").get().student_email, `${account.id}@example.invalid`);
     const booked = await call("/admin/bookings", { user: "teacher", body: { email: "moving-to@example.invalid", lessonType: "single", startAt: "2026-12-15T10:00:00.000Z" } });
     assert.equal(booked.status, 201, await booked.clone().text());
     await drain();
@@ -3690,6 +3772,37 @@ await test("the nightly top-up keeps Inês's weekly slot hers, outside her hours
   } finally {
     beforeRun = null;
     forgetStudent(email);
+  }
+});
+await test("a student's own weekly run she moves outside her hours goes on being extended, and is theirs again once they move it", async () => {
+  await drain();
+  db.exec("DELETE FROM booking_refunds; DELETE FROM bookings; DELETE FROM booking_series; DELETE FROM stripe_events; DELETE FROM email_log;");
+  const at = new Date().toISOString();
+  // Their own open-ended run, Mondays at 10:00, so far booked to 21 September.
+  db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,filled_to,created_at,updated_at) VALUES ('placed-run','alice','single',1,600,'2026-09-21',?,?)").run(at, at);
+  booking("placed-1", { series: "placed-run", payment: "not_required", start: "2026-09-14T09:00:00.000Z", end: "2026-09-14T10:00:00.000Z" });
+  booking("placed-2", { series: "placed-run", payment: "not_required", start: "2026-09-21T09:00:00.000Z", end: "2026-09-21T10:00:00.000Z" });
+  const weeks = () => db.prepare("SELECT starts_at, added_by_teacher FROM bookings WHERE series_id='placed-run' AND status='confirmed' ORDER BY starts_at").all();
+  const placed = () => JSON.parse(db.prepare("SELECT value FROM settings WHERE key='teacher_placed_runs'").get()?.value ?? "[]");
+  const nightly = async () => { await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.parse("2026-09-06T03:10:00.000Z") }, env, ctx); await drain(); };
+  try {
+    // She moves every week to Saturdays at 09:00, when she publishes no hours.
+    const moved = await call("/admin/bookings/placed-1/change", { user: "teacher", body: { startAt: "2026-09-19T08:00:00.000Z", following: true } });
+    assert.equal(moved.status, 200, await moved.clone().text());
+    await drain();
+    assert.deepEqual(placed(), ["placed-run"]);
+    await nightly();
+    // Planned by the student's rules, every new week was skipped and the run ran out.
+    assert.ok(weeks().length >= 10, `the run grows to its horizon: ${weeks().length} weeks`);
+    assert.ok(weeks().every((week) => week.added_by_teacher === 0 && new Date(week.starts_at).getUTCDay() === 6), "on Saturdays, still the student's own lessons");
+
+    // Their own move puts it back on a time they chose within her hours.
+    const theirs = await call("/series/placed-run/reschedule", { body: { startAt: "2026-09-21T09:00:00.000Z" } });
+    assert.equal(theirs.status, 200, await theirs.clone().text());
+    await drain();
+    assert.deepEqual(placed(), []);
+  } finally {
+    db.exec("DELETE FROM bookings WHERE series_id='placed-run'; DELETE FROM booking_series WHERE id='placed-run'; DELETE FROM settings WHERE key='teacher_placed_runs';");
   }
 });
 await test("a saved card can authorise the named lessons and repeats without entering card details or charging early", async () => {
@@ -4256,6 +4369,11 @@ await test("she can set a student up from a name alone and give their email late
     assert.deepEqual([now.name, now.email, now.phone, now.mark], ["Bea Lopes", "later@example.invalid", "+351 911 111 111", "pool"]);
     assert.equal((await details({ name: "Bea Lopes", email: "later@example.invalid", phone: "+351 922 222 222", nif: "123456789" })).status, 200);
     assert.equal(db.prepare("SELECT mark FROM students WHERE id=?").get(student.id).mark, "pool", "ordinary details edits preserve the student's splat when it was not edited");
+    // Only what she sends is written: a NIF saved since her page read their details is not blanked by her saving a phone.
+    db.prepare("UPDATE students SET nif='987654321' WHERE id=?").run(student.id);
+    assert.equal((await details({ phone: "+351 933 333 333" })).status, 200);
+    assert.deepEqual({ ...db.prepare("SELECT name, email, phone, nif FROM students WHERE id=?").get(student.id) },
+      { name: "Bea Lopes", email: "later@example.invalid", phone: "+351 933 333 333", nif: "987654321" });
 
     // With an email, she adds their lessons and sends their welcome as usual.
     const lesson = await call("/admin/bookings", { user: "teacher", body: { email: "later@example.invalid", lessonType: "single", startAt: "2026-10-21T10:00:00.000Z" } });
@@ -4413,12 +4531,19 @@ await test("she makes a sign-in link to send on WhatsApp: nothing is emailed, an
     assert.equal((await confirm()).status, 400, "only once");
     const row = db.prepare("SELECT last_login_at, email_verified_at FROM students WHERE id=?").get(student.id);
     assert.ok(row.last_login_at && row.email_verified_at, "signed in, and able to save a card");
+    // Signed in, so no longer held for a welcome, and still with no address:
+    // a lesson she adds reaches nobody, and her page is told so, not "emailed".
+    const added = await call("/admin/bookings", { user: "teacher", body: { studentId: student.id, lessonType: "single", startAt: "2027-01-05T08:15:00.000Z" } });
+    assert.equal(added.status, 201, await added.clone().text());
+    assert.equal((await added.json()).emailed, false);
     // A link made before their details changed no longer opens.
     const stale = new URL((await (await call(`/admin/students/${student.id}/invite-link`, { user: "teacher", body: {} })).json()).url);
     assert.equal((await call(`/admin/students/${student.id}/details`, { user: "teacher", body: { name: "Wanda Whats", email: "wanda@example.invalid" } })).status, 409, "signed in, the address is theirs to give");
     db.prepare("UPDATE students SET email='wanda@example.invalid' WHERE id=?").run(student.id);
     assert.equal((await call("/auth/email-link/confirm", { user: null, body: { token: stale.searchParams.get("signin") } })).status, 400);
   } finally {
+    await drain();
+    db.prepare("DELETE FROM bookings WHERE student_id IN (SELECT id FROM students WHERE name = 'Wanda Whats')").run();
     db.prepare("DELETE FROM students WHERE name = 'Wanda Whats'").run();
   }
 });
@@ -4827,6 +4952,24 @@ await test("Already paid: ticked lessons are never billed or put on a card, show
     assert.equal((await tick(future, false)).status, 200);
     assert.deepEqual(terms(future), ["scheduled", 2500, "2026-10-12-card-on-file-v1"]);
     assert.ok(!(await lines("2026-10")).some((line) => line.lessonStartsAt === future));
+
+    // Unticked after it happened, her lesson is open again as it stood: never
+    // on the standing card, which one untick used to charge at today's price.
+    const had = "2026-10-14T16:00:00.000Z";
+    assert.equal((await add(had, { paid: true })).status, 201);
+    const untickedAt = clock;
+    try {
+      clock = Date.parse("2026-10-15T10:00:00.000Z");
+      db.prepare("INSERT INTO student_recurring_rates VALUES (?,60,3000,?)").run(id, new Date().toISOString());
+      assert.equal((await tick(had, false)).status, 200);
+      assert.deepEqual([...terms(had), row(had).payment_consent_at], ["not_required", 2500, null, null]);
+      const before = charges.length;
+      await chargeDueLessons(env);
+      assert.ok(!charges.slice(before).some((charge) => charge.key.includes(row(had).id)));
+    } finally {
+      clock = untickedAt;
+      db.prepare("DELETE FROM student_recurring_rates WHERE student_id=?").run(id);
+    }
 
     // A cancellation is not a cash refund. Its payment stays visible until
     // Inês records the money she returned directly, without touching Stripe.
@@ -6464,11 +6607,14 @@ await test("a lesson the student booked on their card is booked again on it, agr
   try {
     const own = await cancelledLesson("carla", "rebook-own-card", "2026-10-19T10:00:00.000Z",
       { payment_consent_at: "2026-09-01T08:00:00.000Z", payment_consent_version: "2026-09-01-after-lesson-v1" });
+    // A cancelled lesson keeps the address it was taken under; they have changed theirs since.
+    db.prepare("UPDATE bookings SET student_email='carla-before@example.invalid' WHERE reference='rebook-own-card'").run();
     const again = await rebook(own.manage, 2500);
     assert.equal(again.status, 201, await again.clone().text());
     const lesson = db.prepare("SELECT * FROM bookings WHERE reference=?").get((await again.json()).booking.reference);
     assert.deepEqual([lesson.payment_status, lesson.payment_consent_at, lesson.payment_consent_version, lesson.added_by_teacher, lesson.amount_cents],
       ["scheduled", new Date().toISOString(), "2026-09-21-fourteen-hours-v1", 0, 2500], "on their card, agreed today on today's terms");
+    assert.equal(lesson.student_email, email, "the new lesson, and the manage link emailed for it, go to the address the account has now");
     await drain();
 
     db.prepare("UPDATE students SET stripe_payment_method=NULL WHERE id='carla'").run();

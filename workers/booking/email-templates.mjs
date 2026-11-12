@@ -278,7 +278,8 @@ export function studentBooked({ tutor = currentTutor(), first, byTeacher, welcom
 
   const times = run.twoTimes ? "these two times are" : "the same time is";
   const plainSlot = byTeacher && !run.oneOff && run.slot;
-  const intro = plainSlot
+  // Hers either way; with no one time to state, its dates are listed below.
+  const intro = byTeacher && !run.oneOff
     ? `${hello(first, tutor)} ${tutor.shortName} has booked a weekly lesson for you.${run.fixed ? " Every lesson is in the calendar attachment." : ""}${website}`
     : run.oneOff
       ? `${hello(first, tutor)} your lessons with ${tutor.shortName} are confirmed. Every date is in the calendar attachment.`

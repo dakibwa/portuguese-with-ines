@@ -91,7 +91,10 @@ export function LessonForm({
   onRefresh?: () => void;
 }) {
   const [lesson, setLesson] = useState({ ...empty, date, time });
-  const quiet = Boolean(student.awaitingWelcome);
+  // Nobody is emailed while their welcome is still to send, or while they
+  // have no address at all (one who signed in from her invite is no longer
+  // awaiting a welcome, and still has nowhere to be emailed).
+  const quiet = Boolean(student.awaitingWelcome) || !student.email;
   const [openedAt] = useState(() => Date.now());
   const startAt = startOf(lesson.date, lesson.time, lesson.startAt);
   // Gone by the time the form opened; the Worker judges by its own clock.

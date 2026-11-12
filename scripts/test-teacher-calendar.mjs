@@ -483,6 +483,21 @@ test("a dismissed change stays gone until the student changes that lesson again"
   const [once] = keys("2026-09-07T20:00:00Z");
   assert.deepEqual(keys("2026-09-07T20:00:00Z", new Set([once])), []);
   assert.deepEqual(keys("2026-09-08T09:00:00Z", new Set([once])), [`changed:l1:${Date.parse("2026-09-08T09:00:00Z")}`], "a second change is new");
+
+  // A weekly run's notice is the run's: named for its next lesson, it came
+  // back as each week's time passed.
+  const week = (id, day, extra) => ({ id, series_id: "run", student_name: "Roman", student_email: "roman@example.invalid",
+    starts_at: `2026-09-${day}T18:00:00Z`, ends_at: `2026-09-${day}T19:00:00Z`, ...extra });
+  const moved = { status: "confirmed", student_changed_at: "2026-09-07T20:00:00Z" };
+  const gone = { status: "cancelled", cancelled_by: "student", cancelled_at: "2026-09-07T20:00:00Z" };
+  for (const [kind, lessons, cancellations] of [
+    ["changed", [week("m1", "09", moved), week("m2", "16", moved)], []],
+    ["cancelled", [], [week("c1", "09", gone), week("c2", "16", gone)]]
+  ]) {
+    const notices = (at, dismissed) => needsYou({ now: new Date(at), meet: null, payments: [], students: [], lessons, cancellations, dismissed }).map((item) => item.dismiss);
+    const [dismissedOnce] = notices("2026-09-08T10:00:00Z");
+    assert.deepEqual(notices("2026-09-09T19:00:00Z", new Set([dismissedOnce])), [], `${kind}: still dismissed once the first week has passed`);
+  }
 });
 
 test("each student has three checks and one next step, grouped by whose move it is", () => {
@@ -695,6 +710,12 @@ test("hours chosen on the Timetable: time off is never online only or extra hour
   const later = { start: 1080, end: 1260 };
   assert.deepEqual(chooseHours(both, block, "extra", later), { ...none, online: [later], extra: [later] });
   assert.deepEqual(chooseHours(both, block, "not working", evening), none);
+  // Extra hours are lesson starts on her grid: here 18:00, 18:30, 19:00 and
+  // 19:30. Not working at times typed off that grid takes the start inside
+  // them and leaves the rest where they were. Cut as plain time, the hours
+  // left began at 18:45 and gained a start at 19:45, later than she offered.
+  assert.deepEqual(chooseHours({ ...none, extra: [evening] }, { kind: "extra", span: evening }, "not working", { start: 1095, end: 1125 }, 30).extra,
+    [{ start: 1080, end: 1110 }, { start: 1140, end: 1200 }]);
   assert.deepEqual(chooseHours(both, block, null, evening), { ...none, extra: [evening] }, "Open again takes only the label off");
   // On a day online only from end to end, extra hours never cut the day's label.
   const allDay = { start: 0, end: 1440 };

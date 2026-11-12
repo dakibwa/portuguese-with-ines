@@ -50,6 +50,16 @@ export const NO_SHOW_WINDOW_HOURS = 0;
 const LESSON_DAY_CONSENT_VERSIONS = new Set(["2026-09-01-after-lesson-v1"]);
 
 /** True when moving or cancelling now falls inside the fee window. */
+/**
+ * The wording a student's own booking agreed to, by when they agreed: the
+ * lesson-day terms until the fourteen-hour ones replaced them on 21 September
+ * 2026. For a lesson whose own record of it has been written over (ticked
+ * "Already paid"), so that it never comes back on stricter terms than it had.
+ */
+export function studentConsentVersionAt(consentAt) {
+  return consentAt && String(consentAt) < "2026-09-22" ? "2026-09-01-after-lesson-v1" : PAYMENT_CONSENT_VERSION;
+}
+
 export function isLateChange(row, now = new Date(), noticeHours = currentTutor().defaults.noticeHours) {
   const start = new Date(row.starts_at);
   const late = start.getTime() - now.getTime() < noticeHours * 3600000;
