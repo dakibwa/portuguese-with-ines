@@ -147,6 +147,19 @@ export function bookingPaymentProblem({ paymentRequired, stripeIsReady, paymentC
  * was not enough — those went straight into handlers doing `body.notes` and
  * `"repeat" in body`, and a four-byte unauthenticated body turned into a 500.
  */
+/**
+ * The largest body a POST may send: photos to read, a worksheet being made,
+ * a student's answers, an expression; anything else 32 KB. Checked against
+ * Content-Length before anything is read, and again while reading.
+ */
+function bodyLimitFor(path) {
+  if (/^\/admin\/lessons\/[^/]+\/homework\/transcribe$/.test(path)) return HOMEWORK_PHOTO_BODY_LIMIT;
+  if (/^\/admin\/lessons\/[^/]+\/homework(?:\/(?:generate|publish|return))?$/.test(path)) return 1048576;
+  if (/^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path)) return 262144;
+  if (path === "/admin/expressions" || path.startsWith("/admin/expressions/")) return 131072;
+  return 32768;
+}
+
 async function readJson(request, limit = 32768) {
   const text = await readBody(request, limit);
   try {
@@ -1625,8 +1638,7 @@ async function teacherStudentList(env) {
        -- Their newest way in still unspent: a welcome, invite or payment link.
        (SELECT MAX(created_at) FROM sign_in_links sl WHERE sl.student_id = s.id AND sl.expires_at > ?) AS invited_at
      FROM students s WHERE ${studentLikeSql("s")}
-       -- The opt-in live check's throwaway accounts (scripts/qa-recurring-rates)
-       -- can never be a student of hers.
+       -- Accounts an old launch check registered are never students of hers.
        AND s.email NOT LIKE 'launch-check-%@example.invalid'
      ORDER BY s.name COLLATE NOCASE`
   )
@@ -2185,11 +2197,7 @@ async function answer(request, env, ctx) {
       if (!request.headers.get("Content-Type")?.toLowerCase().startsWith("application/json")) {
         return fail("Send a JSON request.", 415, request, env);
       }
-      const bodyLimit = /^\/admin\/lessons\/[^/]+\/homework\/transcribe$/.test(path) ? HOMEWORK_PHOTO_BODY_LIMIT
-        : /^\/admin\/lessons\/[^/]+\/homework(?:\/(?:generate|publish|return))?$/.test(path) ? 1048576
-        : /^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path) ? 262144
-        : path === "/admin/expressions" || path.startsWith("/admin/expressions/") ? 131072 : 32768;
-      if (Number(request.headers.get("Content-Length") || 0) > bodyLimit) return fail("Request too large.", 413, request, env);
+      if (Number(request.headers.get("Content-Length") || 0) > bodyLimitFor(path)) return fail("Request too large.", 413, request, env);
       // Cloudflare supplies this trusted edge header. It cannot be replaced
       // with an arbitrary body/email key to bypass unauthenticated limits.
       const ip = rateLimitAddress(request.headers.get("CF-Connecting-IP"));
@@ -7252,10 +7260,7 @@ async function handleAdmin(request, env, ctx, url, path) {
   if (!admin) return fail("Not authorised.", 401, request, env);
   // Authenticate before accepting photos, then recheck once the entire bounded
   // body has arrived. A request paused during logout cannot keep its authority.
-  const bodyLimit = /^\/admin\/lessons\/[^/]+\/homework\/transcribe$/.test(path) ? HOMEWORK_PHOTO_BODY_LIMIT
-    : /^\/admin\/lessons\/[^/]+\/homework(?:\/(?:generate|publish|return))?$/.test(path) ? 1048576
-    : path === "/admin/expressions" || path.startsWith("/admin/expressions/") ? 131072 : 32768;
-  const adminBody = request.method === "POST" ? await readJson(request, bodyLimit) : {};
+  const adminBody = request.method === "POST" ? await readJson(request, bodyLimitFor(path)) : {};
   const authorization = await adminAuthorization(request, env, admin);
   try {
     await authorization.assert();
