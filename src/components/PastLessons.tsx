@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, CheckCircle2, ChevronDown, CircleX, Send } from "lucide-react";
 import { readSession, type MyBooking } from "@/lib/auth-api";
-import { clockDiffersFromPorto, formatBookedLessonLabel, formatShortDay, formatSlotTime, formatTimeIn } from "@/lib/booking-api";
+import { clockDiffersFromPorto, dateKeyIn, formatBookedLessonLabel, formatShortDay, formatSlotTime, formatTimeIn } from "@/lib/booking-api";
 import { BOOKING_TIME_ZONE } from "@/lib/config";
 import type { HomeworkSummary } from "@/lib/homework-api";
 import { HOMEWORK, IN_PERSON, LANGUAGE_CODE, TUTOR_NAME } from "@/lib/tutor";
@@ -30,8 +30,9 @@ function historyTime(booking: MyBooking) {
 
 /** "Tue 3 Nov", with the year once it is not this one. */
 function day(at: string, zone: string, now: number) {
-  const year = (value: number | string) => new Intl.DateTimeFormat("en-GB", { year: "numeric", timeZone: zone }).format(new Date(value));
-  return `${formatShortDay(at, zone)}${year(at) === year(now) ? "" : ` ${year(at)}`}`;
+  // The year is the start of the zone's date key, from a formatter already built.
+  const year = dateKeyIn(new Date(at), zone).slice(0, 4);
+  return `${formatShortDay(at, zone)}${year === dateKeyIn(new Date(now), zone).slice(0, 4) ? "" : ` ${year}`}`;
 }
 
 function homeworkState(item: HomeworkSummary) {
@@ -74,35 +75,41 @@ export function PastLessons({ bookings, clock, onOpenHomework, onOpenLesson, zon
     return () => controller.abort();
   }, [token, attempt]);
 
-  const past = bookings
-    .filter(booking => booking.status === "cancelled" || (booking.status === "confirmed" && Date.parse(booking.endAt) <= clock))
-    .sort((a, b) => historyTime(b) - historyTime(a) || b.startAt.localeCompare(a.startAt));
-  const unmatched = new Set(homework ?? []);
-  const rows: Row[] = past.map(booking => {
-    // Homework names its lesson by when it was; a cancelled lesson has none.
-    const item = booking.status === "confirmed"
-      ? homework?.find(entry => unmatched.has(entry) && Date.parse(entry.lessonAt) === Date.parse(booking.startAt))
-      : undefined;
-    if (item) unmatched.delete(item);
-    return {
-      key: booking.reference,
-      at: booking.startAt,
-      order: historyTime(booking),
-      location: booking.location,
-      length: formatBookedLessonLabel(booking.lessonType),
-      cancelled: booking.status === "cancelled",
-      homework: item,
-      bookAgain: booking.status === "cancelled" && booking.canRebook && Date.parse(booking.startAt) > clock ? booking : undefined
-    };
-  });
-  // Homework from a lesson this account no longer lists still has a row.
-  for (const item of unmatched) {
-    rows.push({ key: `homework-${item.bookingId}`, at: item.lessonAt, order: Date.parse(item.lessonAt), location: item.location ?? "online", length: `${item.minutes} mins homework`, cancelled: false, homework: item });
-  }
-  if (unmatched.size) rows.sort((a, b) => b.order - a.order);
+  // The booking page redraws this whenever anything on it changes; the rows
+  // change only with the lessons, the minute and the homework.
+  const rows = useMemo(() => {
+    const past = bookings
+      .filter(booking => booking.status === "cancelled" || (booking.status === "confirmed" && Date.parse(booking.endAt) <= clock))
+      .sort((a, b) => historyTime(b) - historyTime(a) || b.startAt.localeCompare(a.startAt));
+    const unmatched = new Set(homework ?? []);
+    const list: Row[] = past.map(booking => {
+      // Homework names its lesson by when it was; a cancelled lesson has none.
+      const item = booking.status === "confirmed"
+        ? homework?.find(entry => unmatched.has(entry) && Date.parse(entry.lessonAt) === Date.parse(booking.startAt))
+        : undefined;
+      if (item) unmatched.delete(item);
+      return {
+        key: booking.reference,
+        at: booking.startAt,
+        order: historyTime(booking),
+        location: booking.location,
+        length: formatBookedLessonLabel(booking.lessonType),
+        cancelled: booking.status === "cancelled",
+        homework: item,
+        bookAgain: booking.status === "cancelled" && booking.canRebook && Date.parse(booking.startAt) > clock ? booking : undefined
+      };
+    });
+    // Homework from a lesson this account no longer lists still has a row.
+    for (const item of unmatched) {
+      list.push({ key: `homework-${item.bookingId}`, at: item.lessonAt, order: Date.parse(item.lessonAt), location: item.location ?? "online", length: `${item.minutes} mins homework`, cancelled: false, homework: item });
+    }
+    if (unmatched.size) list.sort((a, b) => b.order - a.order);
+    return list;
+  }, [bookings, clock, homework]);
+  // Checked once for the zone, as the calendar does, not on every redraw.
+  const named = useMemo(() => clockDiffersFromPorto(zone), [zone]);
 
   if (!rows.length && !failed) return null;
-  const named = clockDiffersFromPorto(zone);
   const shown = showAll ? rows : rows.slice(0, SHOWN);
   const hidden = rows.length - shown.length;
 

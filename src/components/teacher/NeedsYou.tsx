@@ -4,12 +4,12 @@ import { X } from "lucide-react";
 import { IN_PERSON } from "@/lib/tutor";
 import { Fragment, type MouseEvent, type ReactNode } from "react";
 import type { AdminBooking, AdminStudent } from "@/lib/admin-api";
-import { formatBookedLessonLabel, formatMoneyCents, formatSlotTime } from "@/lib/booking-api";
-import { dateKey, dateLabel, type NeedsYouItem } from "@/lib/teacher-calendar";
+import { formatBookedLessonLabel, formatMoneyCents, formatShortDay, formatSlotTime } from "@/lib/booking-api";
+import type { NeedsYouItem } from "@/lib/teacher-calendar";
 
 const SHOWN = 3;
 
-const day = (at: string) => dateLabel(dateKey(new Date(at)), { weekday: "short", day: "numeric", month: "short" });
+const day = (at: string) => formatShortDay(at);
 const range = (booking: AdminBooking) => `${formatSlotTime(booking.starts_at)}–${formatSlotTime(booking.ends_at)}`;
 const place = (booking: AdminBooking) => (booking.location === "porto" ? IN_PERSON : "Online");
 /** Each fact whole; a line breaks only after a dot, never inside a fact or before its dot. */
@@ -49,13 +49,10 @@ function was(booking: AdminBooking) {
  * said again. The choosing and the windows live in needsYou(); this only
  * words and renders them.
  */
-export function NeedsYou({ items, sending, onMeet, onWelcome, onStudent, onDismiss, onSeeAll, embedded = false, heading = "Needs you" }: {
+export function NeedsYou({ items, onMeet, onStudent, onDismiss, onSeeAll, embedded = false, heading = "Needs you" }: {
   items: NeedsYouItem[];
-  /** The student whose welcome is on its way. */
-  sending: string;
   onMeet: () => void;
-  onWelcome: (student: AdminStudent, again?: boolean) => void;
-  /** Opens a student's card: on Add a lesson, or on their profile, where their lessons are. */
+  /** Opens a student's card on their lessons. */
   onStudent: (student: AdminStudent, panel?: "lessons" | "history") => void;
   onDismiss: (key: string) => void;
   /** The Timetable shows only the first few notices. */
@@ -64,14 +61,6 @@ export function NeedsYou({ items, sending, onMeet, onWelcome, onStudent, onDismi
   heading?: string;
 }) {
   if (!items.length) return null;
-
-  function studentAction(student: AdminStudent, next: "lessons" | "welcome") {
-    if (next === "lessons") return <button className="button button--coral button--compact" type="button" onClick={() => onStudent(student)}>
-      Add a lesson<span className="visually-hidden"> for {student.name}</span></button>;
-    return <button className="button button--coral button--compact" type="button" disabled={Boolean(sending) || !student.email} onClick={() => onWelcome(student)}>
-      {sending === student.id ? "Sending…" : "Send welcome email"}<span className="visually-hidden"> to {student.name}</span>
-    </button>;
-  }
 
   /** Gone at once; focus moves to the next notice, else the one before, else the card. */
   function dismiss(key: string, event: MouseEvent<HTMLButtonElement>) {
@@ -139,15 +128,6 @@ export function NeedsYou({ items, sending, onMeet, onWelcome, onStudent, onDismi
       action = <button className="teacher-quiet" type="button" onClick={() => onStudent(student, "history")}>
         Open<span className="visually-hidden"> {student.name}</span>
       </button>;
-    } else if (item.kind === "lessons") {
-      who = full = `${item.student.name} has no lessons yet`;
-      detail = "Add a lesson or their weekly lessons";
-      action = studentAction(item.student, "lessons");
-    } else if (item.kind === "welcome") {
-      const { student } = item;
-      who = full = `${student.name} hasn’t been emailed yet`;
-      detail = item.at ? `Next lesson ${day(item.at)}, ${formatSlotTime(item.at)}` : "Their details are ready for their welcome";
-      action = studentAction(student, "welcome");
     } else if (item.kind === "changed") {
       const { booking, count } = item;
       full = `${booking.student_name} changed their ${count > 1 ? "weekly lessons" : "lesson"}`;

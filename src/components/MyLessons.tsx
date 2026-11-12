@@ -4,7 +4,6 @@ import { CancelEdit, EditActions, EditValue } from "@/components/teacher/EditCon
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Mail } from "lucide-react";
 import { AccountAvatar, AccountMenu, type AccountSection } from "@/components/AccountMenu";
-import { AuthPanel } from "@/components/AuthPanel";
 import { CardPrompt, CardTerms, type CardUpcoming } from "@/components/CardOnFile";
 import {
   confirmEmailChange,
@@ -576,19 +575,10 @@ export function MyLessons({
     );
   }
 
-  if (!student) {
-    return (
-      <AuthPanel
-        heading="Sign in"
-        headingLevel={2}
-        onSignedIn={(signedIn) => {
-          setStudent(signedIn);
-          setLoading(true);
-          load();
-        }}
-      />
-    );
-  }
+  // Signed out: the booking page drops this panel in the same update as it
+  // forgets the session, and offers sign-in itself. Only a read racing a
+  // sign-out in another tab gets here first, for a moment.
+  if (!student) return null;
 
   // Opening a detail starts from what is saved, so a draft abandoned with
   // Cancel never comes back.

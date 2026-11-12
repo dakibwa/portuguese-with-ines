@@ -8,6 +8,8 @@
  * cost can be raised later and old hashes still verify.
  */
 
+import { base64Url, safeEqual, sign } from "./tokens.mjs";
+
 const encoder = new TextEncoder();
 
 /**
@@ -24,12 +26,6 @@ const encoder = new TextEncoder();
 const PBKDF2_ITERATIONS = 100000;
 const PBKDF2_ROUNDS = 6;
 const SESSION_DAYS = 90;
-
-function base64Url(bytes) {
-  let binary = "";
-  for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
 
 function fromBase64Url(value) {
   const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
@@ -110,23 +106,7 @@ export function normaliseEmail(value) {
 }
 
 // --- Sessions ---------------------------------------------------------------
-
-const keyCache = new Map();
-
-async function hmacKey(secret) {
-  let key = keyCache.get(secret);
-  if (!key) {
-    key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
-      "sign"
-    ]);
-    keyCache.set(secret, key);
-  }
-  return key;
-}
-
-async function sign(value, secret) {
-  return base64Url(await crypto.subtle.sign("HMAC", await hmacKey(secret), encoder.encode(value)));
-}
+// Signed and compared as manage links are (tokens.mjs), each kind under its own payload.
 
 /**
  * Signed bearer token carrying the account's session version. The Worker also
@@ -145,15 +125,7 @@ export async function readSession(token, secret) {
   if (![3, 4].includes(parts.length)) return null;
 
   const [studentId, expiry] = parts;
-  const signature = parts.at(-1);
-  const expected = await sign(parts.slice(0, -1).join("."), secret);
-  if (signature.length !== expected.length) return null;
-
-  let mismatch = 0;
-  for (let index = 0; index < expected.length; index += 1) {
-    mismatch |= signature.charCodeAt(index) ^ expected.charCodeAt(index);
-  }
-  if (mismatch !== 0) return null;
+  if (!safeEqual(parts.at(-1), await sign(parts.slice(0, -1).join("."), secret))) return null;
   if (!Number(expiry) || Number(expiry) < Date.now()) return null;
 
   return studentId;
@@ -166,6 +138,16 @@ export function sessionVersion(token) {
 
 export async function sessionHash(token) {
   return base64Url(await crypto.subtle.digest("SHA-256", encoder.encode(token)));
+}
+
+/**
+ * SQL true while a student's session is still theirs, for a guarded write:
+ * the account at the session version it was read at, and the token not
+ * signed out. Binds their id, that version and the token's `sessionHash`.
+ */
+export function studentSessionSql() {
+  return `EXISTS (SELECT 1 FROM students WHERE id = ? AND session_version = ?)
+    AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`;
 }
 
 /** A single-use link token, signed under its own prefix so no kind can pass as another. */
@@ -191,14 +173,7 @@ async function readNonceToken(prefix, token, secret) {
   if (parts.length !== 4) return null;
 
   const [studentId, expiry, nonce, signature] = parts;
-  const expected = await sign(`${prefix}:${studentId}.${expiry}.${nonce}`, secret);
-  if (signature.length !== expected.length) return null;
-
-  let mismatch = 0;
-  for (let index = 0; index < expected.length; index += 1) {
-    mismatch |= signature.charCodeAt(index) ^ expected.charCodeAt(index);
-  }
-  if (mismatch !== 0) return null;
+  if (!safeEqual(signature, await sign(`${prefix}:${studentId}.${expiry}.${nonce}`, secret))) return null;
   if (!Number(expiry) || Number(expiry) < Date.now()) return null;
 
   return { studentId, nonce };

@@ -9,14 +9,13 @@
 import assert from "node:assert/strict";
 import { deliver, renderEmail, splitWhen } from "./email.mjs";
 import * as templates from "./email-templates.mjs";
-import { candidateStartMinutes, computeAvailability, DEFAULT_BOOKING_HORIZON_DAYS, isSlotBookable } from "./availability.mjs";
+import { candidateStartMinutes, computeAvailability, isSlotBookable } from "./availability.mjs";
 import {
   chargeSavedCard,
   checkoutSessionProblem,
   createCardSetupSession,
   createCheckoutSession,
   expireCheckoutSession,
-  isTestMode,
   refundPayment,
   retrieveCheckoutSession,
   setupSessionProblem,
@@ -36,7 +35,6 @@ import { createManageToken, readManageToken, safeEqual, bookingReference } from 
 import { rateLimitAddress } from "./rates.mjs";
 import {
   PAYMENT_CONSENT_VERSION,
-  amountAfterLessonTypeChange,
   changePolicy,
   lessonTypeChangeProblem,
   planSeriesCancellation
@@ -148,7 +146,6 @@ await test("the default booking window is twelve weeks and clamps later availabi
     now: new Date("2026-08-30T08:00:00.000Z")
   });
 
-  assert.equal(DEFAULT_BOOKING_HORIZON_DAYS, 84);
   assert.equal(settings.bookingHorizonDays, 84);
   assert.ok(slotsByDate["2026-11-16"]?.length, "the final Monday inside twelve weeks should be offered");
   assert.equal(slotsByDate["2026-11-23"], undefined, "the first Monday outside twelve weeks must stay closed");
@@ -367,17 +364,6 @@ await test("a blocked span withholds every lesson that would overlap it", () => 
   assert.ok(!starts.includes("13:30"));
   assert.ok(starts.includes("12:00"), "12:00 finishes exactly as the block starts and is fine");
   assert.ok(starts.includes("14:00"), "14:00 begins exactly as the block ends and is fine");
-});
-
-await test("a longer lesson is withheld earlier than a shorter one", () => {
-  const range = [{ start: 600, lastStart: 1140 }];
-  const blockedSpans = [{ start: 780, end: 840 }];
-  const hour = candidateStartMinutes({ startRanges: range, blockedSpans, duration: 60, interval: 30 }).map(asTime);
-  const longer = candidateStartMinutes({ startRanges: range, blockedSpans, duration: 90, interval: 30 }).map(asTime);
-
-  assert.ok(hour.includes("12:00"));
-  assert.ok(!longer.includes("12:00"), "a 90-minute lesson at 12:00 would run into the block");
-  assert.ok(longer.includes("11:30"));
 });
 
 await test("a lunch block withholds a long lesson earlier than a short one", () => {
@@ -646,13 +632,6 @@ await test("malformed signature headers are rejected", async () => {
   }
 });
 
-await test("restricted and standard sandbox keys are both recognised as test mode", () => {
-  assert.equal(isTestMode({ STRIPE_SECRET_KEY: "rk_test_example" }), true);
-  assert.equal(isTestMode({ STRIPE_SECRET_KEY: "sk_test_example" }), true);
-  assert.equal(isTestMode({ STRIPE_SECRET_KEY: "rk_live_example" }), false);
-  assert.equal(isTestMode({ STRIPE_SECRET_KEY: "sk_live_example" }), false);
-});
-
 await test("Stripe readiness refuses a test key in the live Worker", () => {
   const shared = { STRIPE_WEBHOOK_SECRET: "whsec_example" };
   assert.equal(
@@ -663,7 +642,11 @@ await test("Stripe readiness refuses a test key in the live Worker", () => {
     stripeReady({ ...shared, STRIPE_SECRET_KEY: "rk_live_example", STRIPE_EXPECTED_MODE: "live" }),
     true
   );
-  assert.equal(stripeMode({ ...shared, STRIPE_SECRET_KEY: "rk_live_example" }), "live");
+  // Restricted and standard keys alike.
+  for (const kind of ["rk", "sk"]) {
+    assert.equal(stripeMode({ ...shared, STRIPE_SECRET_KEY: `${kind}_test_example` }), "test");
+    assert.equal(stripeMode({ ...shared, STRIPE_SECRET_KEY: `${kind}_live_example` }), "live");
+  }
   assert.equal(stripeMode({ ...shared, STRIPE_SECRET_KEY: "something_else" }), "unknown");
 });
 
@@ -1654,20 +1637,12 @@ await test("bulk sequence cancellation keeps a lesson inside the window and refu
   );
 });
 
-await test("an unpaid lesson can change between ordinary lesson lengths", () => {
-  const row = { payment_status: "not_required", amount_cents: null };
+await test("an unpaid or future saved-card lesson can change between ordinary lesson lengths", () => {
   const single = { id: "single", price_cents: 2500 };
   const long = { id: "long", price_cents: 3500 };
-  assert.equal(lessonTypeChangeProblem(row, single, long), "");
-  assert.equal(amountAfterLessonTypeChange(row, long), null);
-});
-
-await test("a future saved-card lesson changes to the new lesson price", () => {
-  const row = { payment_status: "scheduled", amount_cents: 2500 };
-  const single = { id: "single", price_cents: 2500 };
-  const long = { id: "long", price_cents: 3500 };
-  assert.equal(lessonTypeChangeProblem(row, single, long), "");
-  assert.equal(amountAfterLessonTypeChange(row, long), 3500);
+  for (const row of [{ payment_status: "not_required", amount_cents: null }, { payment_status: "scheduled", amount_cents: 2500 }]) {
+    assert.equal(lessonTypeChangeProblem(row, single, long), "");
+  }
 });
 
 await test("a paid lesson cannot silently change price", () => {

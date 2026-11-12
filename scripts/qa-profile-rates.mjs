@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
 import { chromium, expect } from "@playwright/test";
 
 // Accounts, codes and prices are isolated fixtures: no request reaches the
@@ -10,8 +9,6 @@ import { chromium, expect } from "@playwright/test";
 // there prices the next weekly booking without being typed again.
 const base = (process.env.QA_BASE_URL ?? "").replace(/\/$/, "");
 if (!base) throw new Error("Supply QA_BASE_URL explicitly.");
-const out = "tmp/qa/profile-rates";
-await mkdir(out, { recursive: true });
 
 const catalogue = {
   TEST15: { duration: 60, cents: 1500 },
@@ -121,7 +118,6 @@ try {
     await expect(editor.locator(".my-lessons__rates-list")).toHaveCount(0);
     assert.doesNotMatch(await editor.innerText(), /standard price|lesson rates/i, "Nothing suggests a student should have a rate");
     assert.ok(await noOverflow(page), `Closed disclosure fits at ${width}px`);
-    await editor.screenshot({ path: `${out}/closed-${width}.png` });
 
     // A 60 minute code, then a 90 minute one, from the same field.
     await disclosure.locator("summary").click();
@@ -156,7 +152,6 @@ try {
     await expect(rows.nth(1)).toContainText("90-minute lessons");
     await expect(rows.nth(1)).toContainText("€27 each");
     assert.ok(await noOverflow(page), `Saved rates fit at ${width}px`);
-    await editor.screenshot({ path: `${out}/saved-${width}.png` });
 
     // A second code for a length that already has a rate is refused, saying
     // which length, and the typed code stays so a slip can be fixed.
@@ -171,7 +166,6 @@ try {
     await expect(alert).toContainText("We don't recognise that code. Check it with Inês.");
     await expect(rows).toHaveCount(2);
     assert.ok(await noOverflow(page), `A refused code fits at ${width}px`);
-    await editor.screenshot({ path: `${out}/refused-${width}.png` });
     // No length is ever sent: the code says which one it is for.
     assert.deepEqual(state.posts, [{ code: "test15" }, { code: "DEMO27" }, { code: "mock19" }, { code: "NOPE15" }]);
 
@@ -193,7 +187,6 @@ try {
     await page.getByRole("radio", { name: /^90-minute lesson/ }).check();
     await expect(confirmStage.getByRole("radio", { name: "90-minute lesson · €27", exact: true })).toBeChecked();
     await expect(page.getByLabel(/your code/i)).toHaveCount(0);
-    await page.locator("#booking-confirmation-stage").screenshot({ path: `${out}/booking-${width}.png` });
     assert.ok(await noOverflow(page), `Confirmation fits at ${width}px`);
 
     // A booked weekly lesson retains its agreed price; changing its length
@@ -220,7 +213,6 @@ try {
     await change.getByRole("radio", { name: "90-minute lesson · €27", exact: true }).check();
     await expect(change.getByLabel(/your code/i)).toHaveCount(0);
     await expect(change.getByText(/Have a code|Apply and save rate/)).toHaveCount(0);
-    await change.screenshot({ path: `${out}/change-length-${width}.png` });
     assert.deepEqual(account.errors, []);
     await account.context.close();
   }

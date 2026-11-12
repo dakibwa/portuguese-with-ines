@@ -4,7 +4,7 @@ import { HOME_CLOCK, IN_PERSON, LANGUAGE, TUTOR_CITY, TUTOR_NAME } from "@/lib/t
 import { MeetingLink } from "@/components/MeetingLink";
 import { LessonsLoading } from "@/components/LessonsLoading";
 
-import { type CSSProperties, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
   AlertCircle,
@@ -29,7 +29,7 @@ import { AssetMark } from "@/components/BrandMarks";
 import { AccountMenu, AccountSignature, type AccountSection } from "@/components/AccountMenu";
 import { CalendarBookingPrompt } from "@/components/CalendarBookingPrompt";
 import { PastLessons } from "@/components/PastLessons";
-import { CHARGED_EACH, CHARGED_IT, FeeFacts } from "@/components/CardOnFile";
+import { CHARGED_EACH, CHARGED_IT, FeeFacts } from "@/components/FeeFacts";
 import { deferred } from "@/lib/deferred";
 /*
  * Loaded when it is needed, not before. The sign-in panel — with the Google
@@ -42,7 +42,9 @@ import { deferred } from "@/lib/deferred";
  */
 const { Component: AuthPanel, load: loadAuthPanel } = deferred(() => import("@/components/AuthPanel").then((m) => m.AuthPanel), { waiting: "Loading…", reveal: transitionBooking });
 const { Component: AccountControls, load: loadAccountControls } = deferred(() => import("@/components/MyLessons").then((m) => m.MyLessons), { reveal: transitionBooking });
-if (typeof window !== "undefined" && readSession()) void loadAccountControls();
+// A chunk that fails here is asked for again, with its own Try again, when
+// the account shows.
+if (typeof window !== "undefined" && readSession()) loadAccountControls().catch(() => {});
 /*
  * Expressions, with their painter, come only with a student's lessons. They
  * draw nothing while the Worker keeps them closed to students, so a visitor
@@ -205,7 +207,7 @@ function TimePicker({ halves, listLabel, renderTime, selected = "", slots, zone 
   halves: { first: string; last: string; split: string } | null;
   /** Times shown but not chosen here are a named list rather than buttons. */
   listLabel?: string;
-  renderTime: (slot: Slot, place: CSSProperties | undefined) => ReactNode;
+  renderTime: (slot: Slot) => ReactNode;
   selected?: string;
   slots: Slot[];
   zone: string;
@@ -264,7 +266,7 @@ function TimePicker({ halves, listLabel, renderTime, selected = "", slots, zone 
           // across the dialog (13 October 2026, Dan).
           style={columns ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined}
         >
-          {current.slots.map((slot) => renderTime(slot, undefined))}
+          {current.slots.map((slot) => renderTime(slot))}
         </div>
       ) : (
         <p className="booking-state-note time-picker__empty">Nothing free {current.id === "early" ? "before" : "from"} {divide} on this day.</p>
@@ -307,42 +309,28 @@ function sameRates(a: Record<number, number>, b: Record<number, number>) {
   return [...new Set([...Object.keys(a), ...Object.keys(b)])].every((key) => a[Number(key)] === b[Number(key)]);
 }
 
+/** Shown only on the confirmation, so a time is always chosen by then. */
 function RepeatAvailability({
-  chosen,
   error,
   previewing,
   preview,
-  setup = false,
   zone
 }: {
-  chosen: boolean;
   error: string;
   previewing: boolean;
   preview: { bookable: string[]; skipped: string[] } | null;
-  setup?: boolean;
   zone: string;
 }) {
   // A fully available repeat is the expected state, so it should not consume
-  // space. Guidance, loading, a failed check, and clashing weeks are the only
-  // states that need to ask for attention.
-  if (chosen && !previewing && !error && preview && !preview.skipped.length) return null;
+  // space. Loading, a failed check, and clashing weeks are the only states
+  // that need to ask for attention.
+  if (!previewing && !error && preview && !preview.skipped.length) return null;
 
   return (
-    <section
-      className={`booking-repeat-choice${setup ? " booking-repeat-choice--setup" : ""}`}
-      aria-label="Weekly lesson availability"
-    >
+    <section className="booking-repeat-choice" aria-label="Weekly lesson availability">
       {!preview?.skipped.length ? (
         <p className="booking-repeat-note" role="status">
-          {!chosen ? (
-            "Choose a time and we’ll check every week before you book."
-          ) : previewing || (!preview && !error) ? (
-            "Checking which weeks are free…"
-          ) : error ? (
-            error
-          ) : (
-            "We couldn’t check the later weeks just now. Nothing is booked until you confirm."
-          )}
+          {previewing || !error ? "Checking which weeks are free…" : error}
         </p>
       ) : null}
 
@@ -1260,6 +1248,28 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       .catch((error: Error) => setLessonTypesError(error.message));
   }, []);
 
+  const closeManagedLesson = useCallback(() => {
+    managedRequest.current += 1;
+    setManageLoading(false);
+    setManaged(null);
+    setManagedToken("");
+    setManagedSeriesId(null);
+    setManagedLessonTypeId("");
+    setManagedLocation("online");
+    setManageMode("view");
+    setManageError("");
+    setManageOutcome("");
+    setLessonSignInLink({ state: "idle", error: "" });
+    setLessonCardReturn(null);
+    setManagedCalendarPlaceholderHeight(0);
+    setSelectedSlot("");
+    setSelectedDate("");
+    setCalendarWeekCount(4);
+    if (new URLSearchParams(window.location.search).has("manage")) {
+      window.history.replaceState({}, "", "/book/");
+    }
+  }, []);
+
   // A session can change in another tab. Remove its private calendar and
   // management links immediately, and load a replacement account separately.
   // Keep the visitor's unsubmitted booking choices through their own sign-in.
@@ -1288,11 +1298,16 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         refreshStudentInBackground();
         return;
       }
-      setManaged(null);
-      setManagedToken("");
-      setManagedSeriesId(null);
-      setManageError("");
-      setManageOutcome("");
+      // A lesson open on the page closes as its own Close closes it, Change
+      // and all, so nothing of it is left half open for the next account.
+      if (managedToken) closeManagedLesson();
+      else {
+        setManaged(null);
+        setManagedToken("");
+        setManagedSeriesId(null);
+        setManageError("");
+        setManageOutcome("");
+      }
       setBookingPromptDate("");
       setStudent(null);
       setLoadedAccount(null);
@@ -1304,13 +1319,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setPaymentError("");
       setCardReturn(null);
       setAccountLoadError("");
+      // The one read after any sign-in, here or in another tab: the sign-in
+      // forms only show who signed in until it lands.
       if (current) {
         void refreshStudent().catch(() => {
           if (readSession() === current) setAccountLoadError("We couldn’t reach your account just now. Please check your connection and try again.");
         });
       }
     });
-  }, [refreshStudent, refreshStudentInBackground, student?.id]);
+  }, [closeManagedLesson, managedToken, refreshStudent, refreshStudentInBackground, student?.id]);
 
   useEffect(() => {
     let active = true;
@@ -1359,9 +1376,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     const lessonsByAddress = Boolean(initialLessonsView || returningFromCard || params.get("view") === "lessons");
     setAskedForLessons(lessonsByAddress);
     if (lessonsByAddress) {
+      // Signed out, needsLessonsSignIn asks them to sign in once the session
+      // is checked. A flag set here also caught a lesson's own link, and put
+      // Sign in where its Change shows the times.
       setIntent("lessons");
       setUpcomingRequestKey((current) => current + 1);
-      if (!readSession() && !signInToken) setShowAccountSignIn(true);
     } else if (params.get("view") === "book" || params.get("lesson")) {
       setIntent("book");
       if (params.get("lesson") === "single" || params.get("lesson") === "long") {
@@ -1573,13 +1592,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       attempts += 1;
       try {
         // Only the returned lesson's token identifies this checkout. An
-        // account with older confirmed lessons does not prove a new booking.
-        if (!token) await refreshStudent();
+        // account with older confirmed lessons does not prove a new booking,
+        // and every return Stripe is given carries it (`manage`).
         const confirmed = Boolean(token && (await fetchBooking(token)).booking.status === "confirmed");
         if (!active) return;
         if (confirmed) {
           setCardReturn((current) => current && { ...current, state: "confirmed" });
-          setUpcomingRequestKey((current) => current + 1);
+          // Your lessons is handed this read; it needs none of its own.
           refreshStudentInBackground();
           return;
         }
@@ -1598,7 +1617,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       active = false;
       window.clearTimeout(timer);
     };
-  }, [cardReturn?.state, cardReturn?.token, refreshStudent, refreshStudentInBackground]);
+  }, [cardReturn?.state, cardReturn?.token, refreshStudentInBackground]);
 
   /*
    * Stripe tells the booking system a moment after the student is back, so
@@ -1818,7 +1837,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       for (const { typeId, manageToken } of wanted) {
         if (typeId) void fetchAvailability(typeId, todayKey, until, undefined, { manageToken, location: availabilityLocation }).catch(() => {});
       }
-      if (signedOut) void loadAuthPanel();
+      // A chunk that fails here is asked for again, with its own Try again,
+      // when the sign-in shows.
+      if (signedOut) loadAuthPanel().catch(() => {});
     };
     const idle = window.requestIdleCallback ? window.requestIdleCallback(run, { timeout: 2000 }) : window.setTimeout(run, 400);
     return () => {
@@ -2077,6 +2098,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // lessons destination still needs sign-in when that read clears the token;
   // an interrupted read with a retained bearer keeps its retry/error state.
   // Signed in from the lessons panel or a link from an email: Your lessons.
+  // Storing the session already asked for the account (the session listener).
   const enterLessons = (signedIn: Student) => {
     setSignInLinkError("");
     transitionBooking(() => {
@@ -2085,7 +2107,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setAccountView("upcoming");
       setUpcomingRequestKey((current) => current + 1);
     });
-    refreshStudentInBackground();
   };
   // A lesson opened from its emailed link carries its own key: changing it
   // never asks for an account.
@@ -2709,35 +2730,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     }
   }
 
-  const closeManagedLesson = useCallback(() => {
-    managedRequest.current += 1;
-    setManageLoading(false);
-    setManaged(null);
-    setManagedToken("");
-    setManagedSeriesId(null);
-    setManagedLessonTypeId("");
-    setManagedLocation("online");
-    setManageMode("view");
-    setManageError("");
-    setManageOutcome("");
-    setLessonSignInLink({ state: "idle", error: "" });
-    setLessonCardReturn(null);
-    setManagedCalendarPlaceholderHeight(0);
-    setSelectedSlot("");
-    setSelectedDate("");
-    setCalendarWeekCount(4);
-    if (new URLSearchParams(window.location.search).has("manage")) {
-      window.history.replaceState({}, "", "/book/");
-    }
-  }, []);
-
-  const returnFromManagedLesson = useCallback(() => {
-    transitionBooking(() => {
-      closeManagedLesson();
-      setUpcomingRequestKey((current) => current + 1);
-    });
-  }, [closeManagedLesson]);
-
   useEffect(() => {
     if (manageDialogOpen) {
       manageWasOpen.current = true;
@@ -2758,14 +2750,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     });
   }, [manageDialogOpen]);
 
+  // After a change too, Your lessons needs no read of its own: the change
+  // read the account again, and Your lessons is handed that.
   const dismissManagedDialog = useCallback(() => {
     if (manageWorking) return;
-    if (manageOutcome && student) {
-      returnFromManagedLesson();
-      return;
-    }
     transitionBooking(closeManagedLesson);
-  }, [closeManagedLesson, manageOutcome, manageWorking, returnFromManagedLesson, student]);
+  }, [closeManagedLesson, manageWorking]);
 
   useEffect(() => {
     if (!manageDialogOpen) return;
@@ -2865,7 +2855,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setSeriesPreview(null);
       setPayment(null);
       setPaymentError("");
-      setUpcomingRequestKey((current) => current + 1);
+      // Your lessons needs no read of its own: booking read the account again.
     });
     orientTo("account-controls");
     window.requestAnimationFrame(() => document.getElementById("upcoming-lessons-heading")?.focus({ preventScroll: true }));
@@ -2935,8 +2925,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         halves={timeHalves}
         key={`${selectedDate}-online`}
         listLabel="Times online only"
-        renderTime={(slot, place) => (
-          <span className="slot-grid__online-only" key={slot.startAt} role="listitem" style={place}>
+        renderTime={(slot) => (
+          <span className="slot-grid__online-only" key={slot.startAt} role="listitem">
             {formatSlotTime(slot.startAt, viewZone)}
           </span>
         )}
@@ -3599,17 +3589,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               <dt>Your reference</dt>
               <dd>{confirmation.reference}</dd>
             </dl>
-            {/* The fee rule as the confirm step's dabs, said once. */}
+            {/* The fee rule as the confirm step's dabs, said once. With no
+                fee at all, that covers a missed lesson too. */}
             <ul className="booking-payment-facts booking-success__note">
               {lessonType?.price_cents === 0 ? (
                 <li>Please give {TUTOR_NAME} {noticeHours} hours&rsquo; notice to move or cancel</li>
-              ) : lateFeeCents === 0 ? (
-                <li>No fee to change or cancel, or for a missed lesson</li>
               ) : (
-                <>
-                  <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
-                  <li><strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later{postpay ? <>, or if you don&rsquo;t show up</> : null}</li>
-                </>
+                <FeeFacts feeCents={lateFeeCents} noticeHours={noticeHours} noShow={postpay || !lateFeeCents} />
               )}
             </ul>
           </div>
@@ -3657,7 +3643,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setManagedLocation("online");
       setManageMode("view");
       setHasPriorBooking(false);
-      // Signed out, the page is what any visitor sees: ready to book.
+      // Signed out, the page is what any visitor sees: ready to book, its
+      // times beside the calendar rather than a sign-in left from earlier.
+      setShowAccountSignIn(false);
       setIntent("book");
       setAccountView("upcoming");
       setBookingKind("");
@@ -4782,7 +4770,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     setStudent(signedIn);
                     setShowAccountSignIn(false);
                   });
-                  refreshStudentInBackground();
                 }}
               />
             ) : managed && isManagedReschedule ? (
@@ -4877,14 +4864,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     halves={timeHalves}
                     key={selectedDate}
                     zone={viewZone}
-                    renderTime={(slot, place) => (
+                    renderTime={(slot) => (
                       <button
                         aria-pressed={selectedSlot === slot.startAt}
                         className={selectedSlot === slot.startAt ? "is-selected" : ""}
                         disabled={manageWorking}
                         key={slot.startAt}
                         onClick={() => setSelectedSlot(slot.startAt)}
-                        style={place}
                         type="button"
                       >
                         {formatSlotTime(slot.startAt, viewZone)}
@@ -5025,10 +5011,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       <TimePicker
                         halves={timeHalves}
                         key={selectedDate}
-                        renderTime={(slot, place) => (
+                        renderTime={(slot) => (
                           <button
                             key={slot.startAt}
-                            style={place}
                             onClick={() => chooseSlot(slot)}
                             type="button"
                           >
@@ -5072,7 +5057,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   as soon as either changes, signed in or not. */}
               {form.repeat !== "once" ? (
                 <RepeatAvailability
-                  chosen={Boolean(chosen)}
                   error={seriesPreviewError}
                   preview={seriesPreview}
                   previewing={previewing}
@@ -5128,10 +5112,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     heading="Almost there"
                     initialMode="register"
                     keepCopy
-                    onSignedIn={(signedIn) => {
-                      setStudent(signedIn);
-                      refreshStudentInBackground();
-                    }}
+                    onSignedIn={setStudent}
                   />
                 ) : (
                   <form className="student-details-form" onSubmit={submit}>
@@ -5212,22 +5193,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                                   (2 November 2026); when a fee is charged, and that a
                                   no-show costs it instead of the lesson, are in the
                                   terms the agreement links. */}
-                              {lateFeeCents ? <>
-                                <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
-                                <li>
-                                  <strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later, or if you don&rsquo;t show up
-                                </li>
-                              </> : <li>No fee to change or cancel, or for a missed lesson</li>}
+                              <FeeFacts feeCents={lateFeeCents} noticeHours={noticeHours} />
                             </>
                           ) : (
                             <>
                               <li>Pay {TUTOR_NAME} on the lesson day</li>
                               {/* Paid in person, a missed lesson is the lesson itself, so
                                   only the late change has a fee here. */}
-                              {lateFeeCents ? <>
-                                <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
-                                <li><strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later</li>
-                              </> : null}
+                              {lateFeeCents ? <FeeFacts feeCents={lateFeeCents} noticeHours={noticeHours} noShow={false} /> : null}
                             </>
                           )}
                           {form.repeat === null ? <li>Ongoing lessons repeat until you stop them</li> : null}

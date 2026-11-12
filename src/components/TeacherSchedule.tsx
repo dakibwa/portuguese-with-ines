@@ -49,7 +49,6 @@ import {
   dateExtras,
   dateKey,
   daysOff,
-  dateLabel,
   extraSpan,
   hoursFromRules,
   chooseHours,
@@ -68,6 +67,7 @@ import {
   type HoursChoice,
   type Span,
   type WeekHours,
+  shortDateLabel,
 } from "@/lib/teacher-calendar";
 
 const emptyWeek = hoursFromRules([]);
@@ -75,9 +75,6 @@ const emptyWeek = hoursFromRules([]);
 /** A date's time off and extra hours as last chosen, until the Worker confirms them. */
 type DayChange = { dayOff?: boolean; blocks?: Span[]; extra?: Span[]; version: number };
 
-function shortDate(date: string) {
-  return dateLabel(date, { weekday: "short", day: "numeric", month: "short" });
-}
 
 function profileRequested() {
   const params = new URL(window.location.href).searchParams;
@@ -185,7 +182,8 @@ export function TeacherSchedule() {
   );
   const hoursDirty = serialiseHours(savedHours) !== serialiseHours(draftHours);
   const invalidHours = hoursProblem(draftHours);
-  const affectedLessons = useMemo(() => bookingsAffectedByHours(bookings, savedHours, draftHours, interval, now), [bookings, savedHours, draftHours, interval, now]);
+  // Only an unsaved change to her hours can touch a lesson.
+  const affectedLessons = useMemo(() => hoursDirty ? bookingsAffectedByHours(bookings, savedHours, draftHours, interval, now) : [], [hoursDirty, bookings, savedHours, draftHours, interval, now]);
   const needs = useMemo(
     () => needsYou({ now, meet, payments: paymentReview, students: students?.list ?? [], lessons: bookings, cancellations: studentCancellations, dismissed: hiddenNotices }),
     [now, meet, paymentReview, students, bookings, studentCancellations, hiddenNotices],
@@ -394,6 +392,10 @@ export function TeacherSchedule() {
 
   // A quiet read is a background refresh: if it fails, the lessons already on
   // screen stay, rather than giving way to an error she did not ask for.
+  // From the day before the shown week, or yesterday, whichever is earlier, to
+  // include an overnight lesson that began before it. Everything after it comes
+  // too, so paging between weeks ahead asks again only when this date moves.
+  const bookingsFrom = [shiftDate(weekStart, -1), shiftDate(today, -1)].sort()[0];
   const reloadBookings = useCallback(async (quiet = false) => {
     if (!token || readSession() !== token) return;
     const request = ++bookingRequest.current;
@@ -402,15 +404,7 @@ export function TeacherSchedule() {
       setBookingsError("");
     }
     try {
-      // Include an overnight lesson that began before the displayed week.
-      const fromDate = [
-        shiftDate(weekStart, -1),
-        shiftDate(today, -1),
-      ].sort()[0];
-      const result = await fetchBookings(
-        token,
-        portoTimeToUtc(fromDate, "00:00"),
-      );
+      const result = await fetchBookings(token, portoTimeToUtc(bookingsFrom, "00:00"));
       if (request !== bookingRequest.current) return;
       setBookings(
         result.bookings.filter((booking) => booking.status === "confirmed"),
@@ -431,7 +425,7 @@ export function TeacherSchedule() {
     } finally {
       if (request === bookingRequest.current) setBookingsLoading(false);
     }
-  }, [token, weekStart, today]);
+  }, [token, bookingsFrom]);
 
   useEffect(() => {
     void reloadBookings();
@@ -586,7 +580,7 @@ export function TeacherSchedule() {
             updateDayChanges((changes) => changes.delete(date));
             setDayNote({
               error: true,
-              text: `${shortDate(date)} was not changed. ${caught instanceof Error ? caught.message : "Please try again."}`,
+              text: `${shortDateLabel(date)} was not changed. ${caught instanceof Error ? caught.message : "Please try again."}`,
             });
           }
         }
@@ -689,6 +683,19 @@ export function TeacherSchedule() {
           wantedPeriods.current = null;
           setOnlineOnlyPeriods(savedPeriods.current);
           setDayNote({ error: true, text: `${onlineSubject.current} was not changed. ${caught instanceof Error ? caught.message : "Please try again."}` });
+          // Changed on another device: read what is saved now, or every later
+          // choice is refused for the same stale revision.
+          if (caught instanceof AdminApiError && caught.status === 409) {
+            try {
+              const schedule = await fetchSchedule(token);
+              if (account !== accountGeneration.current) return;
+              savedPeriods.current = schedule.settings?.onlineOnlyPeriods ?? [];
+              onlineRevision.current = schedule.settings?.onlineOnlyRevision ?? "0";
+              if (!wantedPeriods.current) setOnlineOnlyPeriods(savedPeriods.current);
+            } catch {
+              // Her next choice is refused the same way, and reads again.
+            }
+          }
         }
       }
     } finally {
@@ -705,23 +712,23 @@ export function TeacherSchedule() {
    */
   function takeDayOff(date: string, off: boolean) {
     const online = off && onlineOnlyHours(latestPeriods(), date).length > 0;
-    if (online) changeOnlineOnly(() => setOnlineOnlyHours(latestPeriods(), date, [], today), shortDate(date));
+    if (online) changeOnlineOnly(() => setOnlineOnlyHours(latestPeriods(), date, [], today), shortDateLabel(date));
     changeDay(
       date,
       { dayOff: off },
       off
-        ? `${shortDate(date)} is a day off.${stayBooked(lessonsDuring(date))}`
-        : `${shortDate(date)} is open again.`,
+        ? `${shortDateLabel(date)} is a day off.${stayBooked(lessonsDuring(date))}`
+        : `${shortDateLabel(date)} is open again.`,
     );
   }
 
   /** Online only all day; a day off opens again first. Hours off stay. */
   function makeDayOnline(date: string, on: boolean) {
-    if (!changeOnlineOnly(() => setOnlineOnlyHours(latestPeriods(), date, on ? [ALL_DAY] : [], today), shortDate(date))) return;
+    if (!changeOnlineOnly(() => setOnlineOnlyHours(latestPeriods(), date, on ? [ALL_DAY] : [], today), shortDateLabel(date))) return;
     if (on && daysOff(shownExceptions).has(date)) changeDay(date, { dayOff: false }, "");
     setDayNote({
       error: false,
-      text: on ? `${shortDate(date)} is online only.` : `${shortDate(date)} can be booked ${IN_PERSON.replace(/^In /, "in ")} again.`,
+      text: on ? `${shortDateLabel(date)} is online only.` : `${shortDateLabel(date)} can be booked ${IN_PERSON.replace(/^In /, "in ")} again.`,
     });
   }
 
@@ -737,13 +744,13 @@ export function TeacherSchedule() {
     const current = { off: dateBlocks(shownExceptions, date), online: onlineOnlyHours(latestPeriods(), date), extra: dateExtras(shownExceptions, date, interval) };
     const next = chooseHours(current, original, kind, span, interval);
     const same = (a: Span[], b: Span[]) => JSON.stringify(a) === JSON.stringify(b);
-    const when = `${spanLabel(span)} on ${shortDate(date)}`;
+    const when = `${spanLabel(span)} on ${shortDateLabel(date)}`;
     const text = kind === "off" ? `${when} is off.${stayBooked(lessonsDuring(date, span))}`
       : kind === "online" ? `${when} is online only.`
-      : kind === "extra" ? `Lessons can start ${startsLabel(span, interval)} on ${shortDate(date)}.`
+      : kind === "extra" ? `Lessons can start ${startsLabel(span, interval)} on ${shortDateLabel(date)}.`
       : kind === "not working" ? `Not working ${when}.` : `${when} is open again.`;
     if (!same(next.online, current.online) &&
-      !changeOnlineOnly(() => setOnlineOnlyHours(latestPeriods(), date, next.online, today), shortDate(date))) return;
+      !changeOnlineOnly(() => setOnlineOnlyHours(latestPeriods(), date, next.online, today), shortDateLabel(date))) return;
     const blocks = same(next.off, current.off) ? undefined : next.off;
     const extra = same(next.extra, current.extra) ? undefined : next.extra;
     if (blocks || extra) changeDay(date, { ...(blocks ? { blocks } : {}), ...(extra ? { extra } : {}) }, text);
@@ -864,13 +871,11 @@ export function TeacherSchedule() {
       ) : null}
       {!editing && bookingsShown ? (
         <NeedsYou
-          items={needs.filter(item => !["lessons", "welcome"].includes(item.kind))}
-          sending={welcoming}
+          items={needs}
           onMeet={() => {
             document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true });
             setActiveTab("profile");
           }}
-          onWelcome={(student) => void sendWelcome(student)}
           onStudent={(student, panel = "lessons") => openStudent(student, panel)}
           onDismiss={key => void dismissNotice(key)}
           onSeeAll={() => { setActiveTab("students"); document.getElementById("teacher-tab-students")?.focus({ preventScroll: true }); }}

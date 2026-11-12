@@ -63,9 +63,6 @@ export type LessonSeries = {
   id: string;
   weekday: number;
   minuteOfDay: number;
-  occurrences: number | null;
-  openEnded: boolean;
-  upcoming: number;
 };
 
 const SESSION_KEY = "ines-student-session";
@@ -300,12 +297,18 @@ export function previewCardBooking(token: string, bookingIds: string[]) {
   });
 }
 
+/**
+ * The checkout address is checked to be Stripe's where the browser is sent
+ * to it (stripePaymentUrl, in CardOnFile), as every payment page's is. Not
+ * here: every page loads this module, and importing booking-api into it would
+ * bring that along too.
+ */
 export function openCardPage(token: string, bookings: CardBooking[] = [], savedCardKey?: string) {
   return post<{ checkoutUrl?: string; authorised?: boolean }>("/me/card", {
     consent: true, ...(bookings.length ? { bookings, bookingConsent: true, ...(savedCardKey ? { savedCardKey } : {}) } : {})
   }, token).then((data) => {
     if (data.authorised === true) return { authorised: true as const };
-    if (typeof data.checkoutUrl !== "string" || !/^https:\/\//.test(data.checkoutUrl)) throw new AuthApiError(BOOKING_REPLY_ERROR, 502);
+    if (typeof data.checkoutUrl !== "string") throw new AuthApiError(BOOKING_REPLY_ERROR, 502);
     return { checkoutUrl: data.checkoutUrl };
   });
 }

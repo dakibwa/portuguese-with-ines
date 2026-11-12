@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
 import { chromium, expect } from "@playwright/test";
 
 // Accounts and lessons are isolated fixtures: no request reaches the Worker.
@@ -14,7 +13,6 @@ const lesson = (id, name, startsAt, nif) => ({
   status: "confirmed", location: "online", meeting_url: null, notes: "", same_day_change: 0, same_day_fee_status: "not_required",
   reschedule_count: 0, payment_status: "scheduled", attendance_status: "expected",
 });
-await mkdir("tmp/qa/nif", { recursive: true });
 
 async function open(width, path, { session = "", me = student, reply = () => null } = {}) {
   const page = await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width < 741 });
@@ -84,7 +82,6 @@ try {
     await form.getByRole("button", { name: "Create my account", exact: true }).click();
     await expect(form.getByRole("alert")).toContainText("That NIF isn't valid");
     assert.ok(await noOverflow(signUp.page));
-    await signUp.page.locator(".auth-panel").screenshot({ path: `tmp/qa/nif/sign-up-${width}.png` });
     await nif.fill("PT 123 456 789");
     await form.getByRole("button", { name: "Create my account", exact: true }).click();
     await expect.poll(() => attempts).toBe(2);
@@ -108,7 +105,6 @@ try {
     const exists = takenForm.locator(".booking-alert--error[role=alert]");
     await expect(exists).toContainText("There is already an account with that email.");
     assert.ok(await noOverflow(taken.page));
-    await taken.page.locator(".auth-panel").screenshot({ path: `tmp/qa/nif/account-exists-${width}.png` });
     await exists.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(taken.page.getByRole("tab", { name: "I have an account", exact: true })).toHaveAttribute("aria-selected", "true");
     await expect(takenForm.getByLabel("Email")).toHaveValue("ana@example.invalid");
@@ -160,7 +156,6 @@ try {
     await expect(field).toHaveCount(0);
     await expect(nifRow).toContainText("123456789");
     assert.ok(await noOverflow(details.page));
-    await editor.screenshot({ path: `tmp/qa/nif/details-${width}.png` });
     await nifRow.getByRole("button", { name: "Change NIF", exact: true }).click();
     await expect(field).toHaveValue("123456789");
     await expect(save).toBeDisabled();

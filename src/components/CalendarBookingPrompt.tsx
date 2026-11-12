@@ -11,12 +11,12 @@ import { useDialogBackdrop } from "@/lib/dialog-backdrop";
 type PromptLesson = { key: string; title: string; detail: string; mark?: ReactNode; onOpen: () => void };
 
 /**
- * The question a calendar day asks. A free day offers to book; a day with
- * more than one booked lesson lists them to open, and can still book another.
+ * A calendar day with more than one booked lesson: its lessons to open, and
+ * a way to book another. A free day goes straight to its times instead.
  */
-export function CalendarBookingPrompt({ date, lessons = [], onBook, onClose }: {
+export function CalendarBookingPrompt({ date, lessons, onBook, onClose }: {
   date: string;
-  lessons?: PromptLesson[];
+  lessons: PromptLesson[];
   onBook: () => void;
   onClose: () => void;
 }) {
@@ -39,7 +39,6 @@ export function CalendarBookingPrompt({ date, lessons = [], onBook, onClose }: {
   return (
     <dialog
       aria-labelledby="calendar-booking-title"
-      aria-describedby={lessons.length ? undefined : "calendar-booking-date"}
       className="policy-dialog calendar-booking-prompt"
       ref={dialogRef}
       {...backdropHandlers}
@@ -49,32 +48,29 @@ export function CalendarBookingPrompt({ date, lessons = [], onBook, onClose }: {
       <div className="policy-dialog__heading">
         {/* A day's lessons are titled by the day: "Your lessons" only
             repeated the card behind the dialog. */}
-        <h2 id="calendar-booking-title">{lessons.length ? longDate : "Do you want to book?"}</h2>
-        <button aria-label={lessons.length ? "Close" : "Close booking question"} onClick={onClose} type="button">
+        <h2 id="calendar-booking-title">{longDate}</h2>
+        <button aria-label="Close" onClick={onClose} type="button">
           <X size={22} aria-hidden="true" />
         </button>
       </div>
       <div className="calendar-booking-prompt__content">
-        {lessons.length ? null : <p id="calendar-booking-date">{longDate}</p>}
-        {lessons.length ? (
-          <ul className="calendar-booking-prompt__lessons">
-            {lessons.map((lesson) => (
-              <li key={lesson.key}>
-                <button className="calendar-booking-prompt__lesson" onClick={lesson.onOpen} type="button">
-                  {lesson.mark}
-                  <span>
-                    <strong>{lesson.title}</strong>
-                    <small>{lesson.detail}</small>
-                  </span>
-                  <ChevronRight size={18} aria-hidden="true" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        <ul className="calendar-booking-prompt__lessons">
+          {lessons.map((lesson) => (
+            <li key={lesson.key}>
+              <button className="calendar-booking-prompt__lesson" onClick={lesson.onOpen} type="button">
+                {lesson.mark}
+                <span>
+                  <strong>{lesson.title}</strong>
+                  <small>{lesson.detail}</small>
+                </span>
+                <ChevronRight size={18} aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
         <div className="calendar-booking-prompt__actions">
           <button className="button button--coral" onClick={onBook} type="button">
-            {lessons.length ? "Book another lesson" : "Choose a lesson"}
+            Book another lesson
           </button>
           <button className="button button--quiet" onClick={onClose} type="button">Not now</button>
         </div>

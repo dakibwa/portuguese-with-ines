@@ -10,7 +10,7 @@ import {
   zonedParts,
   zonedToUtc
 } from "./time.mjs";
-import { DEFAULT_TUTOR, tutorOf } from "./tutor.mjs";
+import { tutorOf } from "./tutor.mjs";
 
 /**
  * Free slots = weekly teaching hours, plus one-off extra windows, minus blocked
@@ -25,9 +25,6 @@ import { DEFAULT_TUTOR, tutorOf } from "./tutor.mjs";
 function overlaps(startA, endA, startB, endB) {
   return startA < endB && startB < endA;
 }
-
-/** Inês's horizon before her settings say otherwise; each tutor's own comes from their record. */
-export const DEFAULT_BOOKING_HORIZON_DAYS = DEFAULT_TUTOR.defaults.bookingHorizonDays;
 
 /** Bumped in the same transaction as teaching-hour and notice-setting writes. */
 export function availabilityRevisionSql() {
@@ -222,10 +219,12 @@ export async function listLessonTypes(env) {
  *        whole weekly sequence is being moved.
  * @param ignoreHoldsOf a signed-in student whose own unfinished card setups
  *        do not count as busy for them: their next booking replaces them.
+ * @param dates when given, only these date keys are worked out: a weekly run
+ *        reads its whole span once and needs one day a week of it.
  */
 export async function computeAvailability(
   env,
-  { fromKey, toKey, lessonType, now, ignoreBookingId = null, ignoreSeriesId = null, ignoreHoldsOf = null, ignoreHorizon = false, teacher = false, location = "online" }
+  { fromKey, toKey, lessonType, now, ignoreBookingId = null, ignoreSeriesId = null, ignoreHoldsOf = null, ignoreHorizon = false, teacher = false, location = "online", dates = null }
 ) {
   const settings = await loadSettings(env);
   const duration = Number(lessonType.duration_minutes);
@@ -246,7 +245,7 @@ export async function computeAvailability(
   const horizonKey = addDaysToKey(todayKey, settings.bookingHorizonDays);
   const start = fromKey < todayKey ? todayKey : fromKey;
   const end = !ignoreHorizon && toKey > horizonKey ? horizonKey : toKey;
-  if (!parseDateKey(start) || !parseDateKey(end) || start > end) return { slots: [], settings };
+  if (!parseDateKey(start) || !parseDateKey(end) || start > end) return { slotsByDate: {}, settings };
 
   const earliest = new Date(now.getTime() + (teacher ? 0 : settings.minimumNoticeHours) * 3600000);
 
@@ -319,6 +318,7 @@ export async function computeAvailability(
   const slotsByDate = {};
 
   for (const key of eachDateKey(start, end)) {
+    if (dates && !dates.has(key)) continue;
     const dayExceptions = [
       ...(recurringByWeekday.get(weekdayOf(key)) ?? []),
       ...(exceptionsByDate.get(key) ?? [])
@@ -383,7 +383,7 @@ export async function isSlotBookable(
     location
   });
 
-  const match = (slotsByDate?.[key] ?? []).some((slot) => slot.startAt === start.toISOString());
+  const match = (slotsByDate[key] ?? []).some((slot) => slot.startAt === start.toISOString());
   if (match) return { ok: true, endAt: new Date(start.getTime() + lessonType.duration_minutes * 60000), availabilityRevision: checkedSettings.availabilityRevision };
   const placeProblem = onlineOnlyProblem(checkedSettings, start, new Date(start.getTime() + lessonType.duration_minutes * 60000), location);
   if (placeProblem) return { ok: false, reason: placeProblem };
@@ -392,9 +392,10 @@ export async function isSlotBookable(
    * Say which of these it was. One message covered all of them, so a student
    * trying to book tomorrow morning inside the notice window was told the slot
    * had "just been taken" — which is not true, and sends them off to pick
-   * another time that will refuse them for the same reason.
+   * another time that will refuse them for the same reason. Worded from the
+   * settings that just refused it.
    */
-  const settings = await loadSettings(env);
+  const settings = checkedSettings;
   const noticeCutoff = new Date(now.getTime() + settings.minimumNoticeHours * 3600000);
   if (start < noticeCutoff) {
     const hours = settings.minimumNoticeHours;

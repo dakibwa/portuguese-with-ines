@@ -28,13 +28,15 @@ async function hmacKey(secret) {
   return key;
 }
 
-function base64Url(bytes) {
+/** Bytes as unpadded base64url, as every token and hash here is written. */
+export function base64Url(bytes) {
   let binary = "";
   for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-async function sign(value, secret) {
+/** HMAC-SHA256 of `value` under `secret`, as base64url: every signed token's signature. */
+export async function sign(value, secret) {
   const signature = await crypto.subtle.sign("HMAC", await hmacKey(secret), encoder.encode(value));
   return base64Url(signature);
 }

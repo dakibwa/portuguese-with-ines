@@ -27,7 +27,7 @@
  * and its binding in wrangler.jsonc under the record's `database`.
  */
 import ines from "../../tutors/ines/tutor.json" with { type: "json" };
-import { DEFAULT_TUTOR } from "./tutor.mjs";
+import { DEFAULT_TUTOR, deepFreeze } from "./tutor.mjs";
 
 export const TUTORS = [ines];
 
@@ -47,14 +47,6 @@ const SHARED = [
 
 /** Signing secrets: each tutor gets their own, derived from the deploy's, so a link or session from one never opens another. */
 const DERIVED = ["BOOKING_TOKEN_SECRET", "ADMIN_TOKEN"];
-
-function deepFreeze(value) {
-  if (value && typeof value === "object") {
-    for (const child of Object.values(value)) deepFreeze(child);
-    Object.freeze(value);
-  }
-  return value;
-}
 
 function realTimeZone(zone) {
   if (typeof zone !== "string" || !zone) return false;

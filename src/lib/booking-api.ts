@@ -112,8 +112,9 @@ async function request<T>(path: string, init?: RequestInit, primed?: Promise<Res
     throw new BookingApiError("Booking is not connected yet.", 503);
   }
 
-  // Anything that changes a booking can free or take a time.
-  if (init?.method && init.method !== "GET") forgetAvailability();
+  // Anything that changes a booking can free or take a time. A weekly run's
+  // preview is sent as a POST but books nothing, so the times stay.
+  if (init?.method && init.method !== "GET" && path !== SERIES_PREVIEW_PATH) forgetAvailability();
 
   let response: Response;
   try {
@@ -293,6 +294,8 @@ export type SelectionOutcome = {
   weeklyTimes: number;
 };
 
+const SERIES_PREVIEW_PATH = "/bookings/series/preview";
+
 /**
  * What a repeat would book, before anything is booked. The student is shown the
  * weeks that are unavailable while they can still change their mind.
@@ -306,7 +309,7 @@ export function previewSeries(
     openEnded: boolean;
     bookable: string[];
     skipped: string[];
-  }>("/bookings/series/preview", {
+  }>(SERIES_PREVIEW_PATH, {
     method: "POST",
     ...(session ? { headers: { Authorization: `Bearer ${session}` } } : {}),
     body: JSON.stringify(payload)
@@ -673,15 +676,16 @@ export function formatLongDate(value: string | Date, timeZone = BOOKING_TIME_ZON
   }).format(typeof value === "string" ? new Date(value) : value);
 }
 
+let shortMonthFormatter: Intl.DateTimeFormat | undefined;
+
 /**
  * Short month name, for the label that starts each calendar week and for the
  * 1st of a month that begins part-way through one.
  */
 export function shortMonth(monthNumber: number, yearHint: string) {
   const [year] = yearHint.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" }).format(
-    new Date(Date.UTC(year, monthNumber - 1, 1))
-  );
+  shortMonthFormatter ??= new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" });
+  return shortMonthFormatter.format(new Date(Date.UTC(year, monthNumber - 1, 1)));
 }
 
 /**

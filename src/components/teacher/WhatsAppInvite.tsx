@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Mail, MessageCircle } from "lucide-react";
-import { CHARGED_EACH } from "@/components/CardOnFile";
+import { CHARGED_EACH } from "@/components/FeeFacts";
+import { OwedLessonChoices, sum, whatsAppNumber } from "@/components/teacher/CardApprovalLink";
 import { firstName } from "@/components/teacher/DormantEmail";
 import { priceFor } from "@/components/teacher/StudentPrice";
 import { upcomingEntries, upcomingLessons, usualWeek } from "@/components/teacher/StudentLessons";
@@ -10,22 +11,6 @@ import { addedByTeacher, cardApprovalChoices, createCardApprovalLink, createInvi
 import { readSession } from "@/lib/auth-api";
 import { formatMoneyCents, formatShortDay, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel, type StudentProgress } from "@/lib/teacher-calendar";
-
-/**
- * The number WhatsApp's link wants: international, digits only. A number she
- * wrote with `+` or `00`, or a Portuguese mobile, is certain; anything else
- * opens WhatsApp on its own chooser, so a message never goes to a stranger.
- */
-export function whatsAppNumber(phone: string) {
-  const written = phone.trim();
-  const digits = written.replace(/\D/g, "");
-  if (written.startsWith("+")) return digits.length >= 8 ? digits : "";
-  if (digits.startsWith("00")) return digits.length >= 10 ? digits.slice(2) : "";
-  if (/^9\d{8}$/.test(digits)) return `351${digits}`;
-  return "";
-}
-
-const sum = (lessons: CardApprovalLesson[]) => lessons.reduce((total, lesson) => total + lesson.amountCents, 0);
 
 /** What a link with lessons ticked asks them to agree to besides those lessons: the Worker puts their other lessons she added on the card as well. */
 const AGREEMENT = `If you agree, your future lessons are then charged to your card ${CHARGED_EACH}.`;
@@ -237,25 +222,8 @@ export function WhatsAppInvite({ student, token, progress, sending, onBusy, onEm
     return <div className="teacher-card-link teacher-card-link--panel teacher-invite__owed" role="group" aria-labelledby={`invite-owed-${student.id}`}>
       <div className="teacher-invite__owed-pick">
       <p className="teacher-card-link__hint"><span id={`invite-owed-${student.id}`}>Tick what {first} still owes</span>. Leave any paid in cash.</p>
-      <ul className="teacher-card-link__choices">
-        {choices.map(lesson => {
-          const checked = ticked.includes(lesson.id);
-          return <li key={lesson.id}>
-            <button
-              aria-checked={checked}
-              className={`paid-tick teacher-card-link__choice${checked ? " is-checked" : ""}`}
-              disabled={busy}
-              role="checkbox"
-              type="button"
-              onClick={() => setTicked(current => checked ? current.filter(id => id !== lesson.id) : [...current, lesson.id])}
-            >
-              <span aria-hidden="true" className="paid-tick__dab">{checked ? <Check size={13} strokeWidth={3.4} /> : null}</span>
-              <span className="teacher-card-link__when">{formatShortDay(lesson.startAt)}, {formatSlotTime(lesson.startAt)}</span>
-              <b>{formatMoneyCents(lesson.amountCents)}</b>
-            </button>
-          </li>;
-        })}
-      </ul>
+      <OwedLessonChoices busy={busy} choices={choices} ticked={ticked}
+        onToggle={id => setTicked(current => current.includes(id) ? current.filter(other => other !== id) : [...current, id])} />
       </div>
       <ApprovalTerms first={first} future={future} owed={chosen} showOwed onRetry={() => void loadFuture()} />
       {error}

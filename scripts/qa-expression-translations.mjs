@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
 import { chromium, expect } from "@playwright/test";
 
 // One UI journey for students' own versions of an expression ("Noutras
@@ -9,8 +8,6 @@ import { chromium, expect } from "@playwright/test";
 // privacy and who may review are proven in workers/booking/integration-test.mjs.
 const base = process.env.QA_BASE_URL;
 if (!base) throw new Error("Supply QA_BASE_URL explicitly.");
-const output = "tmp/qa/expression-translations";
-await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const student = { id: "translation-student", name: "Ana Martins", email: "ana@example.invalid", phone: "", timezone: "Europe/Lisbon", role: "student" };
 const teacher = { ...student, id: "teacher", name: "Inês", email: "ines@example.invalid", role: "teacher" };
@@ -95,7 +92,6 @@ try {
     await panel.getByLabel("How you say it", { exact: true }).fill("To laugh your head off");
     await expect(panel).toContainText("478 characters left");
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no sideways scroll on a phone");
-    await panel.screenshot({ path: `${output}/student-form-${width}.png` });
     await panel.getByRole("button", { name: "Send to Inês", exact: true }).click();
     await expect(panel.getByRole("status")).toHaveText("Thanks! Inês will check it before it appears.");
     assert.equal(translations.length, 1);
@@ -113,7 +109,6 @@ try {
     await page.getByRole("button", { name: "Show meaning", exact: true }).click();
     const preview = page.locator(".student-expressions .expression-translations");
     await expect(preview).toContainText("None yet.");
-    await review.screenshot({ path: `${output}/teacher-review-${width}.png` });
     await item.getByRole("button", { name: /^Approve/ }).click();
     await expect(review.getByRole("status").filter({ hasText: "Approved." })).toContainText("Approved.");
     await expect(review.locator(".teacher-translations__count")).toHaveCount(0);
@@ -127,7 +122,6 @@ try {
     await expect(panel.locator(".expression-translations__list")).toContainText("To laugh your head off");
     await expect(panel.locator(".expression-translations__list")).not.toContainText("Ana");
     await expect(panel.locator(".expression-translations__list .expression-card__value")).toHaveAttribute("lang", "en");
-    await panel.screenshot({ path: `${output}/student-approved-${width}.png` });
 
     // Filtering, adding, changing tabs or opening another card must not silently
     // throw away an expression she is still writing.
@@ -153,7 +147,6 @@ try {
     await page.getByRole("tab", { name: "Timetable", exact: true }).click();
     await page.getByRole("tab", { name: "Expressions", exact: true }).click();
     await expect(first.getByRole("textbox", { name: "Expression", exact: true })).toHaveValue(draftTitle);
-    await first.screenshot({ path: `${output}/teacher-draft-${width}.png` });
     await first.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(first).toContainText("Discard your changes?");
     await first.getByRole("button", { name: "Cancel", exact: true }).click();

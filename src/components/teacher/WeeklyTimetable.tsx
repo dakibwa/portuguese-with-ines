@@ -375,8 +375,9 @@ export function WeeklyTimetable({
     const cell = document
       .elementFromPoint(event.clientX, event.clientY)
       ?.closest<HTMLElement>("[data-slot-minute]");
-    if (cell && Number(cell.dataset.slotDay) === drag.day)
-      setDrag({ ...drag, to: Number(cell.dataset.slotMinute) });
+    const to = Number(cell?.dataset.slotMinute);
+    // A move within the same cell changes nothing, so the grid is not redrawn.
+    if (cell && Number(cell.dataset.slotDay) === drag.day && to !== drag.to) setDrag({ ...drag, to });
   }
 
   function finishDrag() {

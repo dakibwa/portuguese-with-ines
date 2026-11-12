@@ -13,7 +13,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import ines from "../../tutors/ines/tutor.json" with { type: "json" };
 
-function deepFreeze(value) {
+/** Freeze a record all the way down, so no request can change a tutor's settings for the next. */
+export function deepFreeze(value) {
   if (value && typeof value === "object") {
     for (const child of Object.values(value)) deepFreeze(child);
     Object.freeze(value);

@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
 import { chromium } from "playwright";
 
 // UI-only fixture: no accounts, bookings, provider sessions or charges created.
 const base = process.env.QA_BASE_URL;
 if (!base) throw new Error("Supply the site URL explicitly.");
 const browser = await chromium.launch({ headless: true });
-mkdirSync("tmp/qa", { recursive: true });
 for (const width of [390, 1440]) {
   const page = await browser.newPage({ viewport: { width, height: 1000 } });
   const errors = [];
@@ -31,7 +29,6 @@ for (const width of [390, 1440]) {
   assert.deepEqual(requests, [{ purpose: "same-day-fee" }]);
   assert.equal(await button.isEnabled(), true, "Provider failure must leave an accessible retry button");
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-  await page.screenshot({ path: `tmp/qa/payment-recovery-${width}.png`, fullPage: true });
   assert.deepEqual(errors, []);
   await page.close();
   // The emailed link is the key to its lesson: Change opens the times, never
@@ -69,7 +66,6 @@ for (const width of [390, 1440]) {
   await reconnect.waitFor();
   assert.equal(await alerts.getByRole("link", { name: "Open in Stripe for REVIEW-123" }).getAttribute("href"), "https://dashboard.stripe.com/payments", "a row with no payment id opens Stripe's payments list");
   assert.equal(await diary.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-  await diary.screenshot({ path: `tmp/qa/payment-review-diary-${width}.png`, fullPage: true });
   await reconnect.click();
   assert.equal(await diary.getByRole("tab", { name: "Profile", exact: true }).getAttribute("aria-selected"), "true", "Reconnect opens Google Meet in Profile");
   await diary.close();

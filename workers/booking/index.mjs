@@ -16,7 +16,7 @@ import {
   studentCancelled, studentMoved, welcome as welcomeTemplate, dormantInvite
 } from "./email-templates.mjs";
 import { NO_EMAIL_YET, isNoEmailYet, realEmail, withRealEmail } from "./no-email.mjs";
-import { isStudentLike, studentLikeSql } from "./student-like.mjs";
+import { isStudentLike, studentEmailableSql, studentLikeSql } from "./student-like.mjs";
 import {
   chargeSavedCard,
   checkoutSessionProblem,
@@ -62,6 +62,7 @@ import {
   readSignInToken,
   sessionVersion,
   sessionHash,
+  studentSessionSql,
   verifyPassword
 } from "./auth.mjs";
 import {
@@ -82,7 +83,7 @@ import { bookingReference, createManageToken, readManageToken, safeEqual } from 
 import { receiptLines, receiptMonth } from "./receipts.mjs";
 import { ExpressionProblem, expressionsRequest } from "./expressions.mjs";
 import { approvedTranslations, pendingTranslationCount, submitTranslation, translationsMissing, translationsReview } from "./expression-translations.mjs";
-import { HomeworkProblem, HOMEWORK_PHOTO_BODY_LIMIT, teacherHomework, studentHomework, homeworkReturns, homeworkTablesMissing, notifyHomeworkSubmissions, studentNotes, saveStudentPlan } from "./homework.mjs";
+import { HomeworkProblem, HOMEWORK_PHOTO_BODY_LIMIT, teacherHomework, studentHomework, homeworkReturns, notifyHomeworkSubmissions, studentNotes, saveStudentPlan } from "./homework.mjs";
 import { closedExpressions, expressionsOpenToStudents, pickExpression, studentExpressions } from "./student-expressions.mjs";
 import { findRecurringCode, studentRates, studentLessonType, lessonPriceSnapshot, lessonPriceSnapshotSql, studentTypePriceSql, priceForMove, teacherRate, withDerived, rateLimitAddress, takeRateLimit } from "./rates.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
@@ -641,7 +642,6 @@ export async function sendLessonReminders(env, now = new Date()) {
   const { results } = await env.DB.prepare(
     `SELECT b.* FROM bookings b
      WHERE b.status = 'confirmed' AND b.starts_at > ?1 AND b.starts_at <= ?2
-       AND b.student_email NOT LIKE 'no-email:%'
        AND julianday(b.created_at) <= julianday(b.starts_at) - ?4
        AND NOT EXISTS (
          SELECT 1 FROM email_log t
@@ -657,10 +657,7 @@ export async function sendLessonReminders(env, now = new Date()) {
          SELECT 1 FROM email_log e
          WHERE e.dedupe_key = 'student:reminder:' || b.id || ':' || b.sequence
            AND (e.status NOT IN ('failed', 'pending') OR e.created_at > ?3 OR e.send_claim_until > ?5))
-       AND NOT EXISTS (
-         SELECT 1 FROM students s
-         WHERE s.email = lower(trim(b.student_email)) AND s.role = 'student' AND s.awaiting_welcome = 1
-           AND COALESCE(s.password_hash, '') = '' AND COALESCE(s.google_sub, '') = '' AND s.last_login_at IS NULL)
+       AND ${studentEmailableSql("b")}
      ORDER BY b.starts_at LIMIT ${REMINDER_BATCH}`
   )
     .bind(earliest, latest, retryAfter, REMINDER_QUIET_HOURS / 24, now.toISOString())
@@ -939,11 +936,6 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
  * the same as requiring that much free time between it and any other lesson.
  * Students' lessons pass the setting; Inês's own bookings pass nothing.
  */
-function studentSessionSql() {
-  return `EXISTS (SELECT 1 FROM students WHERE id = ? AND session_version = ?)
-    AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`;
-}
-
 async function sameStudentSession(request, env, student) {
   const current = await currentStudent(request, env);
   return current?.id === student.id && (current.session_version ?? 0) === (student.session_version ?? 0);
@@ -1608,52 +1600,60 @@ async function sendDormantInvite(env, { student, settings, words, owner }) {
   });
 }
 
-/** Her students at a glance: who is in, who has a card, what comes next. */
-async function teacherStudentList(env) {
+/**
+ * Her students at a glance: who is in, who has a card, what comes next. With
+ * `studentId`, only that one, for a reply about them. The reads run together.
+ */
+async function teacherStudentList(env, studentId = null) {
   const now = new Date().toISOString();
-  const { results } = await env.DB.prepare(
-    `SELECT s.id, s.name, s.email, s.phone, COALESCE(s.nif, '') AS nif, s.created_at, COALESCE(s.mark, '') AS mark, s.awaiting_welcome,
-       ${dormantSql("s")} AS dormant, s.dormant_emailed_at,
-       (COALESCE(s.stripe_customer_id, '') != '' AND COALESCE(s.stripe_payment_method, '') != '') AS has_card,
-       s.card_consent_at,
-       (s.password_hash != '' OR s.google_sub IS NOT NULL OR s.last_login_at IS NOT NULL) AS signed_in,
-       (EXISTS (SELECT 1 FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed')
-         OR (s.email NOT LIKE 'no-email:%' AND EXISTS (SELECT 1 FROM bookings b WHERE b.student_id IS NULL AND b.student_email = s.email AND b.status = 'confirmed'))) AS has_lessons,
-       (SELECT MIN(b.starts_at) FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed' AND b.ends_at > ?) AS next_lesson_at,
-       (SELECT COUNT(*) FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed' AND b.ends_at > ?
-          AND b.added_by_teacher = 1 AND b.payment_status = 'not_required'
-          AND COALESCE(b.payment_consent_version, '') != '${PAID_BY_HAND_MARK}') AS unpaid_upcoming,
-       (SELECT COUNT(*) FROM booking_series bs WHERE bs.student_id = s.id AND bs.status = 'active') AS weekly,
-       -- What a payment link could still ask them for: the lessons she added
-       -- that have begun, not paid by card or ticked paid by hand (2 November
-       -- 2026, Dan: everyone pays what is still open). Some were paid in cash
-       -- and never ticked, so she reads it as still to settle, not a debt.
-       (SELECT COUNT(*) FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
-          WHERE b.student_id = s.id AND b.starts_at <= ? AND ${CARD_LESSON_TERMS}) AS unpaid_past,
-       (SELECT COALESCE(SUM(${lessonCentsSql("b")}), 0) FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
-          WHERE b.student_id = s.id AND b.starts_at <= ? AND ${CARD_LESSON_TERMS}) AS unpaid_past_cents,
-       -- Their newest way in still unspent: a welcome, invite or payment link.
-       (SELECT MAX(created_at) FROM sign_in_links sl WHERE sl.student_id = s.id AND sl.expires_at > ?) AS invited_at
-     FROM students s WHERE ${studentLikeSql("s")}
-       -- Accounts an old launch check registered are never students of hers.
-       AND s.email NOT LIKE 'launch-check-%@example.invalid'
-     ORDER BY s.name COLLATE NOCASE`
-  )
-    .bind(now, now, now, now, now)
-    .all();
-  /*
-   * A saved card that was declined used to be an email to her and is now a
-   * card in Needs you until it is paid (16 October 2026, Dan). A card just
-   * added was one too, for a week, until 12 November 2026 (Dan: "doesn't feel
-   * like it's needed as a notification unless Ines needs to act"): their row
-   * says Card saved, and `Already paid` still takes a lesson off it.
-   */
-  const { results: declinedRows } = await env.DB.prepare(
-    `SELECT id, student_id, reference, starts_at, attendance_status, payment_status, same_day_fee_status,
-       COALESCE(charged_cents, amount_cents) AS lesson_cents, same_day_fee_cents
-     FROM bookings WHERE student_id IS NOT NULL AND (payment_status = 'payment_due' OR same_day_fee_status = 'payment_due')
-     ORDER BY starts_at`
-  ).all();
+  const [{ results }, { results: declinedRows }, { results: rates }] = await Promise.all([
+    env.DB.prepare(
+      `SELECT s.id, s.name, s.email, s.phone, COALESCE(s.nif, '') AS nif, s.created_at, COALESCE(s.mark, '') AS mark, s.awaiting_welcome,
+         ${dormantSql("s")} AS dormant, s.dormant_emailed_at,
+         (COALESCE(s.stripe_customer_id, '') != '' AND COALESCE(s.stripe_payment_method, '') != '') AS has_card,
+         s.card_consent_at,
+         (s.password_hash != '' OR s.google_sub IS NOT NULL OR s.last_login_at IS NOT NULL) AS signed_in,
+         (EXISTS (SELECT 1 FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed')
+           OR (s.email NOT LIKE 'no-email:%' AND EXISTS (SELECT 1 FROM bookings b WHERE b.student_id IS NULL AND b.student_email = s.email AND b.status = 'confirmed'))) AS has_lessons,
+         (SELECT MIN(b.starts_at) FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed' AND b.ends_at > ?) AS next_lesson_at,
+         (SELECT COUNT(*) FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed' AND b.ends_at > ?
+            AND b.added_by_teacher = 1 AND b.payment_status = 'not_required'
+            AND COALESCE(b.payment_consent_version, '') != '${PAID_BY_HAND_MARK}') AS unpaid_upcoming,
+         (SELECT COUNT(*) FROM booking_series bs WHERE bs.student_id = s.id AND bs.status = 'active') AS weekly,
+         -- What a payment link could still ask them for: the lessons she added
+         -- that have begun, not paid by card or ticked paid by hand (2 November
+         -- 2026, Dan: everyone pays what is still open). Some were paid in cash
+         -- and never ticked, so she reads it as still to settle, not a debt.
+         (SELECT COUNT(*) FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
+            WHERE b.student_id = s.id AND b.starts_at <= ? AND ${CARD_LESSON_TERMS}) AS unpaid_past,
+         (SELECT COALESCE(SUM(${lessonCentsSql("b")}), 0) FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
+            WHERE b.student_id = s.id AND b.starts_at <= ? AND ${CARD_LESSON_TERMS}) AS unpaid_past_cents,
+         -- Their newest way in still unspent: a welcome, invite or payment link.
+         (SELECT MAX(created_at) FROM sign_in_links sl WHERE sl.student_id = s.id AND sl.expires_at > ?) AS invited_at
+       FROM students s WHERE ${studentLikeSql("s")}
+         -- Accounts an old launch check registered are never students of hers.
+         AND s.email NOT LIKE 'launch-check-%@example.invalid' AND (? IS NULL OR s.id = ?)
+       ORDER BY s.name COLLATE NOCASE`
+    )
+      .bind(now, now, now, now, now, studentId, studentId)
+      .all(),
+    /*
+     * A saved card that was declined used to be an email to her and is now a
+     * card in Needs you until it is paid (16 October 2026, Dan). A card just
+     * added was one too, for a week, until 12 November 2026 (Dan: "doesn’t feel
+     * like it’s needed as a notification unless Ines needs to act"): their row
+     * says Card saved, and `Already paid` still takes a lesson off it.
+     */
+    env.DB.prepare(
+      `SELECT id, student_id, reference, starts_at, attendance_status, payment_status, same_day_fee_status,
+         COALESCE(charged_cents, amount_cents) AS lesson_cents, same_day_fee_cents
+       FROM bookings WHERE student_id IS NOT NULL AND (payment_status = 'payment_due' OR same_day_fee_status = 'payment_due')
+         AND (? IS NULL OR student_id = ?)
+       ORDER BY starts_at`
+    ).bind(studentId, studentId).all(),
+    env.DB.prepare("SELECT student_id, duration_minutes, amount_cents FROM student_recurring_rates WHERE ? IS NULL OR student_id = ?")
+      .bind(studentId, studentId).all()
+  ]);
   const declined = {};
   for (const row of declinedRows ?? []) {
     const list = (declined[row.student_id] ??= []);
@@ -1665,7 +1665,6 @@ async function teacherStudentList(env) {
       list.push({ bookingId: row.id, reference: row.reference, startsAt: row.starts_at, amountCents: row.same_day_fee_cents ?? null, part: "fee" });
     }
   }
-  const { results: rates } = await env.DB.prepare("SELECT student_id, duration_minutes, amount_cents FROM student_recurring_rates").all();
   const own = {};
   for (const rate of rates ?? []) (own[rate.student_id] ??= {})[rate.duration_minutes] = rate.amount_cents;
   return (results ?? []).map((row) => ({
@@ -1944,6 +1943,28 @@ async function handleRemoveStudentCard(request, env) {
 }
 
 /**
+ * The card a completed setup session saved, as Stripe's own record of it
+ * says: `{ customer, paymentMethod }`, or `{ refusal }` to answer the webhook
+ * with, a 502 for Stripe to retry when the record cannot be read, a 409 when
+ * the setup is not complete. `label` and `context` go into the log.
+ */
+async function savedSetupCard(env, session, label, ...context) {
+  let intent;
+  try {
+    intent = await retrieveSetupIntent(env, session.setup_intent);
+  } catch (error) {
+    console.error(label, ...context, String(error?.message ?? error));
+    return { refusal: new Response("Card setup could not be verified.", { status: 502 }) };
+  }
+  const paymentMethod = typeof intent?.payment_method === "string" ? intent.payment_method : intent?.payment_method?.id;
+  const customer = typeof intent?.customer === "string" ? intent.customer : intent?.customer?.id;
+  if (intent?.status !== "succeeded" || !paymentMethod || customer !== session.customer) {
+    return { refusal: new Response("Card setup is not complete.", { status: 409 }) };
+  }
+  return { customer, paymentMethod };
+}
+
+/**
  * Stripe has saved the card. From now on the lessons Inês added that are
  * still to come pay for themselves after they end, on the same terms as a
  * lesson the student books. Past lessons stay unchanged unless the student
@@ -1969,19 +1990,8 @@ async function confirmStudentCard(env, session) {
     return new Response("ok", { status: 200 });
   }
 
-  let intent;
-  try {
-    intent = await retrieveSetupIntent(env, session.setup_intent);
-  } catch (error) {
-    console.error("retrieve-student-card", String(error?.message ?? error));
-    return new Response("Card setup could not be verified.", { status: 502 });
-  }
-  const paymentMethod =
-    typeof intent?.payment_method === "string" ? intent.payment_method : intent?.payment_method?.id;
-  const customer = typeof intent?.customer === "string" ? intent.customer : intent?.customer?.id;
-  if (intent?.status !== "succeeded" || !paymentMethod || customer !== session.customer) {
-    return new Response("Card setup is not complete.", { status: 409 });
-  }
+  const { refusal, customer, paymentMethod } = await savedSetupCard(env, session, "retrieve-student-card");
+  if (refusal) return refusal;
 
   const now = new Date().toISOString();
   /*
@@ -2335,6 +2345,7 @@ function sweep(event, env, ctx) {
   ctx.waitUntil(sendLessonReminders(env));
   // Homework whose marking was interrupted, or whose notice failed to send.
   ctx.waitUntil(homeworkNotices(env));
+  ctx.waitUntil(releaseExpiredHolds(env).catch((error) => console.error("release-holds", String(error?.message ?? error))));
 
   // The account has a finite trigger allowance. One per-minute trigger owns
   // prompt money work, and only its 03:10 UTC tick runs the larger nightly
@@ -2774,10 +2785,7 @@ export async function retryPaymentRecovery(env) {
     const { results } = await env.DB.prepare(`WITH outstanding AS (
         SELECT b.*, CASE WHEN attendance_status = 'no_show' THEN 'no-show' ELSE 'lesson' END AS purpose,
           COALESCE(charged_cents, amount_cents) AS captured_amount,
-          (b.student_email NOT LIKE 'no-email:%'
-            AND NOT EXISTS (SELECT 1 FROM students s WHERE s.email = lower(trim(b.student_email))
-              AND s.role = 'student' AND s.awaiting_welcome = 1 AND COALESCE(s.password_hash, '') = ''
-              AND COALESCE(s.google_sub, '') = '' AND s.last_login_at IS NULL)) AS can_notify
+          ${studentEmailableSql("b")} AS can_notify
         FROM bookings b), repair AS (
         SELECT *, (payment_status = 'payment_due' AND (stripe_session_id IS NULL
             OR (can_notify AND captured_amount > 0
@@ -2825,10 +2833,7 @@ export async function retryPaymentRecovery(env) {
     WHERE (captured_request IS NULL OR CASE WHEN json_valid(captured_request)
         THEN json_extract(captured_request, '$.amountCents') = captured_amount
           AND json_extract(captured_request, '$.purpose') = purpose ELSE 0 END)
-      AND ((b.student_email NOT LIKE 'no-email:%'
-          AND NOT EXISTS (SELECT 1 FROM students s WHERE s.email = lower(trim(b.student_email))
-            AND s.role = 'student' AND s.awaiting_welcome = 1 AND COALESCE(s.password_hash, '') = ''
-            AND COALESCE(s.google_sub, '') = '' AND s.last_login_at IS NULL)
+      AND ((${studentEmailableSql("b")}
           AND NOT EXISTS (SELECT 1 FROM email_log WHERE dedupe_key = b.student_key))
         OR (? != '' AND NOT EXISTS (SELECT 1 FROM email_log WHERE dedupe_key = b.teacher_key)))
     ORDER BY updated_at LIMIT 25`).bind(teacherEmail).all();
@@ -2878,10 +2883,7 @@ export async function retryPaymentRecovery(env) {
               AND ((e.kind = 'student_same_day_fee_paid' AND e.dedupe_key = 'same-day-paid:' || b.id)
                 OR (e.kind = 'teacher_same_day_fee_paid' AND e.dedupe_key = 'same-day-paid-teacher:' || b.id)))))
       )
-      AND ((e.kind LIKE 'student_%' AND e.recipient = b.student_email AND b.student_email NOT LIKE 'no-email:%'
-          AND NOT EXISTS (SELECT 1 FROM students s WHERE s.email = lower(trim(b.student_email))
-            AND s.role = 'student' AND s.awaiting_welcome = 1 AND COALESCE(s.password_hash, '') = ''
-            AND COALESCE(s.google_sub, '') = '' AND s.last_login_at IS NULL))
+      AND ((e.kind LIKE 'student_%' AND e.recipient = b.student_email AND ${studentEmailableSql("b")})
         OR (e.kind LIKE 'teacher_%' AND e.recipient = ?))
     ORDER BY e.created_at LIMIT 25`)
     .bind(failedBefore, cutoff, cutoff, now, env.TEACHER_EMAIL || settings.teacherEmail || "").all();
@@ -2904,12 +2906,7 @@ export async function resendFailedEmails(env) {
        AND e.kind IN (${LIFECYCLE_EMAIL_KINDS.map(kind => `'${kind}'`).join(", ")})
        AND ${emailLifecycleMatchesSql("e")}
        AND (
-         (e.kind LIKE 'student_%'
-           AND b.student_email NOT LIKE 'no-email:%'
-           AND e.recipient = b.student_email
-           AND NOT EXISTS (SELECT 1 FROM students s WHERE s.email = lower(trim(b.student_email))
-             AND s.role = 'student' AND s.awaiting_welcome = 1 AND COALESCE(s.password_hash, '') = ''
-             AND COALESCE(s.google_sub, '') = '' AND s.last_login_at IS NULL))
+         (e.kind LIKE 'student_%' AND e.recipient = b.student_email AND ${studentEmailableSql("b")})
          OR (e.kind LIKE 'teacher_%' AND ? = 1 AND e.recipient = ?)
        )
      ORDER BY e.created_at LIMIT 25`
@@ -2941,13 +2938,8 @@ async function topUpOpenSeries(env) {
 
   for (const series of results ?? []) {
     try {
-      const counted = await env.DB.prepare(
-        "SELECT COUNT(*) AS count FROM bookings WHERE series_id = ? AND status = 'confirmed'"
-      )
-        .bind(series.id)
-        .first();
-
-      const outstanding = outstandingFor(series, { bookedCount: counted?.count ?? 0, now });
+      // An open run is pulled forward to the horizon, whatever it holds already.
+      const outstanding = outstandingFor(series, { now });
       if (!outstanding || outstanding.count <= 0) continue;
 
       const student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(series.student_id).first();
@@ -3004,13 +2996,14 @@ async function handleHealth(request, env) {
 
   let lessonTypes = 0;
   let teacherEmail = "";
+  let settings = null;
   try {
     const row = await env.DB.prepare("SELECT COUNT(*) AS count FROM lesson_types WHERE active = 1").first();
     lessonTypes = row?.count ?? 0;
     // Sign-up writes nif (migration 0017) and every Google sign-in and password
     // reset writes email_verified_at (0020), so the absence of either is an outage.
     await env.DB.prepare("SELECT nif, email_verified_at FROM students LIMIT 0").first();
-    const settings = await loadSettings(env);
+    settings = await loadSettings(env);
     teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
   } catch {
     missing.push("schema");
@@ -3018,11 +3011,14 @@ async function handleHealth(request, env) {
 
   if (!teacherEmail) missing.push("TEACHER_EMAIL");
 
-  let paymentMode = "off";
-  try {
-    paymentMode = (await loadSettings(env)).paymentMode;
-  } catch {
-    // Already reported through `missing` above.
+  let paymentMode = settings?.paymentMode ?? "off";
+  // A schema check that failed first still leaves the settings to read.
+  if (!settings) {
+    try {
+      paymentMode = (await loadSettings(env)).paymentMode;
+    } catch {
+      // Already reported through `missing` above.
+    }
   }
 
   // Dormant payments are allowed to carry sandbox credentials while the live
@@ -3057,11 +3053,6 @@ async function handleHealth(request, env) {
   );
 }
 
-/** Fire-and-forget: housekeeping must never delay or fail an availability read. */
-function ctx_releaseHolds(env) {
-  releaseExpiredHolds(env).catch((error) => console.error("release-holds", String(error?.message ?? error)));
-}
-
 async function handleAvailability(request, env, url, teacher = false) {
   const lessonTypeId = url.searchParams.get("lessonType") ?? "single";
   const lessonType = await loadLessonType(env, lessonTypeId);
@@ -3094,7 +3085,6 @@ async function handleAvailability(request, env, url, teacher = false) {
     ignoreSeriesId = owned?.id ?? null;
   }
 
-  ctx_releaseHolds(env);
   const { slotsByDate, settings } = await computeAvailability(env, {
     fromKey, toKey, lessonType, now, ignoreBookingId, ignoreSeriesId, ignoreHoldsOf: student?.id ?? null, teacher,
     location: normaliseLocation(url.searchParams.get("location"))
@@ -3108,7 +3098,7 @@ async function handleAvailability(request, env, url, teacher = false) {
 
   return json(
     {
-      slotsByDate: slotsByDate ?? {},
+      slotsByDate,
       currentSlotOnlineOnly,
       timeZone: homeZone(),
       minimumNoticeHours: teacher ? 0 : settings.minimumNoticeHours,
@@ -3727,11 +3717,10 @@ async function insertOccurrence(env, { series, key, student, lessonType, timezon
   // Commit the occurrence and bookmark together. Stale jobs may neither add
   // an old appointment nor overwrite the bookmark of a moved/extended recipe.
   const [claimed, advanced] = await env.DB.batch([claim, prepareSeriesBookmark(env, series, key, now, sessionIdentity, priceSnapshot, authorization, availabilityRevision)]);
-  if (!(advanced?.meta?.changes > 0)) return { current: false, row: null };
+  if (!(advanced?.meta?.changes > 0)) return { current: false, id: null };
   // A competing lesson only skips this week; the current recipe still advances.
-  if (!(claimed?.meta?.changes > 0)) return { current: true, row: null };
-
-  return { current: true, row: await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first() };
+  if (!(claimed?.meta?.changes > 0)) return { current: true, id: null };
+  return { current: true, id };
 }
 
 /**
@@ -3788,7 +3777,7 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
     teacher: hers
   });
 
-  const rows = [];
+  const ids = [];
   const consideredSkipped = [];
   const pending = [...bookable.map(occurrence => ({ ...occurrence, available: true })),
     ...skipped.map(occurrence => ({ ...occurrence, available: false }))].sort((a, b) => a.key.localeCompare(b.key));
@@ -3801,7 +3790,7 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
       currentSeries = { ...currentSeries, filled_to: occurrence.key };
       continue;
     }
-    const { current, row } = await insertOccurrence(env, {
+    const { current, id } = await insertOccurrence(env, {
       series: currentSeries,
       key: occurrence.key,
       student,
@@ -3824,11 +3813,16 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
     });
 
     if (!current) break;
-    if (row) rows.push(row);
+    if (id) ids.push(id);
     else consideredSkipped.push({ key: occurrence.key, startAt: occurrence.startAt.toISOString(), reason: "Taken while booking." });
     currentSeries = { ...currentSeries, filled_to: occurrence.key };
   }
 
+  // The weeks it booked, read once.
+  const rows = ids.length
+    ? (await env.DB.prepare("SELECT * FROM bookings WHERE id IN (SELECT value FROM json_each(?)) ORDER BY starts_at")
+        .bind(JSON.stringify(ids)).all()).results ?? []
+    : [];
   return { rows, skipped: consideredSkipped };
 }
 
@@ -3888,9 +3882,6 @@ async function handleSeriesPreview(request, env) {
  * to come to the ones in their calendar, and silently cancelling those would be
  * the worse mistake of the two.
  */
-const SERIES_STOP_SESSION_SQL = `EXISTS (SELECT 1 FROM students WHERE id = ? AND session_version = ?)
-  AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`;
-
 async function handleStopSeries(request, env, ctx, seriesId) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in.", 401, request, env);
@@ -3909,16 +3900,11 @@ async function handleStopSeries(request, env, ctx, seriesId) {
   let kept = 0;
   let refunded = 0;
   let pendingRefunds = 0;
-  let cancellationPlan = [];
-  // Too close to cancel, so still on: the email names them.
-  let keptRows = [];
-  let cancellationNoticeHours = 0;
-  let cancellationAvailabilityRevision = null;
 
   // End extension before reading the cancellation set. An occurrence committed
   // first is included below; a stale nightly fill cannot add one afterwards.
   const stopped = await env.DB.prepare(`UPDATE booking_series SET status = 'ended', ended_at = ?, updated_at = ?
-    WHERE id = ? AND student_id = ? AND ${SERIES_STOP_SESSION_SQL}`)
+    WHERE id = ? AND student_id = ? AND ${studentSessionSql()}`)
     .bind(now.toISOString(), now.toISOString(), seriesId, student.id, ...identity)
     .run();
   if (!(stopped?.meta?.changes > 0)) return fail("Please sign in again.", 401, request, env);
@@ -3933,25 +3919,18 @@ async function handleStopSeries(request, env, ctx, seriesId) {
     // A bulk action must not become a shortcut around the 14-hour rule. Keep
     // any occurrence inside the fee window; the student can still cancel it
     // individually and pay the fee.
-    const cancellationSettings = await loadSettings(env);
-    cancellationNoticeHours = cancellationSettings.minimumNoticeHours;
-    cancellationAvailabilityRevision = cancellationSettings.availabilityRevision;
-    const plan = planSeriesCancellation(results ?? [], new Date(), cancellationNoticeHours);
+    const settings = await loadSettings(env);
+    const plan = planSeriesCancellation(results ?? [], new Date(), settings.minimumNoticeHours);
     kept = plan.kept.length;
-    keptRows = plan.kept;
-    cancellationPlan = plan.cancellable;
-
-  }
-
-  if (cancelRemaining) {
+    // Too close to cancel, so still on: the email names them.
+    const keptRows = plan.kept;
     const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?")
       .bind(series.lesson_type_id)
       .first();
-    const settings = await loadSettings(env);
 
     const cancelledRows = [];
     let accountChanged = false;
-    for (const { row, refund } of cancellationPlan) {
+    for (const { row, refund } of plan.cancellable) {
       const current = await currentStudent(request, env);
       if (!current || current.id !== student.id || (current.session_version ?? 0) !== (student.session_version ?? 0)) {
         accountChanged = true;
@@ -3960,31 +3939,29 @@ async function handleStopSeries(request, env, ctx, seriesId) {
       // Earlier refunds may take time. Each remaining occurrence must still
       // be outside the free-change window when its own cancellation starts.
       const cancellationNow = new Date();
-      if (Date.parse(row.starts_at) <= cancellationNow.getTime() || changePolicy(row, cancellationNow, cancellationNoticeHours).late) {
+      if (Date.parse(row.starts_at) <= cancellationNow.getTime() || changePolicy(row, cancellationNow, settings.minimumNoticeHours).late) {
         kept++;
         keptRows.push(row);
         continue;
       }
       if (refund) {
-        if (!await claimRefund(env, row, "student", null, identity, null, cancellationAvailabilityRevision)) { kept++; continue; }
+        if (!await claimRefund(env, row, "student", null, identity, null, settings.availabilityRevision)) { kept++; continue; }
         const updated = await completeRefund(env, row.id);
         if (!updated || updated.refused) { kept++; if (!updated) pendingRefunds++; continue; }
         cancelledRows.push(updated); cancelled++; refunded++;
         continue;
       }
-      const wasRefunded = refund ? 1 : 0;
       const result = await env.DB.prepare(
         `UPDATE bookings SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'student',
-           sequence = sequence + 1, updated_at = ?,
-           payment_status = CASE WHEN ? = 1 THEN 'refunded' ELSE payment_status END
+           sequence = sequence + 1, updated_at = ?
          WHERE id = ? AND status = 'confirmed' AND sequence = ? AND payment_status != 'processing'
            AND payment_status = ? AND amount_cents IS ? AND payment_consent_at IS ?
            AND payment_consent_version IS ? AND charge_started_at IS ?
-           AND ${SERIES_STOP_SESSION_SQL} AND ${availabilityRevisionSql()}`
+           AND ${studentSessionSql()} AND ${availabilityRevisionSql()}`
       )
-        .bind(cancellationNow.toISOString(), cancellationNow.toISOString(), wasRefunded, row.id, row.sequence,
+        .bind(cancellationNow.toISOString(), cancellationNow.toISOString(), row.id, row.sequence,
           row.payment_status, row.amount_cents ?? null, row.payment_consent_at ?? null,
-          row.payment_consent_version ?? null, row.charge_started_at ?? null, ...identity, cancellationAvailabilityRevision)
+          row.payment_consent_version ?? null, row.charge_started_at ?? null, ...identity, settings.availabilityRevision)
         .run();
       if (!(result?.meta?.changes > 0)) { kept++; continue; }
       cancelledRows.push(await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first());
@@ -4040,7 +4017,8 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     .all();
   // Moving a whole run must not become a route around the 14-hour rule: a
   // lesson inside the window stays where it is, and the rest of the run moves.
-  const { minimumNoticeHours, lessonBufferMinutes, availabilityRevision } = await loadSettings(env);
+  const settings = await loadSettings(env);
+  const { minimumNoticeHours, lessonBufferMinutes, availabilityRevision } = settings;
   const gapMs = lessonBufferMinutes * 60000;
   const kept = (results ?? []).filter((row) => changePolicy(row, now, minimumNoticeHours).late);
   const rows = (results ?? []).filter((row) => !kept.includes(row));
@@ -4328,7 +4306,6 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     .all();
   const updatedRows = updatedResults ?? [];
   const updatedSeries = await env.DB.prepare("SELECT * FROM booking_series WHERE id = ?").bind(seriesId).first();
-  const settings = await loadSettings(env);
   const manageUrls = {};
   for (const row of updatedRows) {
     const token = await createManageToken(row.id, env.BOOKING_TOKEN_SECRET);
@@ -4367,14 +4344,19 @@ async function handleGetBooking(request, env, token) {
   const row = await getBookingByToken(env, token);
   if (!row) return fail("That booking link is not valid.", 404, request, env);
 
-  const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
-  const settings = await loadSettings(env);
+  const [lessonType, settings, durationPrices] = await Promise.all([
+    env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first(),
+    loadSettings(env),
+    row.student_id ? studentRates(env, row.student_id) : {}
+  ]);
 
   const policy = changePolicy(row, new Date(), settings.minimumNoticeHours);
-  // Only a cancelled lesson is ever offered Book again; the write decides for real.
-  const offer = row.status === "cancelled" ? await rebookOffer(env, row, settings) : { canRebook: false };
-  // Only a lesson Inês added and is paid to her directly is offered a card here.
-  const card = await lessonCardOffer(env, row, settings);
+  const [offer, card] = await Promise.all([
+    // Only a cancelled lesson is ever offered Book again; the write decides for real.
+    row.status === "cancelled" ? rebookOffer(env, row, settings) : { canRebook: false },
+    // Only a lesson Inês added and is paid to her directly is offered a card here.
+    lessonCardOffer(env, row, settings)
+  ]);
 
   return json(
     {
@@ -4389,7 +4371,7 @@ async function handleGetBooking(request, env, token) {
       changeLocked: policy.locked,
       refundOnCancel: policy.refundOnCancel,
       recurring: Boolean(row.series_id),
-      durationPrices: row.student_id ? await studentRates(env, row.student_id) : {},
+      durationPrices,
       paymentsDue: {
         lesson: row.payment_status === "payment_due" ? row.charged_cents ?? row.amount_cents : null,
         sameDayFee: row.same_day_fee_status === "payment_due" ? row.same_day_fee_cents : null
@@ -4607,7 +4589,7 @@ async function claimRefund(env, row, requestedBy, cancellationMessage = null, id
   const results = await env.DB.batch([
     env.DB.prepare(`INSERT OR IGNORE INTO booking_refunds (booking_id, request, requested_by, created_at)
       SELECT id, ?, ?, ? FROM bookings WHERE id = ? AND status = 'confirmed' AND payment_status = 'paid' AND sequence = ?
-        ${identity ? `AND ${SERIES_STOP_SESSION_SQL}` : ""}
+        ${identity ? `AND ${studentSessionSql()}` : ""}
         ${authorization ? `AND (${authorization.sql})` : ""}
         ${availabilityRevision !== null ? `AND ${availabilityRevisionSql()}` : ""}`)
       .bind(request, requestedBy, now, row.id, row.sequence, ...(identity ?? []), ...(authorization?.values ?? []),
@@ -4615,7 +4597,7 @@ async function claimRefund(env, row, requestedBy, cancellationMessage = null, id
     env.DB.prepare(`UPDATE bookings SET payment_status = 'processing', updated_at = ?, cancellation_message = ?
       WHERE id = ? AND status = 'confirmed' AND payment_status = 'paid' AND sequence = ?
         AND EXISTS (SELECT 1 FROM booking_refunds WHERE booking_id = bookings.id AND status = 'pending')
-        ${identity ? `AND ${SERIES_STOP_SESSION_SQL}` : ""}
+        ${identity ? `AND ${studentSessionSql()}` : ""}
         ${authorization ? `AND (${authorization.sql})` : ""}
         ${availabilityRevision !== null ? `AND ${availabilityRevisionSql()}` : ""}`)
       .bind(now, cancellationMessage, row.id, row.sequence, ...(identity ?? []), ...(authorization?.values ?? []),
@@ -4660,7 +4642,7 @@ async function completeRefund(env, bookingId, now = new Date()) {
   try {
     const refund = operation.stripe_refund_id ? await retrieveRefund(env, operation.stripe_refund_id) : await refundPayment(env, JSON.parse(operation.request));
     if (!refund.id) return null;
-    if (refund.id) await env.DB.prepare("UPDATE booking_refunds SET stripe_refund_id = ? WHERE booking_id = ?").bind(refund.id, bookingId).run();
+    await env.DB.prepare("UPDATE booking_refunds SET stripe_refund_id = ? WHERE booking_id = ?").bind(refund.id, bookingId).run();
     if (refund.status !== "succeeded") return null;
     return await settle();
   } catch (error) {
@@ -4731,7 +4713,6 @@ async function handleCancel(request, env, ctx, token) {
     );
   }
 
-  const refunded = 0;
   if (policy.refundOnCancel) {
     if (body.expectedLateFeeCents !== undefined && body.expectedLateFeeCents !== 0) {
       return fail("The change fee has changed. Please review it before confirming.", 409, request, env);
@@ -4757,7 +4738,6 @@ async function handleCancel(request, env, ctx, token) {
   const cancelled = await env.DB.prepare(
     `UPDATE bookings SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'student',
        sequence = sequence + 1, same_day_change = ?, updated_at = ?,
-       payment_status = CASE WHEN ? = 1 THEN 'refunded' ELSE payment_status END,
        same_day_fee_status = CASE
          WHEN ? = 1 AND payment_status = 'scheduled' AND same_day_fee_status = 'not_required' THEN 'scheduled'
          ELSE same_day_fee_status END,
@@ -4773,7 +4753,6 @@ async function handleCancel(request, env, ctx, token) {
       now.toISOString(),
       sameDay,
       now.toISOString(),
-      refunded,
       sameDay,
       sameDay,
       settings.sameDayChangeFeeCents,
@@ -5120,18 +5099,8 @@ async function confirmLessonCard(env, session) {
   if (row.student_id !== agreed.studentId) return new Response("Session does not match lesson.", { status: 400 });
   if (agreed.seriesId && row.series_id !== agreed.seriesId) return new Response("Session does not match lesson.", { status: 400 });
 
-  let intent;
-  try {
-    intent = await retrieveSetupIntent(env, session.setup_intent);
-  } catch (error) {
-    console.error("retrieve-lesson-card", row.reference, String(error?.message ?? error));
-    return new Response("Card setup could not be verified.", { status: 502 });
-  }
-  const paymentMethod = typeof intent?.payment_method === "string" ? intent.payment_method : intent?.payment_method?.id;
-  const customer = typeof intent?.customer === "string" ? intent.customer : intent?.customer?.id;
-  if (intent?.status !== "succeeded" || !paymentMethod || customer !== session.customer) {
-    return new Response("Card setup is not complete.", { status: 409 });
-  }
+  const { refusal, customer, paymentMethod } = await savedSetupCard(env, session, "retrieve-lesson-card", row.reference);
+  if (refusal) return refusal;
 
   // Cards switched off since the page was opened: nothing goes on one.
   if (!cardsTaken(env, await loadSettings(env))) {
@@ -5360,20 +5329,8 @@ async function confirmCardSetup(env, ctx, session, row) {
   if (row.status !== "pending_payment" || !row.hold_expires_at || new Date(row.hold_expires_at) <= new Date()) {
     return new Response("That booking hold has expired. Please choose a new time.", { status: 409 });
   }
-  let intent;
-  try {
-    intent = await retrieveSetupIntent(env, session.setup_intent);
-  } catch (error) {
-    console.error("retrieve-setup-intent", row.reference, String(error?.message ?? error));
-    return new Response("Card setup could not be verified.", { status: 502 });
-  }
-
-  const paymentMethod =
-    typeof intent?.payment_method === "string" ? intent.payment_method : intent?.payment_method?.id;
-  const customer = typeof intent?.customer === "string" ? intent.customer : intent?.customer?.id;
-  if (intent?.status !== "succeeded" || !paymentMethod || customer !== session.customer) {
-    return new Response("Card setup is not complete.", { status: 409 });
-  }
+  const { refusal, customer, paymentMethod } = await savedSetupCard(env, session, "retrieve-setup-intent", row.reference);
+  if (refusal) return refusal;
 
   await env.DB.prepare(
     "UPDATE students SET stripe_customer_id = ?, stripe_payment_method = ? WHERE id = ?"
@@ -5465,17 +5422,8 @@ async function confirmSelectionCardSetup(env, ctx, session, anchor) {
   if (rows.some((row) => row.status !== "pending_payment" || row.payment_status !== "pending" || !row.hold_expires_at || row.hold_expires_at <= now)) {
     return new Response("That booking hold has expired. Please choose your times again.", { status: 409 });
   }
-  let intent;
-  try { intent = await retrieveSetupIntent(env, session.setup_intent); }
-  catch (error) {
-    console.error("retrieve-selection-setup", anchor.reference, String(error?.message ?? error));
-    return new Response("Card setup could not be verified.", { status: 502 });
-  }
-  const paymentMethod = typeof intent?.payment_method === "string" ? intent.payment_method : intent?.payment_method?.id;
-  const customer = typeof intent?.customer === "string" ? intent.customer : intent?.customer?.id;
-  if (intent?.status !== "succeeded" || !paymentMethod || customer !== session.customer) {
-    return new Response("Card setup is not complete.", { status: 409 });
-  }
+  const { refusal, customer, paymentMethod } = await savedSetupCard(env, session, "retrieve-selection-setup", anchor.reference);
+  if (refusal) return refusal;
   const confirmedAt = new Date().toISOString();
   const [claimed] = await env.DB.batch([
     env.DB.prepare(
@@ -5511,17 +5459,16 @@ async function confirmSelectionCardSetup(env, ctx, session, anchor) {
   return new Response("ok", { status: 200 });
 }
 
-/**
- * Releases slots whose checkout was abandoned.
- *
- * Called opportunistically rather than on a schedule: availability already
- * ignores an expired hold, so this is only housekeeping to stop the table
- * filling with dead rows.
- */
 /** How long a recipe with no lessons yet is left for the request still writing it. */
 const EMPTY_SERIES_GRACE_MINUTES = 10;
 
-async function releaseExpiredHolds(env) {
+/**
+ * Releases slots whose checkout was abandoned, in the minute sweep.
+ * Availability already ignores an expired hold, so this is only housekeeping
+ * to stop the table filling with dead rows; it once ran, unawaited, on every
+ * look at the calendar.
+ */
+export async function releaseExpiredHolds(env) {
   await env.DB.prepare(
     "DELETE FROM bookings WHERE status = 'pending_payment' AND hold_expires_at IS NOT NULL AND hold_expires_at < ?"
   )
@@ -5531,7 +5478,7 @@ async function releaseExpiredHolds(env) {
   // A saved-card run whose setup was abandoned leaves a series row with no
   // bookings once the holds above are swept; without this it lingers forever.
   // A recipe is written a moment before its first lesson is tied to it, and
-  // this runs on anyone's look at the calendar, so one only just made is left
+  // this can run at any moment, so one only just made is left
   // alone: taking it then failed that booking part way, with its first lesson
   // booked and no run. Holds outlast the wait, so an abandoned setup's recipe
   // still goes in the sweep that takes its holds.
@@ -5914,10 +5861,7 @@ async function handleReset(request, env) {
       before.session_version ?? 0,
       parsed.nonce
     ),
-    ...forgetPendingAccess(env, parsed.studentId, { email: before.email, sessionVersion: confirmedVersion }),
-    env.DB.prepare("DELETE FROM login_attempts WHERE email = (SELECT email FROM students WHERE id = ?)").bind(
-      parsed.studentId
-    )
+    ...forgetPendingAccess(env, parsed.studentId, { email: before.email, sessionVersion: confirmedVersion })
   ]);
 
   if (!(reset[0]?.meta?.changes > 0)) return fail("That reset link has already been used.", 400, request, env);
@@ -6073,15 +6017,11 @@ async function handleMe(request, env) {
       .all(),
     // Only what the page needs to say "this repeats, and here is how to stop it".
     env.DB.prepare(
-      `SELECT s.*, COUNT(b.id) AS upcoming
-       FROM booking_series s
-       LEFT JOIN bookings b
-         ON b.series_id = s.id AND b.status = 'confirmed' AND b.starts_at > ?
+      `SELECT s.id, s.weekday, s.minute_of_day FROM booking_series s
        WHERE s.student_id = ? AND s.status = 'active'
-         AND EXISTS (SELECT 1 FROM students owner WHERE owner.id = s.student_id AND owner.session_version = ?)
-       GROUP BY s.id`
+         AND EXISTS (SELECT 1 FROM students owner WHERE owner.id = s.student_id AND owner.session_version = ?)`
     )
-      .bind(now.toISOString(), student.id, student.session_version ?? 0)
+      .bind(student.id, student.session_version ?? 0)
       .all(),
     // Lessons Inês added that they have had and a card can still pay for
     // (11 November 2026, Dan: "pay for any outstanding lessons"), oldest
@@ -6141,14 +6081,7 @@ async function handleMe(request, env) {
     }))
   );
 
-  const series = (seriesRows ?? []).map((row) => ({
-    id: row.id,
-    weekday: row.weekday,
-    minuteOfDay: row.minute_of_day,
-    occurrences: row.occurrences ?? null,
-    openEnded: row.occurrences === null,
-    upcoming: row.upcoming ?? 0
-  }));
+  const series = (seriesRows ?? []).map((row) => ({ id: row.id, weekday: row.weekday, minuteOfDay: row.minute_of_day }));
 
   const current = await currentStudent(request, env);
   if (!current || current.id !== student.id || current.session_version !== student.session_version) return fail("Please sign in again.", 401, request, env);
@@ -6269,8 +6202,7 @@ async function handleConfirmEmailChange(request, env) {
 
   const nonce = parsed.nonce;
   const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-  const currentAccount = `EXISTS (SELECT 1 FROM students WHERE id = ? AND session_version = ?)
-    AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`;
+  const currentAccount = studentSessionSql();
   const tokenHash = await sessionHash(bearer);
   const identity = [student.id, student.session_version ?? 0, tokenHash];
   const clearPending = () => env.DB.prepare(`DELETE FROM email_changes WHERE nonce = ? AND student_id = ? AND ${currentAccount}`)
@@ -6322,7 +6254,6 @@ async function handleConfirmEmailChange(request, env) {
     return fail("That address is now in use on another account.", 409, request, env);
   }
 
-  await env.DB.prepare("DELETE FROM login_attempts WHERE email = ?").bind(student.email).run().catch(() => {});
   const session = await createSession(student.id, env.BOOKING_TOKEN_SECRET, (student.session_version ?? 0) + 1);
   const updated = await env.DB.prepare(`SELECT * FROM students WHERE id = ? AND email = ? AND session_version = ?
     AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`)
@@ -6542,9 +6473,6 @@ async function homeworkReply(request, env, operation) {
   try { return json(await operation(), 200, request, env); }
   catch (error) {
     if (error instanceof HomeworkProblem) return fail(error.message, error.status, request, env);
-    if (homeworkTablesMissing(error)) {
-      return fail("Homework is not ready yet. Please try again after the website update.", 503, request, env);
-    }
     throw error;
   }
 }
@@ -6757,6 +6685,17 @@ const PAST_ROW_SQL = `current.starts_at <= ? AND current.payment_status IN ('not
 const PAST_MEET_HOLD = `, meeting_retry_at = MAX(COALESCE(meeting_retry_at, ''), (SELECT end_at FROM proposed WHERE id = bookings.id))`;
 
 /**
+ * Every lesson and live hold between two instants: read once for a run's
+ * overlap checks, which the guarded write then makes again.
+ */
+async function lessonsBetween(env, from, to) {
+  return (await env.DB.prepare(
+    `SELECT id, starts_at, ends_at FROM bookings WHERE (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > ?))
+       AND starts_at < ? AND ends_at > ?`
+  ).bind(new Date().toISOString(), to, from).all()).results ?? [];
+}
+
+/**
  * Her change of a lesson's length, or of it and every later week of its run
  * (9 November 2026, Dan: "change recurring ones from 60 to 90 and they all
  * change"). Each changes to the student's own price for the new length, in
@@ -6788,19 +6727,20 @@ async function teacherChangeLength(request, env, ctx, bookingId, body, authoriza
   const types = new Map();
   const planned = [];
   const kept = [];
+  const endOf = (lesson) => new Date(Date.parse(lesson.starts_at) + lessonType.duration_minutes * 60000).toISOString();
+  // Ordered by start, and each takes the same length, so the last ends last.
+  const others = lessons.length ? await lessonsBetween(env, lessons[0].starts_at, endOf(lessons.at(-1))) : [];
   for (const lesson of lessons) {
     if (lesson.lesson_type_id === lessonType.id) continue;
     if (!types.has(lesson.lesson_type_id)) {
       types.set(lesson.lesson_type_id, await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(lesson.lesson_type_id).first());
     }
-    const endAt = new Date(Date.parse(lesson.starts_at) + lessonType.duration_minutes * 60000).toISOString();
+    const endAt = endOf(lesson);
     // Her own lessons keep no gap, as when she adds one: only an overlap stops it.
     const reason = (past ? pastChangeProblem(lesson) : "") ||
       lengthKeptReason(lesson, types.get(lesson.lesson_type_id), lessonType, amountCents) ||
-      (await env.DB.prepare(
-        `SELECT 1 FROM bookings WHERE id != ? AND (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > ?))
-           AND starts_at < ? AND ends_at > ? LIMIT 1`
-      ).bind(lesson.id, new Date().toISOString(), endAt, lesson.starts_at).first() ? "it would run into another lesson" : "");
+      (others.some((other) => other.id !== lesson.id && other.starts_at < endAt && other.ends_at > lesson.starts_at)
+        ? "it would run into another lesson" : "");
     if (reason) {
       kept.push({ startsAt: lesson.starts_at, reason });
       continue;
@@ -6974,6 +6914,9 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
   const types = new Map();
   const candidates = [];
   const kept = [];
+  const refunding = new Set(((await env.DB.prepare(
+    "SELECT booking_id FROM booking_refunds WHERE status = 'pending' AND booking_id IN (SELECT value FROM json_each(?))"
+  ).bind(JSON.stringify(lessons.map((lesson) => lesson.id))).all()).results ?? []).map((refund) => refund.booking_id));
   for (const lesson of lessons) {
     if (!types.has(lesson.lesson_type_id)) {
       types.set(lesson.lesson_type_id, await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(lesson.lesson_type_id).first());
@@ -6998,8 +6941,7 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
     const nextLocation = location ?? lesson.location;
     if (startAt === lesson.starts_at && !lengthChanges && nextLocation === lesson.location) continue;
     const endAt = new Date(Date.parse(startAt) + nextType.duration_minutes * 60000).toISOString();
-    if (lesson.payment_status === "processing" || lesson.charge_started_at || lesson.same_day_fee_status === "processing" ||
-        await env.DB.prepare("SELECT 1 FROM booking_refunds WHERE booking_id = ? AND status = 'pending'").bind(lesson.id).first()) {
+    if (lesson.payment_status === "processing" || lesson.charge_started_at || lesson.same_day_fee_status === "processing" || refunding.has(lesson.id)) {
       reason = "its payment is going through";
     }
     if (past) reason ||= pastChangeProblem(lesson);
@@ -7018,17 +6960,16 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
   // where it was and may then be in the way of another, so this settles. Of
   // two of these lessons that would meet, the later stays: the lesson she
   // opened comes first, then each week in turn.
+  const others = candidates.length ? await lessonsBetween(env,
+    candidates.reduce((first, entry) => entry.startAt < first ? entry.startAt : first, candidates[0].startAt),
+    candidates.reduce((last, entry) => entry.endAt > last ? entry.endAt : last, candidates[0].endAt)) : [];
   for (let settled = false; !settled;) {
     settled = true;
-    const moving = JSON.stringify(candidates.map((entry) => entry.lesson.id));
+    const moving = new Set(candidates.map((entry) => entry.lesson.id));
     for (const [index, entry] of candidates.entries()) {
       const clash = candidates.slice(0, index).some((other) => other.startAt < entry.endAt && other.endAt > entry.startAt) ||
         kept.some(({ lesson }) => lesson.starts_at < entry.endAt && lesson.ends_at > entry.startAt) ||
-        await env.DB.prepare(
-          `SELECT 1 FROM bookings WHERE id NOT IN (SELECT value FROM json_each(?))
-             AND (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > ?))
-             AND starts_at < ? AND ends_at > ? LIMIT 1`
-        ).bind(moving, new Date().toISOString(), entry.endAt, entry.startAt).first();
+        others.some((other) => !moving.has(other.id) && other.starts_at < entry.endAt && other.ends_at > entry.startAt);
       if (!clash) continue;
       candidates.splice(index, 1);
       kept.push({ lesson: entry.lesson, reason: "it would run into another lesson" });
@@ -7304,12 +7245,13 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
 
   if (request.method === "GET" && path === "/admin/bookings") {
     const from = url.searchParams.get("from") ?? new Date(Date.now() - 7 * 86400000).toISOString();
+    // One student's lessons, for their card's history: by their account, and
+    // an older lesson with no account by their address, as her page matches them.
+    const student = url.searchParams.get("student");
     // Each student's chosen splat travels with their lessons, so Inês sees it
-    // beside their name. Until migration 0022 adds the column the query
-    // without it still answers, so her schedule never depends on the order
-    // the database and the Worker are updated in.
-    const lessonsQuery = (mark) => env.DB.prepare(
-      `SELECT b.*, l.name AS lesson_name, COALESCE(s.nif, '') AS student_nif${mark ? ", COALESCE(s.mark, '') AS student_mark" : ""},
+    // beside their name.
+    const { results } = await env.DB.prepare(
+      `SELECT b.*, l.name AS lesson_name, COALESCE(s.nif, '') AS student_nif, COALESCE(s.mark, '') AS student_mark,
          (COALESCE(s.awaiting_welcome, 0) = 1 AND COALESCE(s.password_hash, '') = '' AND s.google_sub IS NULL AND s.last_login_at IS NULL) AS student_awaiting_welcome,
          -- A student's first lesson, for Needs you: the page only reads from
          -- yesterday on, so it cannot tell for itself. Cancelled lessons never
@@ -7321,25 +7263,24 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
            AND NOT EXISTS (SELECT 1 FROM bookings legacy WHERE legacy.student_id IS NULL AND legacy.student_email = b.student_email AND +legacy.status = 'confirmed' AND legacy.starts_at < b.starts_at)) AS first_lesson
        FROM bookings b
        JOIN lesson_types l ON l.id = b.lesson_type_id LEFT JOIN students s ON s.id = b.student_id
-       WHERE b.starts_at > ? ORDER BY b.starts_at`
+       WHERE b.starts_at > ? ${student ? `AND (b.student_id = ? OR (b.student_id IS NULL
+         AND lower(trim(b.student_email)) = (SELECT lower(trim(email)) FROM students WHERE id = ?)))` : ""}
+       ORDER BY b.starts_at`
     )
-      .bind(from)
+      .bind(from, ...(student ? [student, student] : []))
       .all();
-    let results;
-    try {
-      ({ results } = await lessonsQuery(true));
-    } catch {
-      ({ results } = await lessonsQuery(false));
-    }
+    // A lesson for a student with no email yet reads as having none, never as
+    // the key that stands in for it.
+    const bookings = (results ?? []).map(withRealEmail);
+    // Payments to reconcile are her schedule's, not one student's history.
+    if (student) return json({ bookings }, 200, request, env);
     const cutoff = new Date(Date.now() - 23 * 3600000).toISOString();
     const { results: reconciliation } = await env.DB.prepare(`SELECT id, reference, payment_status, same_day_fee_status, student_name, starts_at, stripe_payment_intent, same_day_fee_payment_intent FROM bookings
       WHERE (payment_status = 'processing' AND (charge_started_at IS NULL OR charge_started_at < ?))
          OR (same_day_fee_status = 'processing' AND (same_day_fee_started_at IS NULL OR same_day_fee_started_at < ?))
          OR EXISTS (SELECT 1 FROM booking_refunds WHERE booking_id = bookings.id AND status = 'pending')`)
       .bind(cutoff, cutoff).all();
-    // A lesson for a student with no email yet reads as having none, never as
-    // the key that stands in for it.
-    return json({ bookings: (results ?? []).map(withRealEmail), manualPaymentReconciliation: reconciliation ?? [] }, 200, request, env);
+    return json({ bookings, manualPaymentReconciliation: reconciliation ?? [] }, 200, request, env);
   }
 
   if (request.method === "GET" && path === "/admin/availability") {
@@ -7418,34 +7359,6 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
 
     await env.DB.batch([...statements, availabilityRevisionBump(env, authorization)]);
     return json({ ok: true, count: statements.length - 1 }, 200, request, env);
-  }
-
-  if (request.method === "POST" && path === "/admin/exceptions") {
-    const body = adminBody;
-    if (body.remove) {
-      await env.DB.batch([
-        env.DB.prepare(`DELETE FROM availability_exceptions WHERE id = ? AND (${authorization.sql})`).bind(Number(body.remove), ...authorization.values),
-        availabilityRevisionBump(env, authorization)
-      ]);
-      return json({ ok: true }, 200, request, env);
-    }
-    if (!parseDateKey(body.date)) return fail("Invalid date.", 400, request, env);
-    const kind = body.kind === "extra" ? "extra" : "blocked";
-    const start = body.startMinute ?? null;
-    const end = body.endMinute ?? null;
-    const minute = (value) => value === null || (Number.isInteger(value) && value >= 0 && value <= 1440);
-    // A blocked span ends when she is free again; an extra window ends at its last start.
-    if (!minute(start) || !minute(end) || (start !== null && end !== null && (kind === "blocked" ? end <= start : end < start))) {
-      return fail("Invalid time range.", 400, request, env);
-    }
-
-    await env.DB.batch([
-      env.DB.prepare(
-        `INSERT INTO availability_exceptions (date, kind, start_minute, end_minute, note, created_at) SELECT ?, ?, ?, ?, ?, ? WHERE (${authorization.sql})`
-      ).bind(body.date, kind, start, end, cleanText(body.note, 200), new Date().toISOString(), ...authorization.values),
-      availabilityRevisionBump(env, authorization)
-    ]);
-    return json({ ok: true }, 200, request, env);
   }
 
   // One date's time off and extra hours, from the teacher calendar. `dayOff`,
@@ -7552,11 +7465,14 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
   }
 
   if (request.method === "GET" && path === "/admin/students") {
-    const settings = await loadSettings(env);
-    const students = await teacherStudentList(env);
-    const { submissions } = await homeworkReturns(env);
+    // Homework waiting for her is read only while her pages show homework.
+    const [settings, students, { submissions }, dismissed] = await Promise.all([
+      loadSettings(env), teacherStudentList(env),
+      tutorOf(env).features?.homework ? homeworkReturns(env) : { submissions: [] },
+      dismissedNotices(env)
+    ]);
     return json({ students: students.map(student => ({ ...student, homeworkToReview: submissions.filter(item => item.studentId === student.id) })), cardsAccepted: cardsTaken(env, settings),
-      dismissed: await dismissedNotices(env) }, 200, request, env);
+      dismissed }, 200, request, env);
   }
 
   // A Needs you notice that only tells her something, dismissed on every
@@ -7609,8 +7525,8 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       // The student stays; only the free price waits for the update.
       return fail("Free lessons need a database update first. The student was added on the standard price.", 503, request, env);
     }
-    const list = await teacherStudentList(env);
-    return json({ student: list.find((entry) => entry.id === studentId) }, 201, request, env);
+    const [listed] = await teacherStudentList(env, studentId);
+    return json({ student: listed }, 201, request, env);
   }
 
   // Their details, filled in or corrected later. Their email is how they sign
@@ -7677,8 +7593,8 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     }
     // A welcome or sign-in link sent to the old address, a mistyped one
     // perhaps, must not open their account now.
-    const list = await teacherStudentList(env);
-    return json({ student: list.find((entry) => entry.id === student.id) }, 200, request, env);
+    const [listed] = await teacherStudentList(env, student.id);
+    return json({ student: listed }, 200, request, env);
   }
 
   // Her price for a student, per length; null is the standard price again.
@@ -7690,8 +7606,8 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     if (priced.problem) return fail(priced.problem, 400, request, env);
     const updated = await setStudentPrices(env, student.id, priced.prices, authorization);
     if (updated === null) return fail("Free lessons need a database update first. Nothing was changed.", 503, request, env);
-    const list = await teacherStudentList(env);
-    return json({ student: list.find((entry) => entry.id === student.id), updated, stayFree: await lessonsStayingFree(env, student.id) }, 200, request, env);
+    const [listed] = await teacherStudentList(env, student.id);
+    return json({ student: listed, updated, stayFree: await lessonsStayingFree(env, student.id) }, 200, request, env);
   }
 
   // Prepare a personal approval link without emailing, changing consent or
@@ -7829,8 +7745,8 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       await authorization.assert();
       return fail("They have a lesson to come, so they aren’t dormant.", 409, request, env);
     }
-    const list = await teacherStudentList(env);
-    return json({ student: list.find((entry) => entry.id === student.id) }, 200, request, env);
+    const [listed] = await teacherStudentList(env, student.id);
+    return json({ student: listed }, 200, request, env);
   }
 
   // Her come-back email's words, as she last saved them.
@@ -7888,18 +7804,16 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     // may go from now on.
     await env.DB.prepare(`UPDATE students SET awaiting_welcome = 0 WHERE id = ? AND awaiting_welcome = 1 AND (${owner.sql})`)
       .bind(student.id, ...owner.values).run();
-    const list = await teacherStudentList(env);
-    return json({ ok: true, student: list.find((entry) => entry.id === student.id) }, 200, request, env);
+    const [listed] = await teacherStudentList(env, student.id);
+    return json({ ok: true, student: listed }, 200, request, env);
   }
 
   if (request.method === "POST" && path === "/admin/bookings") {
     const body = adminBody;
     // A student is named by their account, so one with no email yet can have
-    // lessons too (14 October 2026, Dan); an address still names them for a
-    // caller that has only that.
+    // lessons too (14 October 2026, Dan).
     const studentId = typeof body.studentId === "string" ? body.studentId.trim() : "";
-    const email = normaliseEmail(body.email);
-    if (!studentId && !isEmail(email)) return fail("Please choose the student.", 400, request, env);
+    if (!studentId) return fail("Please choose the student.", 400, request, env);
 
     let lessonType = await loadLessonType(env, cleanText(body.lessonType, 40) || "single");
     if (!lessonType) return fail("That lesson type is not available.", 400, request, env);
@@ -7944,14 +7858,12 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     )
       .bind(new Date().toISOString(), start.toISOString(), endsAt.toISOString())
       .first();
-    if (clash && studentId && clash.student_id === studentId && Date.parse(clash.starts_at) === start.getTime()) {
+    if (clash && clash.student_id === studentId && Date.parse(clash.starts_at) === start.getTime()) {
       return fail("They already have this lesson.", 409, request, env);
     }
     if (clash) return fail(`That overlaps an existing lesson (${clash.reference}).`, 409, request, env);
 
-    let student = studentId
-      ? await env.DB.prepare(`SELECT * FROM students WHERE id = ? AND ${studentLikeSql()}`).bind(studentId).first()
-      : await env.DB.prepare("SELECT * FROM students WHERE email = ?").bind(email).first();
+    let student = await env.DB.prepare(`SELECT * FROM students WHERE id = ? AND ${studentLikeSql()}`).bind(studentId).first();
     const now = new Date().toISOString();
 
     // Every lesson belongs to a student she has set up (13 October 2026, Dan:
@@ -8122,10 +8034,14 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     const body = adminBody;
     const start = new Date(body.startAt);
     if (typeof body.startAt !== "string" || Number.isNaN(start.getTime())) return fail("That time could not be understood.", 400, request, env);
-    // A record stays a record: a lesson to come is added, and announced, as one.
-    if (row.payment_status === RECORDED && start > new Date()) {
-      return fail("A recorded lesson stays in the past. Add a new lesson instead.", 409, request, env);
-    }
+    // A lesson already had stays in the past, as through her one change: a
+    // lesson to come is added, and announced, as one. Moved on, one a card had
+    // paid could be cancelled from its link for a refund, and a record would
+    // become a lesson nobody was told of. Only one still waiting for its card
+    // charge, nothing taken, moves on to a new time (see the no-show policy);
+    // the write checks it is still waiting, as a charge leaves `sequence` alone.
+    const intoFuture = Date.parse(row.starts_at) <= Date.now() && start.getTime() > Date.now();
+    if (intoFuture && !(row.payment_status === "scheduled" && !row.charge_started_at)) return fail(PAST_STAYS, 409, request, env);
 
     const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?")
       .bind(row.lesson_type_id)
@@ -8151,12 +8067,13 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
          no_show_marked_at = CASE WHEN payment_status = 'scheduled' AND charge_started_at IS NULL
            AND (starts_at != ? OR ends_at != ?) THEN NULL ELSE no_show_marked_at END
        WHERE id = ? AND status = 'confirmed' AND sequence = ? AND payment_status != 'processing'
+         AND (? = 0 OR (payment_status = 'scheduled' AND charge_started_at IS NULL))
          AND NOT EXISTS (SELECT 1 FROM bookings other WHERE other.id != bookings.id
            AND (other.status = 'confirmed' OR (other.status = 'pending_payment' AND other.hold_expires_at > ?)) AND other.starts_at < ? AND other.ends_at > ?) AND (${authorization.sql})`
     )
       .bind(start.toISOString(), endsAt.toISOString(), row.starts_at, now.toISOString(),
         start.toISOString(), endsAt.toISOString(), start.toISOString(), endsAt.toISOString(),
-        row.id, row.sequence, now.toISOString(), endsAt.toISOString(), start.toISOString(), ...authorization.values)
+        row.id, row.sequence, intoFuture ? 1 : 0, now.toISOString(), endsAt.toISOString(), start.toISOString(), ...authorization.values)
       .run();
 
     if (!(moved?.meta?.changes > 0)) return fail("That lesson or time has just changed. Please reload.", 409, request, env);
@@ -8230,11 +8147,6 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     );
 
     return json({ booking: publicBooking(updated, lessonType, settings), emailed: await studentIsEmailed(env, updated.student_email) }, 200, request, env);
-  }
-
-  const adminLength = path.match(/^\/admin\/bookings\/([^/]+)\/length$/);
-  if (adminLength && request.method === "POST") {
-    return await teacherChangeLength(request, env, ctx, adminLength[1], adminBody, authorization);
   }
 
   const adminChange = path.match(/^\/admin\/bookings\/([^/]+)\/change$/);
@@ -8358,21 +8270,6 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     }
     // This records money already returned by Inês. No provider call or email.
     const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first();
-    return json({ booking: withRealEmail(updated) }, 200, request, env);
-  }
-
-  const adminPaidByHand = path.match(/^\/admin\/bookings\/([^/]+)\/paid-by-hand$/);
-  if (adminPaidByHand && request.method === "POST") {
-    const changed = await env.DB.prepare(
-      `UPDATE bookings SET payment_status = 'not_required', payment_consent_at = NULL, payment_consent_version = ?, updated_at = ?
-       WHERE id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'scheduled' AND (${authorization.sql})`
-    )
-      .bind(PAID_BY_HAND_MARK, new Date().toISOString(), adminPaidByHand[1], ...authorization.values)
-      .run();
-    if ((changed?.meta?.changes ?? 0) === 0) {
-      return fail("Only a lesson you added that is waiting to be charged can be marked paid by hand.", 409, request, env);
-    }
-    const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(adminPaidByHand[1]).first();
     return json({ booking: withRealEmail(updated) }, 200, request, env);
   }
 

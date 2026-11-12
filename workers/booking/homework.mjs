@@ -4,6 +4,7 @@ import { homeZone, formatInZone, zoneName } from "./time.mjs";
 import { tutorOf } from "./tutor.mjs";
 import { initialMarks, markingInstructions, validateAutomaticMarks } from "./homework-marking.mjs";
 import { isStudentLike } from "./student-like.mjs";
+import { studentSessionSql } from "./auth.mjs";
 
 export class HomeworkProblem extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
@@ -293,14 +294,6 @@ Design for the requested minutes, normally 6–8 questions and NEVER more than 1
   throw new HomeworkProblem("Not found.", 404);
 }
 
-// Migration 0029 is applied by hand after the Worker ships. Until then the
-// Students list and a student's Homework tab read as empty, never as broken.
-export const homeworkTablesMissing = error => /no such table: (lesson_homework|homework_progress|homework_ai_usage)/.test(String(error));
-async function rowsOrNone(statement) {
-  try { return (await statement.all()).results ?? []; }
-  catch (error) { if (homeworkTablesMissing(error)) return []; throw error; }
-}
-
 /**
  * Her notes page for one student (9 November 2026, Dan: "Ines can input notes
  * about each lesson etc and it can build up over time"): her plan for them,
@@ -320,13 +313,13 @@ async function readPlan(db, studentId) {
   }
 }
 export async function studentNotes(env, studentId, now = new Date()) {
-  const rows = await rowsOrNone(env.DB.prepare(`SELECT b.id, b.starts_at, b.ends_at, h.notes, h.level, h.draft_json IS NOT NULL AS drafted,
+  const rows = (await env.DB.prepare(`SELECT b.id, b.starts_at, b.ends_at, h.notes, h.level, h.draft_json IS NOT NULL AS drafted,
       h.published_at, p.submission_json IS NOT NULL AS submitted, json_extract(p.submission_json, '$.returnedAt') AS returned_at
     FROM bookings b
     LEFT JOIN lesson_homework h ON h.booking_id = b.id AND h.student_id = b.student_id
     LEFT JOIN homework_progress p ON p.booking_id = b.id AND p.student_id = b.student_id
     WHERE b.student_id = ? AND b.status = 'confirmed' AND b.attendance_status <> 'no_show' AND b.starts_at <= ?
-    ORDER BY b.starts_at DESC`).bind(studentId, now.toISOString()));
+    ORDER BY b.starts_at DESC`).bind(studentId, now.toISOString()).all()).results ?? [];
   return {
     ...await readPlan(env.DB, studentId),
     lessons: rows.map(row => ({
@@ -358,18 +351,14 @@ export async function saveStudentPlan(env, studentId, body, authorization = null
 }
 
 export async function homeworkReturns(env) {
-  const results = await rowsOrNone(env.DB.prepare(`SELECT p.booking_id, p.student_id,
+  const results = (await env.DB.prepare(`SELECT p.booking_id, p.student_id,
     json_extract(p.submission_json, '$.submittedAt') AS submitted_at
     FROM homework_progress p JOIN lesson_homework h ON h.booking_id = p.booking_id AND h.student_id = p.student_id
     JOIN bookings b ON b.id = p.booking_id AND b.student_id = p.student_id
     WHERE h.published_at IS NOT NULL AND p.submission_json IS NOT NULL
-      AND json_extract(p.submission_json, '$.returnedAt') IS NULL ORDER BY submitted_at ASC`));
+      AND json_extract(p.submission_json, '$.returnedAt') IS NULL ORDER BY submitted_at ASC`).all()).results ?? [];
   return { submissions: results.map(row => ({ bookingId: row.booking_id, studentId: row.student_id, submittedAt: row.submitted_at })) };
 }
-
-// Migration 0030 adds the notification record. Until it is applied a
-// submission is still saved and reviewable; only the email waits for it.
-const noticeColumnsMissing = error => /no such column: (?:\w+\.)?notified_/.test(String(error));
 
 /**
  * Tells Inês, once per submission, that homework is waiting: the student, the
@@ -381,11 +370,9 @@ const noticeColumnsMissing = error => /no such column: (?:\w+\.)?notified_/.test
  */
 export async function notifyHomeworkSubmissions(env, { to, send, link, bookingId = null }) {
   if (!to) return 0;
-  let rows;
   const stale = new Date(Date.now() - 120000).toISOString();
-  try {
-    const recent = new Date(Date.now() - 3 * 86400000).toISOString();
-    rows = (await env.DB.prepare(`SELECT p.booking_id, p.student_id FROM homework_progress p
+  const recent = new Date(Date.now() - 3 * 86400000).toISOString();
+  const rows = (await env.DB.prepare(`SELECT p.booking_id, p.student_id FROM homework_progress p
       JOIN lesson_homework h ON h.booking_id = p.booking_id AND h.student_id = p.student_id AND h.published_at IS NOT NULL
       JOIN bookings b ON b.id = p.booking_id AND b.student_id = p.student_id
       LEFT JOIN email_log e ON e.dedupe_key = 'teacher:homework-submitted:' || json_extract(p.submission_json, '$.id')
@@ -396,10 +383,6 @@ export async function notifyHomeworkSubmissions(env, { to, send, link, bookingId
         AND (p.notified_submission_id IS NOT json_extract(p.submission_json, '$.id')
           OR ((p.notified_at IS NULL OR p.notified_at <= ?) AND COALESCE(e.status, '') NOT IN ('sent', 'dry-run')))
       LIMIT 10`).bind(bookingId, bookingId, recent, stale).all()).results ?? [];
-  } catch (error) {
-    if (homeworkTablesMissing(error) || noticeColumnsMissing(error)) return 0;
-    throw error;
-  }
   let sent = 0;
   for (const { booking_id: lessonId, student_id: studentId } of rows) {
     // Reading through savedProgress applies the 90-second hand-off first.
@@ -465,8 +448,7 @@ async function approveHomework(env, booking, row, body, authorization = null) {
 async function writeProgress(env, bookingId, studentId, saved, answers, submission, authorization) {
   const time = stamp(saved?.updated_at);
   const encoded = submission ? JSON.stringify(submission) : null;
-  const currentSession = `EXISTS (SELECT 1 FROM students WHERE id = ? AND session_version = ?)
-    AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`;
+  const currentSession = studentSessionSql();
   const identity = [studentId, authorization.sessionVersion, authorization.tokenHash];
   const changed = saved
     ? await env.DB.prepare(`UPDATE homework_progress SET answers_json = ?, submission_json = ?, completed_at = ?, updated_at = ?
@@ -517,12 +499,12 @@ export async function studentHomework(env, student, method, bookingId, body, act
   if (!isStudentLike(student)) throw new HomeworkProblem("Homework is in the student’s account. Open their lesson to prepare it.", 403);
   if (!bookingId && method !== "GET") throw new HomeworkProblem("Not found.", 404);
   if (method === "GET" && !bookingId) {
-    const results = await rowsOrNone(env.DB.prepare(`SELECT h.booking_id, b.starts_at, b.location, h.level, h.minutes,
+    const results = (await env.DB.prepare(`SELECT h.booking_id, b.starts_at, b.location, h.level, h.minutes,
       json_extract(h.published_json, '$.title') AS title, h.published_at, p.completed_at, p.updated_at AS progress_at,
       json_extract(p.submission_json, '$.submittedAt') AS submitted_at, json_extract(p.submission_json, '$.returnedAt') AS returned_at
       FROM lesson_homework h JOIN bookings b ON b.id = h.booking_id AND b.student_id = h.student_id
       LEFT JOIN homework_progress p ON p.booking_id = h.booking_id AND p.student_id = h.student_id
-      WHERE h.student_id = ? AND h.published_at IS NOT NULL ORDER BY b.starts_at DESC`).bind(student.id));
+      WHERE h.student_id = ? AND h.published_at IS NOT NULL ORDER BY b.starts_at DESC`).bind(student.id).all()).results ?? [];
     return { homework: results.map(row => ({ bookingId: row.booking_id, lessonAt: row.starts_at, location: row.location, title: row.title, level: row.level, minutes: row.minutes,
       publishedAt: row.published_at, completedAt: row.completed_at ?? null, submittedAt: row.submitted_at ?? null,
       returnedAt: row.returned_at ?? null, started: Boolean(row.progress_at) })) };
