@@ -17,7 +17,7 @@ import {
   type AdminStudent,
   type KeptLesson,
 } from "@/lib/admin-api";
-import { formatBookedLessonLabel, formatMoneyCents, formatPriceCents, formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
+import { formatBookedLessonLabel, formatMoneyCents, formatPriceCents, formatShortDay, formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
 import { NO_SHOW_WINDOW_HOURS_AFTER, SAME_DAY_FEE_LABEL } from "@/lib/config";
 
 // When a card is charged, in the words the student reads (CardOnFile): at the
@@ -65,7 +65,7 @@ type Props = {
 
 /** "Tue 8 Dec", as her timetable names a day. */
 function shortDay(startsAt: string) {
-  return dateLabel(dateKey(new Date(startsAt)), { weekday: "short", day: "numeric", month: "short" });
+  return formatShortDay(startsAt);
 }
 
 /** "Tue 8 Dec to Tue 5 Jan" for several lessons, or the one day. */

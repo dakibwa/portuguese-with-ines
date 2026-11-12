@@ -89,7 +89,7 @@ export function StudentList({ token, students, workspace, error, sending, reques
     (name ?? search.current)?.focus({ preventScroll: true });
   }, [expanded, busyStudent]);
   const noticeProps = {
-    sending, onMeet, onWelcome, onDismiss,
+    onMeet, onDismiss,
     onStudent: (student: AdminStudent, panel: "lessons" | "history" = "lessons") => {
       if (!busyStudent) setExpanded({ studentId: student.id, panel });
     },

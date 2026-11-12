@@ -425,8 +425,8 @@ test("Needs you lists only what waits on her, once each, and empties on its own"
   ];
   const items = needsYou({ now, meet, payments: [{ id: "p1", reference: "REVIEW-1", payment_status: "processing" }], students, lessons, cancellations });
   assert.deepEqual(new Set(items.map(item => item.key)), new Set([
-    // No email is not a to-do (2 November 2026, Dan): Bea and Cal wait on nothing.
-    "meet", "payment:p1", "first:first-soon", "welcome:Ana", "welcome:Kai", "changed:changed-recent", "changed:w1", "cancelled:c1", "changed:first-changed", "changed:added-changed", "cancelled:r1",
+    // A welcome or first lesson is the student card's own step, never a notice.
+    "meet", "payment:p1", "first:first-soon", "changed:changed-recent", "changed:w1", "cancelled:c1", "changed:first-changed", "changed:added-changed", "cancelled:r1",
   ]));
   const changes = items.filter(item => item.kind === "changed");
   assert.equal(changes[0].key, "changed:first-changed", "newest student changes lead older ones");

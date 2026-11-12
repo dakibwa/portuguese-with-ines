@@ -70,10 +70,8 @@ export function LessonForm({
   date = "",
   time = "17:00",
   idPrefix,
-  tone = "coral",
   onCreated,
   onBusy,
-  onCancel,
   onRefresh,
 }: {
   token: string;
@@ -81,12 +79,8 @@ export function LessonForm({
   date?: string;
   time?: string;
   idPrefix: string;
-  /** Coral while adding a lesson is the next thing to do; blue once something else is. */
-  tone?: "coral" | "blue";
   onCreated: (message: string) => void;
   onBusy?: (busy: boolean) => void;
-  /** Back to where she was, without adding anything. */
-  onCancel?: () => void;
   /** Re-read a student's price after the server refuses an obsolete quote. */
   onRefresh?: () => void;
 }) {
@@ -119,7 +113,7 @@ export function LessonForm({
       {!startAt && !busy ? <p className="visually-hidden" id={`${idPrefix}-needs-time`}>Choose a date and a time first.</p> : null}
       <div className="teacher-manual-submit teacher-dialog-actions">
         <button
-          className={`button button--${past ? "coral" : tone}`}
+          className="button button--coral"
           type="submit"
           disabled={busy || !startAt}
           aria-describedby={!startAt && !busy ? `${idPrefix}-needs-time` : undefined}
@@ -130,11 +124,6 @@ export function LessonForm({
               ? "Add past lesson"
               : `${weekly ? "Add weekly lessons" : "Add lesson"}${quiet ? "" : " and email student"}`}
         </button>
-        {onCancel ? (
-          <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">
-            Cancel
-          </button>
-        ) : null}
       </div>
     </>
   );
@@ -158,11 +147,8 @@ export function LessonForm({
               ...(weekly ? { repeat: lesson.repeat as Exclude<Repeat, "once"> } : {}),
               ...(tickable && paid ? { paid: true } : {}),
             });
-            // Ready for their next lesson: the same choices, a new date.
+            // The form closes now; the next one must not offer the time just taken.
             forgetAvailability();
-            setAvailabilityRefresh(current => current + 1);
-            setLesson((current) => ({ ...current, date: "", startAt: "" }));
-            setPaid(false);
             onCreated(addedLine(lesson.date, lesson.time, lesson.repeat, result.series, result.emailed !== false, past, tickable && paid));
           } catch (caught) {
             if (caught instanceof AdminApiError && caught.status === 409 && /price.*changed/i.test(caught.message)) onRefresh?.();

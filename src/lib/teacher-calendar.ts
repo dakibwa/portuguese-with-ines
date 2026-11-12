@@ -27,13 +27,14 @@ export const WEEKDAYS = [
 export type TeachingWindow = { start: number; lastStart: number };
 export type WeekHours = Record<number, TeachingWindow[]>;
 
+// Building an Intl formatter costs far more than formatting with one, and her
+// timetable formats thousands of dates a render: each is built once.
+const dateKeyFormat = new Intl.DateTimeFormat("en-CA", { timeZone: TUTOR_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+const labelFormats = new Map<string, Intl.DateTimeFormat>();
+const minuteFormat = new Intl.DateTimeFormat("en-GB", { timeZone: TUTOR_TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
 export function dateKey(date: Date) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TUTOR_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
+  const parts = dateKeyFormat.formatToParts(date);
   const part = (type: string) => parts.find((p) => p.type === type)!.value;
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
@@ -57,10 +58,10 @@ export function dateLabel(
     month: "long",
   },
 ) {
-  return new Intl.DateTimeFormat("en-GB", {
-    ...options,
-    timeZone: "UTC",
-  }).format(new Date(`${key}T12:00:00Z`));
+  const id = JSON.stringify(options);
+  let format = labelFormats.get(id);
+  if (!format) labelFormats.set(id, (format = new Intl.DateTimeFormat("en-GB", { ...options, timeZone: "UTC" })));
+  return format.format(new Date(`${key}T12:00:00Z`));
 }
 
 export function minuteLabel(minute: number) {
@@ -571,12 +572,7 @@ export function timeAhead(exceptions: AvailabilityException[], onlineOnly: Onlin
 }
 
 function localMinute(value: string) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: TUTOR_TIME_ZONE,
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date(value));
+  const parts = minuteFormat.formatToParts(new Date(value));
   return (
     Number(parts.find((p) => p.type === "hour")!.value) * 60 +
     Number(parts.find((p) => p.type === "minute")!.value)
@@ -725,8 +721,6 @@ export const NEEDS_YOU_AHEAD_DAYS = 7;
 export type NeedsYouItem =
   | { kind: "meet"; key: "meet"; reconnect: boolean }
   | { kind: "payment"; key: string; review: PaymentReview; part: "lesson" | "fee" | "refund" }
-  | { kind: "lessons"; key: string; student: AdminStudent }
-  | { kind: "welcome"; key: string; student: AdminStudent; at?: string | null }
   | { kind: "changed"; key: string; dismiss: string; booking: AdminBooking; count: number; first: boolean }
   | { kind: "cancelled"; key: string; dismiss: string; booking: AdminBooking; count: number }
   | { kind: "first"; key: string; dismiss: string; booking: AdminBooking }
@@ -735,6 +729,8 @@ export type NeedsYouItem =
 
 /** Students she set up with no email hold this in place of one; nothing is ever shown or sent to it. */
 const NO_EMAIL_YET = "no-email:";
+/** Homework waiting for her, while homework is offered at all: hidden, it has nothing to press. */
+const reviewsHomework = (student: AdminStudent) => tutor.features.homework && Boolean(student.homeworkToReview?.length);
 
 /** A past lesson counts too; her students do not need a future booking to stay set up. */
 export const hasLessons = (student: AdminStudent) => Boolean(student.hasLessons || student.nextLessonAt || student.upcoming || student.weekly);
@@ -830,7 +826,6 @@ export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[]
   const general: NeedsYouItem[] = [];
   for (const item of items) {
     // A missing lesson or welcome is the card's own next step, never a task card.
-    if (item.kind === "lessons" || item.kind === "welcome") continue;
     const booking = item.kind === "payment" ? byBooking.get(item.review.id) : "booking" in item ? item.booking : undefined;
     const row = "student" in item ? byId.get(item.student.id)
       : booking && (booking.student_id ? byId.get(booking.student_id) : byEmail.get(realEmail(booking.student_email)));
@@ -845,7 +840,7 @@ export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[]
   const priority = (row: StudentWorkspaceRow) => {
     if (row.items.some(item => item.kind === "payment" || item.kind === "declined")) return 0;
     if (row.items.some(item => item.kind === "changed" || item.kind === "cancelled")) return 1;
-    if (row.student.homeworkToReview?.length) return 1.5;
+    if (reviewsHomework(row.student)) return 1.5;
     return row.items.length ? 3 : 4;
   };
   const latestChange = (row: StudentWorkspaceRow) => Math.max(0, ...row.items.map(item =>
@@ -859,7 +854,7 @@ export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[]
     || a.student.name.localeCompare(b.student.name)
     || a.student.id.localeCompare(b.student.id));
 
-  const needsHer = (row: StudentWorkspaceRow) => Boolean(row.items.length || row.student.homeworkToReview?.length);
+  const needsHer = (row: StudentWorkspaceRow) => Boolean(row.items.length || reviewsHomework(row.student));
   const sections: Record<StudentSection, StudentWorkspaceRow[]> = { needs: [], todo: [], waiting: [], set: [] };
   const dormant: StudentWorkspaceRow[] = [];
   for (const row of rows) {
@@ -930,15 +925,6 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
   }
 
   const timed: { time: number; changed: number; item: NeedsYouItem }[] = [];
-  for (const student of students) {
-    const email = student.email ?? "";
-    const time = Date.parse(student.nextLessonAt ?? "") || Infinity;
-    // No email is not a to-do (2 November 2026, Dan); a welcome is, once there is one.
-    if (email && !email.startsWith(NO_EMAIL_YET) && student.awaitingWelcome)
-      timed.push({ time, changed: 0, item: { kind: "welcome", key: `welcome:${student.id}`, student, at: student.nextLessonAt } });
-    if (!hasLessons(student))
-      timed.push({ time, changed: 0, item: { kind: "lessons", key: `lessons:${student.id}`, student } });
-  }
 
   const confirmed = lessons.filter((row) => row.status === "confirmed" && real(row));
   const changedRows = confirmed.filter((row) => row.student_changed_at && recent(row.student_changed_at) && ahead(row.starts_at));

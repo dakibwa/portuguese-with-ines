@@ -8,18 +8,16 @@ import { Check } from "lucide-react";
  * lavender; ticked the capsule turns blue and the dab coral, with a cream
  * check, so it reads as done at a glance.
  */
-export function PaidTick({ checked, disabled, onChange, describedBy, plain }: {
+export function PaidTick({ checked, disabled, onChange, plain }: {
   checked: boolean;
   disabled?: boolean;
   onChange: (checked: boolean) => void;
-  describedBy?: string;
   /** On Students: a small soft capsule with a little checkbox, strong blue once checked. */
   plain?: boolean;
 }) {
   return (
     <button
       aria-checked={checked}
-      aria-describedby={describedBy}
       className={`paid-tick${plain ? " paid-tick--plain" : ""}${checked ? " is-checked" : ""}`}
       disabled={disabled}
       onClick={() => onChange(!checked)}
