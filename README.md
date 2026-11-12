@@ -60,9 +60,11 @@ once, and only for the exact request it would have made. Free times are reused
 for a minute. The sign-in form's code is left out of the first load and
 fetched while the page is idle, with the next likely step's free times, and
 the account's own code comes with the page whenever a session is stored.
-Expressions' code comes only with a student's lessons, and homework's code and
-styles only with homework itself, so an add-on that is closed to students, or
-a feature that is hidden, adds nothing to a visitor's first load.
+Expressions' code comes only with a student's lessons, and homework's code only
+when a lesson's homework opens, so an add-on that is closed to students, or a
+feature that is hidden, adds nothing to a visitor's first load. Homework's
+styles come with it for a student; her schedule loads them ahead of its own,
+as it always has, because a few of their rules tie with hers.
 
 The reading pages load one stylesheet, `src/app/globals.css`. The booking
 page, accounts, the reset page, her schedule and Pinta e descobre also load
