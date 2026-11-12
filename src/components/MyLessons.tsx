@@ -38,6 +38,33 @@ function accountDetails(student?: Student | null) {
   return { name: student?.name ?? "", email: student?.email ?? "", nif: student?.nif ?? "" };
 }
 
+/*
+ * The outstanding lessons a student left out of the card step (11 November
+ * 2026: some were paid to Inês in cash), remembered for the browser tab's
+ * session only, so coming back from Stripe or reloading does not ask about
+ * them again and a new visit does.
+ */
+const LEFT_OUT_KEY = "ines-card-left-out:";
+
+function readLeftOut(studentId: string): string[] {
+  if (!studentId || typeof window === "undefined") return [];
+  try {
+    const saved: unknown = JSON.parse(window.sessionStorage.getItem(LEFT_OUT_KEY + studentId) ?? "[]");
+    return Array.isArray(saved) ? saved.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberLeftOut(studentId: string, ids: string[]) {
+  if (!studentId || !ids.length) return;
+  try {
+    window.sessionStorage.setItem(LEFT_OUT_KEY + studentId, JSON.stringify([...new Set([...readLeftOut(studentId), ...ids])]));
+  } catch {
+    // Storage blocked: this visit still leaves them out, a reload asks again.
+  }
+}
+
 /**
  * The account's own cards, a lesson's homework and Your details, each headed
  * like the Your lessons calendar card with the name's menu beneath its
@@ -60,7 +87,7 @@ export function MyLessons({
   section = "upcoming"
 }: {
   /** The account the booking page has just loaded, so arriving doesn't ask for it twice. */
-  initialAccount?: { student: Student; bookings: MyBooking[]; series?: LessonSeries[]; cardsAccepted?: boolean; sameDayFeeCents?: number; minimumNoticeHours?: number } | null;
+  initialAccount?: { student: Student; bookings: MyBooking[]; series?: LessonSeries[]; cardsAccepted?: boolean; sameDayFeeCents?: number; minimumNoticeHours?: number; outstandingLessons?: string[] } | null;
   /** The calendar's minute clock keeps history current without another account read. */
   clock: number;
   /** The account's own prices, as last read or changed here, so booking prices with them. */
@@ -85,6 +112,13 @@ export function MyLessons({
   const [bookings, setBookings] = useState<MyBooking[]>(initialAccount?.bookings ?? []);
   const [series, setSeries] = useState<LessonSeries[]>(initialAccount?.series ?? []);
   const [cardsAccepted, setCardsAccepted] = useState(Boolean(initialAccount?.cardsAccepted));
+  // Lessons they have had that a card can still pay for, asked for on arrival.
+  const [outstanding, setOutstanding] = useState<string[]>(initialAccount?.outstandingLessons ?? []);
+  // Those they left out this visit, for the browser tab's session.
+  const [leftOut, setLeftOut] = useState(() => {
+    const studentId = initialAccount?.student.id ?? "";
+    return { studentId, ids: readLeftOut(studentId) };
+  });
   // The live fee and notice the card is agreed under.
   const [cardRules, setCardRules] = useState({ feeCents: initialAccount?.sameDayFeeCents, noticeHours: initialAccount?.minimumNoticeHours });
   // Back from Stripe with a card saved; the account may take a moment to say so.
@@ -141,6 +175,7 @@ export function MyLessons({
     setBookings(initialAccount.bookings);
     setSeries(initialAccount.series ?? []);
     setCardsAccepted(Boolean(initialAccount.cardsAccepted));
+    setOutstanding(initialAccount.outstandingLessons ?? []);
     setCardRules({ feeCents: initialAccount.sameDayFeeCents, noticeHours: initialAccount.minimumNoticeHours });
     setStudent((current) => current && {
       ...current,
@@ -279,6 +314,7 @@ export function MyLessons({
       setBookings(data.bookings);
       setSeries(data.series ?? []);
       setCardsAccepted(Boolean(data.cardsAccepted));
+      setOutstanding(data.outstandingLessons ?? []);
       setCardRules({ feeCents: data.sameDayFeeCents, noticeHours: data.minimumNoticeHours });
     } catch (caught) {
       if (request !== accountRequest.current || readSession() !== session) return;
@@ -904,6 +940,21 @@ export function MyLessons({
   ) : null;
   const askForCard = !cardSaved && !cardChecking && cardsAccepted && hasStudentSide(student) &&
     student.cardForAllLessons === false && unpaidAdded > 0;
+  // Lessons they have had that are still owed, asked of every student while
+  // cards are taken, a saved card or not (11 November 2026, Dan: "even if they
+  // are already a user too"), except those they left out this visit. Back
+  // from the card this visit, the account may not yet say they are paid, so
+  // they are not asked for again until it is read afresh.
+  // Read once per account, never again while the step is pressed, so a press
+  // that remembers what was left out cannot re-key the step under it.
+  if (leftOut.studentId !== student.id) setLeftOut({ studentId: student.id, ids: readLeftOut(student.id) });
+  const studentLeftOut = leftOut.studentId === student.id ? leftOut.ids : readLeftOut(student.id);
+  const owed = cardsAccepted && hasStudentSide(student) && !cardAdded ? outstanding.filter((id) => !studentLeftOut.includes(id)) : [];
+  const leaveOut = (ids: string[], done: boolean) => {
+    rememberLeftOut(student.id, ids);
+    // Kept here too, so a browser that refuses storage still closes the step.
+    if (done) setLeftOut({ studentId: student.id, ids: [...new Set([...studentLeftOut, ...ids])] });
+  };
   // Someone Inês let in from a WhatsApp link may have no email yet. It is
   // their only way back in on another phone, so it is the first thing asked,
   // before the card, with no skip (2 November 2026, Dan: "they need to add an
@@ -954,7 +1005,7 @@ export function MyLessons({
   // it covers their weekly lessons too): each weekly run once, as its day and
   // Porto time, and any single lesson Inês added still to come.
   const upcomingAdded: CardUpcoming[] = [];
-  if (cardBookingId || askForCard) {
+  if (cardBookingId || owed.length || askForCard) {
     for (const booking of bookings
       .filter((entry) => Date.parse(entry.startAt) > clock && entry.status === "confirmed" && entry.addedByTeacher && entry.paymentStatus === "not_required" && !entry.paidByHand)
       .sort((a, b) => a.startAt.localeCompare(b.startAt))) {
@@ -968,7 +1019,17 @@ export function MyLessons({
       });
     }
   }
-  const cardPrompt = cardBookingId || askForCard ? <CardPrompt key={cardBookingId} bookingId={cardBookingId} onOpenChange={setCardOpen} upcoming={upcomingAdded} /> : null;
+  const cardPrompt = cardBookingId || owed.length || askForCard ? (
+    <CardPrompt
+      key={cardBookingId}
+      bookingId={cardBookingId || owed.join(",")}
+      choosable={!cardBookingId && owed.length > 0}
+      needsCard={askForCard}
+      onLeaveOut={leaveOut}
+      onOpenChange={setCardOpen}
+      upcoming={upcomingAdded}
+    />
+  ) : null;
   return (
     <>
       {cardNote}

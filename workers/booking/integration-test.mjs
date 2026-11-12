@@ -6956,6 +6956,46 @@ await test("a lesson put on a card from its link is charged when it ends, or the
   }
 });
 
+// 11 November 2026, Dan: signing in asks them to pay for any outstanding lessons.
+await test("a hand-set-up student's account lists exactly their outstanding lessons, oldest first, as the card preview reads them", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  const id = "oona";
+  try {
+    const toCome = await handSetUpStudent(id, "2026-09-16T10:00:00.000Z");
+    const past = (name, start, patch = "") => {
+      const lesson = linkedBooking(name, { owner: id, payment: "not_required", start, end: start.replace("T10", "T11") });
+      db.prepare(`UPDATE bookings SET added_by_teacher=1${patch} WHERE id=?`).run(lesson);
+      return lesson;
+    };
+    // Out of time order on purpose.
+    const middle = past("oona-middle", "2026-08-25T10:00:00.000Z");
+    const oldest = past("oona-oldest", "2026-08-18T10:00:00.000Z");
+    const newest = past("oona-newest", "2026-09-01T10:00:00.000Z");
+    // One she added after it happened, kept before those carried a price.
+    const record = past("oona-record", "2026-08-17T10:00:00.000Z", ", payment_status='recorded', amount_cents=NULL");
+    past("oona-paid-by-hand", "2026-08-19T10:00:00.000Z", ", payment_consent_version='paid-by-hand'");
+    past("oona-cancelled", "2026-08-20T10:00:00.000Z", ", status='cancelled'");
+    past("oona-free", "2026-08-21T10:00:00.000Z", ", payment_status='free'");
+    past("oona-zero", "2026-08-22T10:00:00.000Z", ", amount_cents=0");
+    past("oona-own", "2026-08-23T10:00:00.000Z", ", added_by_teacher=0");
+    past("oona-charging", "2026-08-24T10:00:00.000Z", ", charge_started_at='2026-08-24T12:00:00.000Z'");
+    past("oona-no-show", "2026-08-26T10:00:00.000Z", ", attendance_status='no_show'");
+    const ownToken = await createSession(id, env.BOOKING_TOKEN_SECRET);
+    const me = async () => (await (await call("/me", { method: "GET", token: ownToken })).json()).outstandingLessons;
+    const outstanding = await me();
+    assert.deepEqual(outstanding, [record, oldest, middle, newest]);
+    assert.ok(toCome.every((lesson) => !outstanding.includes(lesson.id)), "lessons still to come are not outstanding");
+    const preview = await call("/me/card/preview", { token: ownToken, body: { bookingIds: outstanding } });
+    assert.equal(preview.status, 200, await preview.clone().text());
+    assert.deepEqual((await preview.json()).bookings.map((lesson) => lesson.id), outstanding);
+    db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','off')").run();
+    assert.deepEqual(await me(), [], "none while cards are off");
+  } finally {
+    db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+    forgetStudent(`${id}@example.invalid`);
+  }
+});
+
 console.log(`${passed} booking integration tests passed.`);
 globalThis.fetch = nativeFetch;
 globalThis.Date = NativeDate;

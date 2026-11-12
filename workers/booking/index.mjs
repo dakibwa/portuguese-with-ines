@@ -6083,7 +6083,7 @@ async function handleMe(request, env) {
   // The settings, lessons and weekly runs are read at once rather than one
   // after another: Your lessons waits on this reply.
   const now = new Date();
-  const [settings, { results }, { results: seriesRows }] = await Promise.all([
+  const [settings, { results }, { results: seriesRows }, { results: outstandingRows }] = await Promise.all([
     loadSettings(env),
     env.DB.prepare(
       `SELECT b.*, l.name AS lesson_name, l.duration_minutes, l.price_cents
@@ -6103,7 +6103,20 @@ async function handleMe(request, env) {
        GROUP BY s.id`
     )
       .bind(now.toISOString(), student.id, student.session_version ?? 0)
-      .all()
+      .all(),
+    // Lessons Inês added that they have had and a card can still pay for
+    // (11 November 2026, Dan: "pay for any outstanding lessons"), oldest
+    // first, offered on Your lessons; the preview and approval check each again.
+    isStudentLike(student)
+      ? env.DB.prepare(
+        `SELECT b.id FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
+         WHERE b.starts_at <= ? AND ${CARD_LESSON_SQL}
+           AND EXISTS (SELECT 1 FROM students s WHERE s.id = b.student_id AND s.session_version = ?)
+         ORDER BY b.starts_at LIMIT ${MAX_CARD_LESSONS}`
+      )
+        .bind(now.toISOString(), student.id, student.session_version ?? 0)
+        .all()
+      : { results: [] }
   ]);
 
   /*
@@ -6161,7 +6174,8 @@ async function handleMe(request, env) {
   const current = await currentStudent(request, env);
   if (!current || current.id !== student.id || current.session_version !== student.session_version) return fail("Please sign in again.", 401, request, env);
   return json(
-    { student: publicStudent(student), bookings, series, sameDayFeeCents: settings.sameDayChangeFeeCents, minimumNoticeHours: settings.minimumNoticeHours, cardsAccepted: cardsTaken(env, settings) },
+    { student: publicStudent(student), bookings, series, sameDayFeeCents: settings.sameDayChangeFeeCents, minimumNoticeHours: settings.minimumNoticeHours, cardsAccepted: cardsTaken(env, settings),
+      outstandingLessons: cardsTaken(env, settings) ? (outstandingRows ?? []).map((row) => row.id) : [] },
     200,
     request,
     env

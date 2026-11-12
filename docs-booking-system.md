@@ -151,11 +151,12 @@ lesson she added:
 - It is **open** until a card pays it or she ticks `Already paid`: it counts
   in `unpaidPast` and `unpaidPastCents`, and her tick lists (the invite's and
   the payment link's) offer it. One at €0 is never open.
-- It goes on a card only by being named in a link the student reviews
-  (below): it becomes `scheduled` at the amount they agreed to and is charged
-  as any ended lesson on a card is. From then it is an ordinary lesson on a
-  card. Saving a card, the standing agreement and the charge sweep never
-  take a record no link named.
+- It goes on a card only by being named in an approval the student reviews
+  (below), from her link or from the step that opens when they sign in: it
+  becomes `scheduled` at the amount they agreed to and is charged as any
+  ended lesson on a card is. From then it is an ordinary lesson on a card.
+  Saving a card, the standing agreement and the charge sweep never take a
+  record the student has not approved by name.
 - Records kept before that date have no `amount_cents`. Their price is the
   student's price for that length now (their own rate, a 90 derived from
   their 60, else the standard price). One expression, `lessonCentsSql`, reads
@@ -3111,6 +3112,35 @@ confirmation. Creating or viewing the link cannot take payment. Old welcome
 links retain their future-only behaviour. The lessons and card consent stay
 unchanged until the student completes their own approval (and Stripe setup if
 a card is needed).
+
+**Asked at every sign-in (11 November 2026).** Dan: "can it be really obvious
+for them so when they sign in it prompts them to add their card for their
+recurring lessons and pay for any outstanding lessons?", "even if they are
+already a user too". The same step now opens by itself, with no link from
+Inês: `GET /me` returns `outstandingLessons`, the ids of the student's lessons
+she added that have started (`starts_at <= now`) and that a card can still
+pay for (`CARD_LESSON_SQL`: confirmed, `not_required` or one she added after
+it happened, no charge started, attendance as expected, not ticked **Already
+paid**, priced above €0), oldest first, at most `MAX_CARD_LESSONS` (20). It is `[]` while cards are not taken
+or for an account with no student side, and is read under the same
+`session_version` guard as the bookings. `Your lessons` (and the booking page,
+which holds the same account card) shows the step for any student account
+with such a lesson, whatever card they have: no card, a saved card, or a
+standing agreement. The ids go to the existing `POST /me/card/preview` and
+`POST /me/card`, which check each lesson's time and amount again when they
+write, so the list itself grants nothing and the Worker's approval, webhook
+and charging are unchanged. A link from Inês still wins and shows exactly the
+lessons she ticked.
+
+Because nobody ticked these (many past lessons were paid to her by hand and
+never marked), the student can leave any of them out by pressing it, and only
+the lessons still in are sent for approval; never charge twice (12 October
+2026). Leaving one out changes nothing on the Worker: the lesson stays open
+on Inês's page until it is paid or she ticks it. What was left out is kept
+only in that browser tab's `sessionStorage` (`ines-card-left-out:<studentId>`),
+so the same visit does not ask again and a new visit does. With every lesson
+left out, the step is the plain card ask if lessons to come still need a card
+("card first" stands), and otherwise closes for the visit.
 
 Reuse this workflow whenever a student needs to authorise teacher-added
 lessons that have already happened, including a student who already saved a
