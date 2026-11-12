@@ -235,6 +235,28 @@ export function removeSpan(spans: Span[], cut: Span) {
   );
 }
 
+/**
+ * Extra hours are lesson starts, a step of her booking interval apart from
+ * each block's first. Taking a stretch out of them takes the starts inside it
+ * and leaves every other start where it was. Cut as plain time, a stretch at
+ * minutes off that grid left hours beginning at the cut, and the Worker,
+ * which keeps a block as its first and last start, stepped new starts from
+ * there: off her grid, and one later than any she had offered.
+ */
+export function removeStarts(spans: Span[], cut: Span, interval: number) {
+  return spans.flatMap((span) => {
+    if (cut.end <= span.start || cut.start >= span.end) return [span];
+    const kept: Span[] = [];
+    for (let start = span.start; start < span.end; start += interval) {
+      if (start >= cut.start && start < cut.end) continue;
+      const before = kept.at(-1);
+      if (before && before.end === start) before.end = Math.min(1440, start + interval);
+      else kept.push({ start, end: Math.min(1440, start + interval) });
+    }
+    return kept;
+  });
+}
+
 export function overlapsSpan(spans: Span[], start: number, end: number) {
   return spans.some((span) => span.start < end && start < span.end);
 }
@@ -466,19 +488,22 @@ export function chooseHours(
   original: HoursBlock | null,
   kind: HoursChoice,
   span: Span,
+  /** Her booking interval, so extra hours lose whole starts (`removeStarts`). */
+  interval?: number,
 ) {
   let { off, online, extra } = current;
   const was = (of: HoursKind) => original?.kind === of || (of === "online" && Boolean(original?.online));
+  const withoutExtra = (cut: Span) => interval ? removeStarts(extra, cut, interval) : removeSpan(extra, cut);
   // A kind chosen replaces the block pressed; opening again and not working take only the times set.
   if (original && kind && kind !== "not working") {
     if (was("off")) off = removeSpan(off, original.span);
     if (was("online") && (kind !== "extra" || original.online)) online = removeSpan(online, original.span);
-    if (was("extra") && kind !== "online") extra = removeSpan(extra, original.span);
+    if (was("extra") && kind !== "online") extra = withoutExtra(original.span);
   }
   if (kind === "off") {
     off = addSpan(off, span);
     online = removeSpan(online, span);
-    extra = removeSpan(extra, span);
+    extra = withoutExtra(span);
   } else if (kind === "online") {
     online = addSpan(online, span);
     off = removeSpan(off, span);
@@ -487,7 +512,7 @@ export function chooseHours(
     off = removeSpan(off, span);
     if (original?.online) online = addSpan(online, span);
   } else if (kind === "not working") {
-    extra = removeSpan(extra, span);
+    extra = withoutExtra(span);
     if (original?.online) online = removeSpan(online, span);
   } else {
     off = removeSpan(off, span);
@@ -922,16 +947,21 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
   for (const group of grouped(changedRows, (row) => row.series_id ? `${row.series_id}|${row.student_changed_at}` : row.id)) {
     const [booking] = group;
     for (const row of group) shown.add(row.id);
-    timed.push({ time: Date.parse(booking.starts_at), changed: Date.parse(booking.student_changed_at!), item: { kind: "changed", key: `changed:${booking.id}`, dismiss: `changed:${booking.id}:${Date.parse(booking.student_changed_at!)}`, booking, count: group.length, first: Boolean(booking.first_lesson && !booking.added_by_teacher) } });
+    timed.push({ time: Date.parse(booking.starts_at), changed: Date.parse(booking.student_changed_at!), item: { kind: "changed", key: `changed:${booking.id}`, dismiss: `changed:${booking.series_id ?? booking.id}:${Date.parse(booking.student_changed_at!)}`, booking, count: group.length, first: Boolean(booking.first_lesson && !booking.added_by_teacher) } });
   }
   // Booked again since (10 November 2026): their confirmed lesson at that start settles it.
   const bookedAgain = (row: AdminBooking) => lessons.some((other) => other.status === "confirmed" &&
     (other.student_id ?? other.student_email) === (row.student_id ?? row.student_email) && Date.parse(other.starts_at) === Date.parse(row.starts_at));
-  const cancelledRows = cancellations.filter((row) => row.cancelled_by === "student" && real(row) && recent(row.cancelled_at) && ahead(row.starts_at) && !bookedAgain(row));
+  const recentCancelled = cancellations.filter((row) => row.cancelled_by === "student" && real(row) && recent(row.cancelled_at));
+  const cancelledRows = recentCancelled.filter((row) => ahead(row.starts_at) && !bookedAgain(row));
   for (const group of grouped(cancelledRows, (row) => row.series_id || row.id)) {
     const [booking] = group;
-    const latest = Math.max(...group.map(row => Date.parse(row.cancelled_at!)));
-    timed.push({ time: Date.parse(booking.starts_at), changed: latest, item: { kind: "cancelled", key: `cancelled:${booking.id}`, dismiss: `cancelled:${booking.id}:${latest}`, booking, count: group.length } });
+    // What she dismisses is the run's notice, as of its latest cancellation:
+    // named for the next lesson still ahead, it changed as each week's time
+    // passed, and a notice she had dismissed came back.
+    const run = booking.series_id || booking.id;
+    const latest = Math.max(...recentCancelled.filter(row => (row.series_id || row.id) === run).map(row => Date.parse(row.cancelled_at!)));
+    timed.push({ time: Date.parse(booking.starts_at), changed: latest, item: { kind: "cancelled", key: `cancelled:${booking.id}`, dismiss: `cancelled:${run}:${latest}`, booking, count: group.length } });
   }
   for (const booking of confirmed) {
     if (booking.first_lesson && !booking.added_by_teacher && soon(booking.starts_at) && !shown.has(booking.id))

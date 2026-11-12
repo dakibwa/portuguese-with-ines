@@ -339,7 +339,8 @@ async function fixture(width, options = {}) {
         target.dormantEmailedAt = "2026-09-07T10:15:00.000Z";
         return route.fulfill({ json: { ok: true, student: target } });
       }
-      if (studentRoute[2] === "details") Object.assign(target, { name: data.name, email: data.email, phone: data.phone, nif: data.nif });
+      // Only the details she changed arrive, and only those are written.
+      if (studentRoute[2] === "details") Object.assign(target, Object.fromEntries(["name", "email", "phone", "nif"].filter(key => key in data).map(key => [key, data[key]])));
       if (studentRoute[2] === "prices") {
         target.ownPrices = Object.fromEntries(Object.entries(data.prices).filter(([, cents]) => cents !== null));
         const sixty = target.ownPrices[60];
@@ -467,11 +468,14 @@ async function showLessons(page) {
   const lessons = page.getByRole("button", { name: "View lessons", exact: true });
   if (await lessons.isVisible()) await lessons.click();
 }
+// What she changed on a date. Each save also names that date's rows as her
+// page last read them (`expectedIds`), which one check below follows.
 const dayWrites = (state, date) =>
   state.writes
     .filter((entry) => entry.path === "/admin/exceptions/day")
-    .map((entry) => entry.data)
+    .map(({ data }) => Object.fromEntries(Object.entries(data).filter(([field]) => field !== "expectedIds")))
     .filter((entry) => !date || entry.date === date);
+const dayRowsRead = (state) => state.writes.findLast((entry) => entry.path === "/admin/exceptions/day").data.expectedIds;
 // A time pressed offers a choice at it: a lesson there, or its hours as time
 // off or online only, their times set first. Nothing saves until she chooses.
 const choiceAt = (page) => page.locator(".teacher-slot-menu");
@@ -555,10 +559,14 @@ try {
     await expect(online).toHaveAttribute("aria-checked", "false");
     await expect.poll(() => state.onlineOnlyPeriods).toEqual([]);
     assert.deepEqual(dayWrites(state).at(-1), { date: "2026-09-09", dayOff: true });
+    assert.deepEqual(dayRowsRead(state), [], "The date had nothing on it when her page read it");
     await online.click();
     await expect(online).toHaveAttribute("aria-checked", "true");
     await expect(off).toHaveAttribute("aria-checked", "false");
     await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-09", dayOff: false });
+    // Her next save names the day off the last one made, so the Worker can
+    // refuse a save made over a change from another device.
+    assert.deepEqual(dayRowsRead(state), [state.nextId]);
     await online.click();
     await expect(note).toHaveText("Wed 9 Sept can be booked in Porto again.");
     await expect.poll(() => state.onlineOnlyPeriods).toEqual([]);
@@ -1336,7 +1344,7 @@ try {
   const savedStudents = page.waitForResponse(isStudentRead);
   await noraProfile.getByRole("button", { name: "Save details", exact: true }).click();
   await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/nora/details").at(-1)?.data).toEqual(
-    { name: "Nora Lima", email: "nora@example.invalid", phone: "", nif: "" });
+    { email: "nora@example.invalid" });
   await expect(nora.locator(".teacher-setup__notice")).toHaveText("Their details are saved.");
   await (await savedStudents).finished();
   const olderStudents = page.waitForResponse(isStudentRead);
@@ -1752,12 +1760,13 @@ try {
     assert.equal(await open.locator("button").count(), 0, "The name's button holds no other button");
     await detailsPencil.click();
     // The student chooses their splat elsewhere while this unrelated editor
-    // still holds its older account snapshot. Saving a phone never sends it.
+    // still holds its older account snapshot. Saving a phone sends the phone
+    // alone, so nothing they have saved since (a splat, a NIF) is put back.
     state.students.find(student => student.id === "sam").mark = "bloom";
     await history.getByLabel("Phone", { exact: true }).fill("+351 922 222 222");
     await history.getByRole("button", { name: "Save details", exact: true }).click();
     await expect.poll(() => state.writes.at(-1)?.path).toBe("/admin/students/sam/details");
-    assert.equal(Object.hasOwn(state.writes.at(-1).data, "mark"), false);
+    assert.deepEqual(state.writes.at(-1).data, { phone: "+351 922 222 222" });
     assert.equal(state.students.find(student => student.id === "sam").mark, "bloom");
     // Saved, the lines read again with focus on the pencil; closing returns her to their name.
     await expect(samRow.locator(".teacher-setup__notice")).toHaveText("Their details are saved.");

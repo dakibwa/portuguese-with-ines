@@ -1284,6 +1284,28 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     });
   }, [refreshStudent]);
 
+  // The lessons on offer and how they are paid. Asked again from the alert's
+  // `Try again`: a read that failed as the page opened was never repeated, so
+  // the page went on with its built-in lessons and "pay on the day", and a
+  // booking then needed an agreement to pay it had no way to give.
+  const loadLessonTypes = useCallback(() => {
+    setLessonTypesError("");
+    listLessonTypes()
+      .then(({ lessonTypes: types, postpay: postpayOn, paymentReady }) => {
+        setLessonTypes(types);
+        if (paymentReady === false || (postpayOn && !STRIPE_PUBLISHABLE_READY)) {
+          setPostpay(false);
+          setPaymentConfigurationError(
+            `Online payment is temporarily unavailable, so booking is paused. Please message ${TUTOR_NAME} instead.`
+          );
+          return;
+        }
+        setPaymentConfigurationError("");
+        setPostpay(Boolean(postpayOn));
+      })
+      .catch((error: Error) => setLessonTypesError(error.message));
+  }, []);
+
   // A session can change in another tab. Remove its private calendar and
   // management links immediately, and load a replacement account separately.
   // Keep the visitor's unsubmitted booking choices through their own sign-in.
@@ -1398,20 +1420,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       }
     }
 
-    listLessonTypes()
-      .then(({ lessonTypes: types, postpay: postpayOn, paymentReady }) => {
-        setLessonTypes(types);
-        if (paymentReady === false || (postpayOn && !STRIPE_PUBLISHABLE_READY)) {
-          setPostpay(false);
-          setPaymentConfigurationError(
-            `Online payment is temporarily unavailable, so booking is paused. Please message ${TUTOR_NAME} instead.`
-          );
-          return;
-        }
-        setPaymentConfigurationError("");
-        setPostpay(Boolean(postpayOn));
-      })
-      .catch((error: Error) => setLessonTypesError(error.message));
+    loadLessonTypes();
 
     // `fetchMe` already clears a genuinely invalid session on a 401. A network
     // interruption (including a quick reload while this request is in flight)
@@ -1480,7 +1489,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       })
       .finally(() => { if (active) setCheckingSession(false); });
     return () => { active = false; };
-  }, [applyAccount, initialLessonsView, refreshStudent]);
+  }, [applyAccount, initialLessonsView, loadLessonTypes, refreshStudent]);
 
   // Link creation can finish just after booking confirmation. Refresh the
   // affected lesson a few times without extending the booking request itself.
@@ -2216,8 +2225,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     (lessonType?.id === "trial" || ratesReady) &&
     !previewing &&
     !loadingSlots &&
-    // Paused card payments never stand in the way of a free lesson.
-    (freeLesson || !paymentConfigurationError) &&
+    // Paused card payments never stand in the way of a free lesson, and
+    // neither does not yet knowing how lessons are paid.
+    (freeLesson || (!paymentConfigurationError && !lessonTypesError)) &&
     (!needsPaymentConsent || paymentConsent);
 
   useEffect(() => {
@@ -2689,7 +2699,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     setLessonSignInLink({ state: "sending", error: "" });
     try {
       await requestSignInLink(email);
-      if (request === managedRequest.current) setLessonSignInLink({ state: "sent", error: "" });
+      if (request === managedRequest.current) {
+        setLessonSignInLink({ state: "sent", error: "" });
+        // The button pressed gives way to a line of text. Focus stays in the
+        // dialog, or the next Tab lands on the page behind it.
+        requestAnimationFrame(() => manageDialogRef.current?.focus({ preventScroll: true }));
+      }
     } catch (caught) {
       if (request === managedRequest.current) {
         setLessonSignInLink({ state: "idle", error: caught instanceof Error ? caught.message : "That link couldn’t be sent. Please try again." });
@@ -2724,6 +2739,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               : "Your weekly lessons have stopped. There were no future booked lessons to cancel."
         );
       });
+      // The lesson that is open, as it now is: it went on reading Booked,
+      // with its Join link, under the line saying it had been cancelled.
+      if (cancelRemaining && managedToken) {
+        void fetchBooking(managedToken).then((fresh) => {
+          if (request === managedRequest.current) setManaged(fresh);
+        }).catch(() => { /* It reads right the next time it is opened. */ });
+      }
       refreshStudentInBackground();
     } catch (caught) {
       if (request !== managedRequest.current) return;
@@ -2771,7 +2793,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     manageWasOpen.current = false;
     const trigger = lessonTrigger.current;
     lessonTrigger.current = null;
-    requestAnimationFrame(() => restoreDialogFocus(trigger));
+    requestAnimationFrame(() => {
+      // Change redraws the calendar, so the day that opened the lesson may be
+      // gone from the page: its day as now drawn, or the lessons' heading,
+      // takes focus, which otherwise fell to the page.
+      const day = trigger?.getAttribute("data-date-key");
+      restoreDialogFocus(trigger?.isConnected ? trigger
+        : (day ? document.querySelector<HTMLElement>(`#lesson-calendar button[data-date-key="${CSS.escape(day)}"]`) : null)
+          ?? document.getElementById("upcoming-lessons-heading") ?? trigger);
+    });
   }, [manageDialogOpen]);
 
   const dismissManagedDialog = useCallback(() => {
@@ -2902,15 +2932,25 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
   // Where, while booking and while changing a lesson. Switch to online on an
   // online-only day comes through here too, so it is exactly pressing Online.
+  // A lesson in Porto is read on Porto's clock and one online on the
+  // student's own, so the place decides which day a chosen time falls on.
+  // The chosen day goes with it: left on the other clock's date, a student in
+  // Tokyo saw Tuesday chosen with no time and saved Wednesday at 03:00.
+  function keepChosenDay(option: "online" | "porto") {
+    if (selectedSlot) setSelectedDate(dateKeyIn(new Date(selectedSlot), option === "porto" ? BOOKING_TIME_ZONE : studentZone));
+  }
+
   function chooseBookingLocation(option: "online" | "porto") {
     slotRecheck.current = [...savedChoices.map(choice => choice.startAt), ...(selectedSlot ? [selectedSlot] : [])];
     setLoadingSlots(true);
     setForm((current) => ({ ...current, location: option }));
+    keepChosenDay(option);
   }
 
   function chooseManagedLocation(option: "online" | "porto") {
     setLoadingSlots(true);
     setManagedLocation(option);
+    keepChosenDay(option);
   }
 
   // One quiet line under a Porto day's times: the globe, what it means, and
@@ -3439,7 +3479,18 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               setAccountLoadError("");
               setCheckingSession(true);
               refreshStudent()
-                .catch(() => setAccountLoadError("We still couldn’t reach your account. Please try again in a moment."))
+                .then((data) => {
+                  // This can be the visit's first account read to succeed,
+                  // and the page has not yet opened on anything: it used to
+                  // stay that way, their bar over an empty page. It opens as
+                  // the first read would have; a view already chosen stays.
+                  if (data?.student) setIntent((current) => (current === "choose" ? "lessons" : current));
+                  else if (!readSession()) setIntent((current) => (current === "choose" ? "book" : current));
+                })
+                .catch(() => {
+                  if (readSession()) setAccountLoadError("We still couldn’t reach your account. Please try again in a moment.");
+                  else setIntent((current) => (current === "choose" ? "book" : current));
+                })
                 .finally(() => setCheckingSession(false));
             }}
             type="button"
@@ -3713,11 +3764,17 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           <div className="booking-alert__body">
             <p>{loadError}</p>
             <div className="booking-alert__actions">
-              {availabilityError && !lessonTypesError ? (
-                <button className="button button--outline button--compact" disabled={loadingSlots} onClick={() => loadAvailability()} type="button">
-                  Try again
-                </button>
-              ) : null}
+              <button
+                className="button button--outline button--compact"
+                disabled={loadingSlots}
+                onClick={() => {
+                  if (lessonTypesError) loadLessonTypes();
+                  if (availabilityError) loadAvailability();
+                }}
+                type="button"
+              >
+                Try again
+              </button>
               <a className="button button--outline button--compact" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
                 Message {TUTOR_NAME}<span className="visually-hidden"> (opens in a new tab)</span>
               </a>
@@ -3908,6 +3965,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                             try {
                               const result = await recoverBookingPayment(managedToken, purpose);
                               if (!current()) return;
+                              // The browser's own Back can bring this page back exactly as it was
+                              // left, still "Opening secure payment…" with nothing to press.
+                              window.addEventListener("pageshow", (event) => { if (event.persisted) setManageWorking(false); }, { once: true });
                               window.location.assign(stripePaymentUrl(result.url));
                             } catch (error) {
                               if (!current()) return;
@@ -3938,6 +3998,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           <button
                             className="button button--quiet"
                             onClick={() => transitionBooking(() => {
+                              setManageError("");
                               setCancelEveryWeek(!lessonChangeable);
                               setManageMode("confirm-cancel");
                             })}
@@ -4921,7 +4982,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   <button
                     className="button button--quiet"
                     disabled={manageWorking}
-                    onClick={() => transitionBooking(() => setManageMode("view"))}
+                    onClick={() => transitionBooking(() => { setManageError(""); setManageMode("view"); })}
                     type="button"
                   >
                     {manageMode === "reschedule-sequence" ? "Keep current schedule" : "Keep current time"}

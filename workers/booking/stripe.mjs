@@ -63,6 +63,7 @@ async function stripeRequest(env, path, body, { idempotencyKey = "" } = {}) {
     const error = new Error(payload?.error?.message ?? `Stripe returned ${response.status}`);
     error.stripeStatus = response.status;
     error.stripeType = payload?.error?.type ?? "";
+    error.stripeCode = payload?.error?.code ?? "";
     throw error;
   }
   return payload;
@@ -77,6 +78,16 @@ export function stripeProblemIsRetryable(error) {
   const status = Number(error?.stripeStatus ?? 0);
   return error?.stripeType === "idempotency_error" || status === 0 || (status >= 300 && status < 400) ||
     status === 409 || status === 429 || status >= 500;
+}
+
+/**
+ * Stripe's plain refusal of a request: it read it and will not do it, and
+ * asked again under the same key it answers the same. A key it rejects (401,
+ * 403) is ours to put right, after which the same request goes through, so
+ * that is not one.
+ */
+export function stripeRefused(error) {
+  return [400, 402, 404].includes(Number(error?.stripeStatus ?? 0)) && error?.stripeType !== "idempotency_error";
 }
 
 async function stripeGet(env, path) {

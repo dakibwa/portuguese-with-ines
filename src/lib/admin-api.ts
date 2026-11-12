@@ -58,6 +58,7 @@ export type AvailabilityRule = {
   last_start_minute: number;
   active?: number;
 };
+export type WeeklyRule = { weekday: number; startMinute: number; lastStartMinute: number };
 export type AvailabilityException = {
   id: number;
   /** Null for a block that repeats every week on `weekday`, such as lunch. */
@@ -246,16 +247,21 @@ export function fetchBookings(token: string, from?: string) {
   });
 }
 
+/**
+ * Replaces her whole week. `expected` is the week as this page last read it:
+ * the Worker refuses the save (409) if another device has changed it since.
+ */
 export function saveRules(
   token: string,
-  rules: { weekday: number; startMinute: number; lastStartMinute: number }[],
+  rules: WeeklyRule[],
+  expected: WeeklyRule[],
 ) {
   return adminRequest<{ ok: true; count: number }>(
     token,
     "/admin/availability",
     {
       method: "POST",
-      body: JSON.stringify({ rules }),
+      body: JSON.stringify({ rules, expected }),
     },
   ).then((data) => {
     if (data.ok !== true || !Number.isInteger(data.count) || data.count < 0) throw new Error(BOOKING_REPLY_ERROR);
@@ -286,10 +292,12 @@ export function saveOnlineOnlyPeriods(token: string, periods: OnlineOnlyPeriod[]
  * independent: each replaces only its own rows, and weekly rows are never
  * touched. A part left out is left as it is.
  */
+/** Replaces a date's time off or extra hours. `expectedIds` are that date's rows as this page last read them. */
 export function saveDayOff(
   token: string,
   date: string,
   change: { dayOff?: boolean; blocks?: { start: number; end: number }[]; extra?: { start: number; end: number }[] },
+  expectedIds: number[],
 ) {
   return adminRequest<{ ok: true; exceptions: AvailabilityException[] }>(
     token,
@@ -298,6 +306,7 @@ export function saveDayOff(
       method: "POST",
       body: JSON.stringify({
         date,
+        expectedIds,
         dayOff: change.dayOff,
         blocks: change.blocks?.map((block) => ({
           startMinute: block.start,
@@ -499,8 +508,8 @@ export function addStudent(token: string, input: StudentDetailsInput & { prices?
   }).then(data => studentReply(data));
 }
 
-/** Their details, all at once. Their email can change only until they first sign in. */
-export function updateStudentDetails(token: string, studentId: string, input: Omit<StudentDetailsInput, "mark">) {
+/** Their details: the ones she changed, the rest left as they are. Their email can change only until they first sign in. */
+export function updateStudentDetails(token: string, studentId: string, input: Partial<Omit<StudentDetailsInput, "mark">>) {
   return adminRequest<{ student: AdminStudent }>(token, `/admin/students/${encodeURIComponent(studentId)}/details`, {
     method: "POST",
     body: JSON.stringify(input),

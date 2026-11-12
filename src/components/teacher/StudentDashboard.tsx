@@ -104,7 +104,11 @@ export function StudentDashboard({ student, token, facts, homeworkId, homeworkRe
       setHistory({ token, studentId, email, bookings: null, error: caught instanceof Error ? caught.message : "Lesson history couldn’t be loaded." });
     });
     return () => { active = false; };
-  }, [token, studentId, email, attempt]);
+    // Read again whenever her list is: it is after every change she makes to a
+    // lesson and on her return to the page, each giving this card a new
+    // `student`. The card stays open behind the Timetable, and went on
+    // listing a lesson she had just cancelled or moved there.
+  }, [token, studentId, email, attempt, student]);
 
   useEffect(() => {
     let active = true;

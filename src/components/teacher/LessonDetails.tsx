@@ -185,10 +185,16 @@ export function LessonDetails({
   const timeMoves = Boolean(date && time) && (date !== dateKey(new Date(booking.starts_at)) || time !== formatSlotTime(booking.starts_at));
   const [cancelMessage, setCancelMessage] = useState("");
   const firstName = booking.student_name.split(" ")[0];
-  // Set up by her and not welcomed yet: the site emails them nothing.
-  const awaiting = Boolean(booking.student_awaiting_welcome);
+  // Set up by her and not welcomed yet: their emails are held.
+  const held = Boolean(booking.student_awaiting_welcome);
   // Added by name alone: there is no address to welcome until she gives one.
   const noEmail = !booking.student_email;
+  // Either way the site emails them nothing. One who signed in from her
+  // invite is no longer held and still has no address, so nothing here may
+  // promise them an email.
+  const awaiting = held || noEmail;
+  const emailedOnce = noEmail ? (held ? "you add their email and send their welcome" : "you add their email") : "you send their welcome";
+  const notEmailed = held ? "they haven’t had their welcome yet" : "they have no email yet";
   const recorded = booking.payment_status === "recorded";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -606,7 +612,7 @@ export function LessonDetails({
             {booking.reschedule_count > 0 ? <li>Moved {booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}</li> : null}
             {inline && booking.same_day_fee_status === "scheduled" ? <li>Change fee scheduled</li>
               : inline && booking.same_day_fee_status === "processing" ? <li>Change fee processing</li> : null}
-            {awaiting ? <li>{noEmail ? "No email yet: add it from their details on Students, then send their welcome" : "Not emailed yet: send their welcome from Students"}</li> : null}
+            {awaiting ? <li>{noEmail ? `No email yet: add it from their details on Students${held ? ", then send their welcome" : ""}` : "Not emailed yet: send their welcome from Students"}</li> : null}
           </ul>
           {inline ? null : recordBlock}
         </>
@@ -724,7 +730,7 @@ export function LessonDetails({
               <ul className="booking-payment-facts teacher-confirm-facts">
                 {past && pastReason ? <>
                   <li>Length and place stay: {pastReason}</li>
-                  <li>{recorded ? "No email is sent" : awaiting ? `${firstName} isn’t emailed until ${noEmail ? "you add their email and send" : "you send"} their welcome` : `${firstName} gets an email with the new time`}</li>
+                  <li>{recorded ? "No email is sent" : awaiting ? `${firstName} isn’t emailed until ${emailedOnce}` : `${firstName} gets an email with the new time`}</li>
                 </> : past ? <>
                   {changeDabs.map(dab => <li key={dab}>{dab}</li>)}
                   {changeDirty && !changing.length ? <li>Nothing to change</li> : null}
@@ -735,7 +741,7 @@ export function LessonDetails({
                   {!changing.length ? <li>Nothing to change</li> : null}
                   {changeKept.length ? <li>{keptLine(changeKept).trim().replace(/\.$/, "")}</li> : null}
                   {changing.length ? (
-                    <li>{awaiting ? `${firstName} isn’t emailed until ${noEmail ? "you add their email and send" : "you send"} their welcome` : `${firstName} gets one email with the change`}</li>
+                    <li>{awaiting ? `${firstName} isn’t emailed until ${emailedOnce}` : `${firstName} gets one email with the change`}</li>
                   ) : null}
                 </> : null}
               </ul>
@@ -760,7 +766,7 @@ export function LessonDetails({
                 {action === "cancel" && everyWeek ? <>
                   <li>{later.length} lessons, {daySpan(later)}</li>
                   <li>{awaiting
-                    ? `${firstName} isn’t emailed: they haven’t had their welcome yet`
+                    ? `${firstName} isn’t emailed: ${notEmailed}`
                     : `${firstName} gets one email listing them, with an update for their calendar`}</li>
                   {later.some(paidByHand) ? <li>Refund {firstName} directly for any paid to you by hand</li> : null}
                   {later.some(lesson => lesson.payment_status === "paid") ? <li>{firstName} is refunded in full, automatically</li> : null}
@@ -775,7 +781,7 @@ export function LessonDetails({
                       {recorded
                         ? "No email is sent"
                         : awaiting
-                        ? `${firstName} isn’t emailed: they haven’t had their welcome yet`
+                        ? `${firstName} isn’t emailed: ${notEmailed}`
                         : `${firstName} gets an email saying you’ve cancelled, with an update for their calendar`}
                     </li>
                     {ticked ? (
