@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "../workspace.css";
 import { IdiomsExperience } from "@/components/expressions/IdiomsExperience";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";

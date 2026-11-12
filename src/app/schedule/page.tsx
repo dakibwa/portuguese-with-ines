@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "../workspace.css";
 import { SiteHeader } from "@/components/SiteHeader";
 import { TeacherSchedule } from "@/components/TeacherSchedule";
 import "./teacher-schedule.css";

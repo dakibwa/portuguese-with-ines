@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "../workspace.css";
 import { ResetPassword } from "@/components/ResetPassword";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";

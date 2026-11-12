@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "../workspace.css";
 import { pageMetadata } from "@/lib/page-metadata";
 import { preconnect } from "react-dom";
 import { BookingFlow } from "@/components/BookingFlow";

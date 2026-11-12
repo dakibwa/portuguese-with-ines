@@ -64,6 +64,13 @@ Expressions' code comes only with a student's lessons, and homework's code and
 styles only with homework itself, so an add-on that is closed to students, or
 a feature that is hidden, adds nothing to a visitor's first load.
 
+The reading pages load one stylesheet, `src/app/globals.css`. The booking
+page, accounts, the reset page, her schedule and Pinta e descobre also load
+`src/app/workspace.css`, after it, which holds every rule only they render.
+A rule goes in `workspace.css` only when no reading page shows what it
+styles; anything the header, footer, menu, buttons, marks or the terms dialog
+need stays in `globals.css`.
+
 Two settings look incidental and are not. Both were wrong at some point and
 cost real bytes:
 
