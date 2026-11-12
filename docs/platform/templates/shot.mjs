@@ -13,7 +13,7 @@ const { chromium } = await import('playwright').catch(() => import('/opt/node22/
   const proxy = process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY } : undefined;
   let browser;
   try { browser = await chromium.launch({ proxy }); }
-  catch (e) { browser = await chromium.launch({ proxy, executablePath: '/opt/pw-browsers/chromium' }); }
+  catch { browser = await chromium.launch({ proxy, executablePath: '/opt/pw-browsers/chromium' }); }
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1, ignoreHTTPSErrors: true });
   const page = await ctx.newPage();
   const errs = [];

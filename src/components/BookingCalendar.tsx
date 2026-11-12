@@ -3,9 +3,8 @@
 import { HOME_CLOCK, IN_PERSON, LANGUAGE, TUTOR_CITY, TUTOR_NAME } from "@/lib/tutor";
 import { MeetingLink } from "@/components/MeetingLink";
 import { LessonsLoading } from "@/components/LessonsLoading";
-import { StudentExpressions } from "@/components/expressions/StudentExpressions";
 
-import { type ComponentType, type CSSProperties, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type CSSProperties, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
   AlertCircle,
@@ -31,6 +30,7 @@ import { AccountMenu, AccountSignature, type AccountSection } from "@/components
 import { CalendarBookingPrompt } from "@/components/CalendarBookingPrompt";
 import { PastLessons } from "@/components/PastLessons";
 import { CHARGED_EACH, CHARGED_IT, FeeFacts } from "@/components/CardOnFile";
+import { deferred } from "@/lib/deferred";
 /*
  * Loaded when it is needed, not before. The sign-in panel — with the Google
  * button, the segmented tabs and the whole account form behind it — is only
@@ -40,9 +40,16 @@ import { CHARGED_EACH, CHARGED_IT, FeeFacts } from "@/components/CardOnFile";
  * time is chosen. The account's own code is fetched with the page whenever a
  * session is stored, since a signed-in student opens on it.
  */
-const { Component: AuthPanel, load: loadAuthPanel } = deferred(() => import("@/components/AuthPanel").then((m) => m.AuthPanel), "Loading…");
-const { Component: AccountControls, load: loadAccountControls } = deferred(() => import("@/components/MyLessons").then((m) => m.MyLessons));
+const { Component: AuthPanel, load: loadAuthPanel } = deferred(() => import("@/components/AuthPanel").then((m) => m.AuthPanel), { waiting: "Loading…", reveal: transitionBooking });
+const { Component: AccountControls, load: loadAccountControls } = deferred(() => import("@/components/MyLessons").then((m) => m.MyLessons), { reveal: transitionBooking });
 if (typeof window !== "undefined" && readSession()) void loadAccountControls();
+/*
+ * Expressions, with their painter, come only with a student's lessons. They
+ * draw nothing while the Worker keeps them closed to students, so a visitor
+ * booking a lesson never waits for them, and one that fails to load leaves
+ * the lessons as they are.
+ */
+const { Component: StudentExpressions } = deferred(() => import("@/components/expressions/StudentExpressions").then((m) => m.StudentExpressions), { quiet: true });
 import { LessonMark } from "@/components/LessonMarks";
 import { clearSession, confirmSignInLink, fetchMe, requestEmailChange, requestSignInLink, isReturningDevice, readSession, rememberedAccount, rememberReturningStudent, SessionStorageError, SIGN_IN_LINK_SENT, storeSession, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
 import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
@@ -754,59 +761,6 @@ function glideBarGroups(stage: HTMLElement, before: BarGroup[]) {
     }
   }
   return duration + 40;
-}
-
-/**
- * A component whose code is fetched when it is needed. Once the code is here
- * it renders in the same commit as the decision that shows it, so that
- * decision's transition eases to its real height. (next/dynamic suspended on
- * every first render, even with the code already fetched, and React then held
- * its fallback for 300ms before the form popped in.) Code still on its way
- * eases in when it arrives.
- */
-function deferred<Props extends object>(fetchComponent: () => Promise<ComponentType<Props>>, waiting = "") {
-  let ready: ComponentType<Props> | null = null;
-  let loading: Promise<ComponentType<Props>> | null = null;
-  const load = () =>
-    (loading ??= fetchComponent().then(
-      (component) => (ready = component),
-      (error: unknown) => {
-        loading = null;
-        throw error;
-      }
-    ));
-  function Deferred(props: Props) {
-    const [Loaded, setLoaded] = useState(() => ready);
-    const [failed, setFailed] = useState(false);
-    useEffect(() => {
-      if (Loaded || failed) return;
-      let live = true;
-      load().then(
-        (component) => {
-          if (live) transitionBooking(() => setLoaded(() => component));
-        },
-        () => {
-          if (live) setFailed(true);
-        }
-      );
-      return () => {
-        live = false;
-      };
-    }, [Loaded, failed]);
-    if (Loaded) return <Loaded {...props} />;
-    if (failed) {
-      return (
-        <p className="booking-state-note" role="alert">
-          This part of the page couldn&rsquo;t load.{" "}
-          <button className="button button--outline button--small" onClick={() => setFailed(false)} type="button">
-            Try again
-          </button>
-        </p>
-      );
-    }
-    return waiting ? <p className="booking-state-note">{waiting}</p> : null;
-  }
-  return { Component: Deferred, load };
 }
 
 function settleStage(stage: HTMLElement, fromHeight: number, floor: number, present: Set<Element>, fromBlank = false) {

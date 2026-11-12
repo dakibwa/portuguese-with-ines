@@ -1,3 +1,13 @@
+/* Kept first: homework.css loaded just ahead of this file when these lived
+   there, so here they keep their place in the cascade. A lesson opened in
+   place by its pencil takes the whole row; closed lessons stay in the grid. */
+.teacher-history-lesson:has(.teacher-pencil[aria-expanded="true"]) { grid-column: 1 / -1; }
+/* Her plan for a student, and homework's own notes: the site's cream field
+   with one blue boundary on focus. */
+.homework-notes__field { display: block; box-sizing: border-box; width: 100%; min-height: 7.5rem; padding: 0.8rem 1rem; border: 1px solid var(--rule); border-radius: var(--squiggle-field); background: #fffaf0; color: var(--ink); font: 400 1rem/1.55 var(--body); resize: vertical; field-sizing: content; }
+.homework-notes__field::placeholder { color: #6e6aa0; }
+.homework-notes__field:focus-visible { border-color: var(--blue-deep); outline: 0; box-shadow: inset 0 0 0 1px var(--blue-deep); }
+
 /* Her page is a column the window's height, as the booking page is, so a
    short tab (Receipts, Profile) ends on the footer rather than a strip of
    paper beneath it (27 October 2026, Dan: no empty space). */
@@ -3230,7 +3240,6 @@
 .teacher-details-edit input:focus-visible { outline: 2px solid var(--blue); outline-offset: -1px; border-color: transparent; }
 .teacher-details-edit > .teacher-edit-actions { grid-column: 1 / -1; justify-self: end; }
 .teacher-details-edit > .teacher-inline-error { grid-column: 1 / -1; margin: 0; }
-.teacher-inline-edit__error { flex: 1 0 100%; margin: 0; }
 @media (pointer: coarse) { .teacher-details-edit input { min-height: 44px; } }
 .teacher-price__row { display: flex; align-items: end; gap: 0.5rem; }
 .teacher-price__row > .teacher-price-fields { flex: 1 1 auto; min-width: 0; }

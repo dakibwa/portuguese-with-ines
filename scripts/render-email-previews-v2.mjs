@@ -15,7 +15,8 @@ import path from "node:path";
 import { renderEmail } from "../workers/booking/email.mjs";
 import * as t from "../workers/booking/email-templates.mjs";
 
-const outDir = path.resolve(process.argv[2] ?? "/workspace/hw-share/emails-v2/html");
+// Replaced on every run, so the default is the git-ignored tmp/.
+const outDir = path.resolve(process.argv[2] ?? "tmp/email-previews");
 
 const site = "https://portuguesewithines.com";
 const manageUrl = `${site}/book/?manage=sample-token`;

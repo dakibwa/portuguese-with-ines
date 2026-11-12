@@ -72,5 +72,3 @@ export const staticLessonTypes = lessonProducts.map((product) => ({
   duration_minutes: product.durationMinutes,
   price_cents: product.priceCents
 }));
-
-export const trialLesson = lessonProducts[0];

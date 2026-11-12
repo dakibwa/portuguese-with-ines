@@ -9,8 +9,6 @@
 .teacher-homework, .student-homework { --hw-dab: 42% 58% 49% 51% / 63% 43% 57% 37%; --hw-dab-alt: 60% 40% 32% 68% / 40% 58% 42% 60%; min-width: 0; color: var(--ink); }
 .teacher-homework { container: homework / inline-size; }
 .homework-worksheet { container: worksheet / inline-size; }
-/* An opened worksheet needs the whole row; closed lessons stay in the grid. */
-.teacher-history-lesson:has(:is(.teacher-history-homework, .teacher-pencil)[aria-expanded="true"]) { grid-column: 1 / -1; }
 .teacher-history-lesson .teacher-homework { margin-top: 1rem; }
 .teacher-homework fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .teacher-homework .button, .student-homework .button { gap: 0.5rem; white-space: nowrap; }
@@ -29,21 +27,18 @@
 /* The little dabs: the booking journey's time chips, filled in cream with
    coral lettering, filling coral when pointed at. On Inês's cream lesson rows
    cream would vanish, so there they take the lilac wash. */
-.homework-back, .homework-answers-toggle, .homework-link, .homework-review summary, .teacher-history-homework.teacher-history-homework {
+.homework-back, .homework-answers-toggle, .homework-link, .homework-review summary {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; min-height: 40px; padding: 0.5rem 1rem; border: 0; border-radius: var(--squiggle-chip);
   background: var(--raised); color: var(--coral-action); cursor: pointer; font: 700 0.72rem/1.2 var(--ui); letter-spacing: 0.1em; text-decoration: none; text-transform: uppercase;
   transition: background var(--motion-surface) var(--motion-ease), color var(--motion-surface) var(--motion-ease);
 }
-:is(.homework-back, .homework-answers-toggle, .homework-link, .homework-review summary, .teacher-history-homework):hover:not(:disabled) { background: var(--coral-action); color: var(--paper-light); }
-:is(.homework-back, .homework-answers-toggle, .homework-link, .homework-review summary, .teacher-history-homework):focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-:is(.homework-back, .homework-link, .teacher-history-homework):disabled { opacity: 0.55; cursor: default; }
+:is(.homework-back, .homework-answers-toggle, .homework-link, .homework-review summary):hover:not(:disabled) { background: var(--coral-action); color: var(--paper-light); }
+:is(.homework-back, .homework-answers-toggle, .homework-link, .homework-review summary):focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+:is(.homework-back, .homework-link):disabled { opacity: 0.55; cursor: default; }
 .homework-back { border-radius: var(--squiggle-button-alt); }
 .homework-back svg { transition: transform 160ms var(--motion-ease); }
 .homework-back:hover:not(:disabled) svg { transform: translateX(-3px); }
-.teacher-homework :is(.homework-link, .homework-review summary), .teacher-history-homework.teacher-history-homework { background: rgba(170, 164, 230, 0.26); }
-.teacher-history-homework.teacher-history-homework { flex: 0 0 auto; min-height: 44px; margin: 0 0 0 auto; padding-inline: 0.75rem; color: var(--ink); white-space: nowrap; }
-.teacher-history-homework svg { color: currentColor; }
-.teacher-history-homework[aria-expanded="true"] { background: var(--blue-deep); color: var(--paper-light); }
+.teacher-homework :is(.homework-link, .homework-review summary) { background: rgba(170, 164, 230, 0.26); }
 
 /* State is a dab too: cream while it waits for someone, blue once it is done. */
 .homework-status {
@@ -88,28 +83,27 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 .homework-toolbar__tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-left: auto; }
 
 /* Fields: the site's cream fields with one blue boundary on focus. */
-.homework-notes textarea, .homework-source textarea, .homework-editor textarea, .homework-editor input, .homework-editor select, .homework-settings select,
+.homework-source textarea, .homework-editor textarea, .homework-editor input, .homework-editor select, .homework-settings select,
 .homework-sheet textarea, .homework-review textarea {
   display: block; box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 0.7rem 0.95rem;
   border: 1px solid var(--rule); border-radius: var(--squiggle-field); background: #fffaf0; color: var(--ink);
   font: 400 1rem/1.55 var(--body); field-sizing: content;
 }
-.homework-notes textarea, .homework-editor textarea, .homework-sheet textarea, .homework-review textarea { resize: vertical; min-height: 3.1rem; }
+.homework-editor textarea, .homework-sheet textarea, .homework-review textarea { resize: vertical; min-height: 3.1rem; }
 .homework-review textarea { min-height: 4.6rem; }
-.homework-notes textarea { min-height: 7.5rem; }
 .homework-editor select, .homework-settings select { padding: 0.55rem 2rem 0.55rem 0.8rem; font-size: 0.92rem; field-sizing: fixed; cursor: pointer; }
-.homework-notes textarea::placeholder, .homework-review textarea::placeholder { color: #6e6aa0; }
-.homework-notes textarea:focus-visible, .homework-source select:focus-visible, .homework-editor :is(input, textarea, select):focus-visible,
+.homework-review textarea::placeholder { color: #6e6aa0; }
+.homework-source select:focus-visible, .homework-editor :is(input, textarea, select):focus-visible,
 .homework-settings select:focus-visible, .homework-sheet textarea:focus-visible, .homework-review textarea:focus-visible {
   border-color: var(--blue-deep); outline: 0; box-shadow: inset 0 0 0 1px var(--blue-deep);
 }
 .homework-sheet textarea:disabled { background: transparent; border-style: dashed; color: var(--ink); opacity: 1; cursor: default; }
 
 /* Labels read above their field; a note such as Optional stays on the label's line. */
-.homework-notes, .homework-settings label, .homework-editor label, .homework-review__feedback {
+.homework-settings label, .homework-editor label, .homework-review__feedback {
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 0.5rem; font: 600 0.84rem/1.4 var(--ui);
 }
-.homework-notes > textarea, .homework-settings label > select, .homework-editor label > :is(input, textarea, select), .homework-review__feedback > textarea { flex: 1 0 100%; }
+.homework-settings label > select, .homework-editor label > :is(input, textarea, select), .homework-review__feedback > textarea { flex: 1 0 100%; }
 .homework-editor small, .homework-review small { color: var(--lavender-ink); font-weight: 500; font-size: 0.76rem; }
 
 /* Lesson notes: Inês's private material, folded once a sheet exists, as an
@@ -246,9 +240,6 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 
 .homework-uncertain { margin: 0; padding: 0.7rem 1rem 0.7rem 2rem; border: 1px solid var(--coral); border-radius: var(--squiggle-field); background: rgba(239, 93, 60, 0.1); color: #862c21; font: 500 0.86rem/1.5 var(--ui); }
 .homework-remake.button { margin-top: 1rem; min-height: 48px; }
-.homework-notes__field { display: block; box-sizing: border-box; width: 100%; min-height: 7.5rem; padding: 0.8rem 1rem; border: 1px solid var(--rule); border-radius: var(--squiggle-field); background: #fffaf0; color: var(--ink); font: 400 1rem/1.55 var(--body); resize: vertical; field-sizing: content; }
-.homework-notes__field::placeholder { color: #6e6aa0; }
-.homework-notes__field:focus-visible { border-color: var(--blue-deep); outline: 0; box-shadow: inset 0 0 0 1px var(--blue-deep); }
 .homework-source .homework-notes__field { margin-top: 0.25rem; }
 
 /* The first step's big blob: lilac-washed with its splat cropped into the
@@ -563,8 +554,8 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .homework-back svg, .past-lesson__homework svg { transition: none; }
-  .homework-back:hover:not(:disabled) svg, .past-lesson__homework:hover svg:last-child { transform: none; }
+  .homework-back svg { transition: none; }
+  .homework-back:hover:not(:disabled) svg { transform: none; }
 }
 
 @media (max-width: 600px) {

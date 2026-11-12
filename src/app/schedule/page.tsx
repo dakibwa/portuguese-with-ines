@@ -1,4 +1,8 @@
 import type { Metadata } from "next";
+import "../workspace.css";
+// Homework's code waits until it opens, but its styles load here, ahead of
+// hers as they always have: a few of its rules and hers tie, and hers win.
+import "../homework.css";
 import { SiteHeader } from "@/components/SiteHeader";
 import { TeacherSchedule } from "@/components/TeacherSchedule";
 import "./teacher-schedule.css";

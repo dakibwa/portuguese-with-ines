@@ -28,7 +28,7 @@
 /visuals/*
   Cache-Control: public, max-age=86400, must-revalidate
 
-/icon.svg
+/icon.png
   Cache-Control: public, max-age=86400, must-revalidate
 
 # HTML pages: 10-minute browser cache with revalidation. Short enough to pick up

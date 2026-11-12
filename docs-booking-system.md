@@ -6,11 +6,8 @@ the source of truth for availability, bookings, and changes.
 
 ## Why not Square, Cal.com, or Acuity
 
-**Square cannot be the rail.** Square does not onboard sellers in Portugal —
-its seller countries are Australia, Canada, France, Ireland, Japan, Spain, the
-United Kingdom and the United States. The account this site pointed at until
-August 2026 was Dan's UK account, set up as a test. It could never have taken
-money for a Porto-based business, and its booking URL is now removed.
+**Square cannot be the rail.** Square does not onboard sellers in Portugal, so
+it can never take money for a Porto-based business.
 
 **The website owns bookings.** Optional lesson sync and Google Meet use a
 separate Google calendar created for this app. Student calendar invitations
@@ -94,7 +91,7 @@ When that teacher account opens `/book/` or signs in there, it goes straight to
 the same `/schedule/` dashboard. This is a navigation choice based on the verified
 account role; admin endpoints still check teacher permissions on every request.
 
-A teacher can also be one of Inês's students (17 October 2026, Dan). Adding a
+A teacher can also be one of Inês's students. Adding a
 teacher's email from Add student sets `also_student = 1` on their account
 (migration `0032-also-student.sql`) instead of refusing it; `role` stays
 `'teacher'`, so they remain an admin everywhere. Their name, password and
@@ -112,18 +109,16 @@ returns `alsoStudent`; `/book/?view=lessons` then opens their lessons, with
 Her own bookings are checked for clashes only, not against her published hours
 or the notice window. Those exist to shape what students may choose; she is the
 one deciding, and fitting a lesson in outside them is a normal thing for her to
-do. A double booking is never intended, so that is still refused.
+do. A double booking is never intended, so a clash is refused.
 
-Adding a lesson for someone who booked another way creates their account if it
-does not exist, with no password. Their confirmation says Inês booked it and
+The student's confirmation of a lesson she adds says Inês booked it and
 carries the calendar invitation. While they have never been in, or have not yet
 saved a card from their account, its button is a one-click sign-in link (good
 for 14 days, once) instead of the manage link, and it says how adding a card
 works; the invitation still carries the manage link. Her own copy says
 `You added a lesson`.
 
-**Recording a lesson already had** (15 October 2026, Dan; owed like any
-lesson she added from 11 November 2026). A `startAt` at or before now is a
+**Recording a lesson already had.** A `startAt` at or before now is a
 lesson she is recording, not booking. It is checked for clashes only, like any lesson she adds (weekly
 hours, time off and the notice window don't apply), and the same student at
 the same start answers 409 `They already have this lesson.` Nothing else a
@@ -133,17 +128,13 @@ whatever the student has agreed to; no reminder (those look only ahead); and
 no Google Calendar event or Meet. One still
 running when she records it carries `meeting_retry_at = ends_at`, so the Meet
 sweep never reaches it. It cannot repeat weekly (400). The reply is
-`emailed: false`. Its place, `online` or `porto`, is hers to give (16 October
-2026, Dan) and is stored for the record only: a past lesson never has a Meet,
-a calendar event or an email, whichever it is.
+`emailed: false`. Its place, `online` or `porto`, is hers to give and is
+stored for the record only: a past lesson never has a Meet, a calendar event
+or an email, whichever it is.
 
-It is stored as `payment_status = 'recorded'` (no migration: the column has
-no CHECK constraint), the mark that it was added afterwards. Until
-11 November 2026 it was kept for the record only, with no price. Then Dan
-sent a student's card with one past lesson open and two saying `Recorded`:
-"this is weird why are they different Ines needs to send a link for all
-three and the future lessons too". So, for money, a record is now any past
-lesson she added:
+It is stored as `payment_status = 'recorded'` (the column has no CHECK
+constraint), the mark that it was added afterwards. For money, a record is
+any past lesson she added:
 
 - It carries the student's price for its length in `amount_cents`, quoted
   and guarded as any lesson she adds is (`expectedPriceCents`, the price
@@ -157,19 +148,19 @@ lesson she added:
   ended lesson on a card is. From then it is an ordinary lesson on a card.
   Saving a card, the standing agreement and the charge sweep never take a
   record the student has not approved by name.
-- Records kept before that date have no `amount_cents`. Their price is the
-  student's price for that length now (their own rate, a 90 derived from
-  their 60, else the standard price). One expression, `lessonCentsSql`, reads
+- A record kept before records carried a price has no `amount_cents`. Its
+  price is the student's price for that length now (their own rate, a 90
+  derived from their 60, else the standard price). One expression, `lessonCentsSql`, reads
   what a lesson she added costs wherever the open rule reads an amount, so
   the count, the tick lists, the review and the approval never disagree. An
   old record's amount is written onto its row only when a tick, an approval
   or a correction touches it.
-- It is still **not in Receipts** while it is open: an unticked record has no
+- It is **not in Receipts** while it is open: an unticked record has no
   line. Ticked, it is paid by hand; paid by card, it is a card payment.
 
-Her pages no longer say `Recorded` ("why do they appear different it should
-be consistent?"): in a student's card it has the `Already paid` tick like any
-open past lesson, and opened it reads `€20 · to pay you directly`. The
+Her pages never label it `Recorded`: in a student's card it has the
+`Already paid` tick like any open past lesson, and opened it reads
+`€20 · to pay you directly`. The
 student sees it under Past lessons on Your lessons as a plain row, like any
 other past lesson. Homework is set on it as usual.
 
@@ -180,7 +171,7 @@ one change `A lesson already had stays in the past. Add a new lesson
 instead.`), so a record never becomes an unannounced lesson to come. Its
 length and place are corrected as any lesson already had is (see her one
 change, below).
-An unproven account with a password is still reclaimed first (below), because
+An unproven account with a password is reclaimed first (below), because
 the lesson and its homework must not reach whoever registered the address;
 with no confirmation sent, the mailbox's owner gets back in with Google or a
 password reset.
@@ -193,11 +184,11 @@ published hours or the notice window, and the run is marked `booking_series.adde
 the nightly top-up keeps doing so. A week that cannot be booked is left out and
 named in both emails.
 
-**Paying for the lessons she adds** (migration 0023, 12 October 2026, Dan).
+**Paying for the lessons she adds** (migration 0023).
 A lesson Inês adds records its price and `added_by_teacher = 1`. One she
 records after it has happened is a record (`recorded`, above): it goes on a
-card only when a link names it. A lesson to come is paid to
-her as before (`payment_status = 'not_required'`) until the student saves a card
+card only when an approval names it. A lesson to come is paid to
+her directly (`payment_status = 'not_required'`) until the student saves a card
 from their own account (`POST /me/card`, Stripe's hosted setup page,
 `client_reference_id = student:<id>`, `metadata.purpose = student_card`). That
 agreement is stored as `students.card_consent_at` (when the session was
@@ -208,7 +199,7 @@ SetupIntent, the card is saved, every lesson she added that has not yet started
 becomes `scheduled` (charged after it ends, on the same change and no-show terms
 as a lesson the student books), her weekly slots for them turn on
 `automatic_payment`, and anything she adds afterwards is `scheduled` from the
-start. A lesson already had is changed only if the link named it (see the
+start. A lesson already had is changed only if an approval named it (see the
 approval link, below), and one the student booked themselves never is. A card
 saved at one booking's checkout agreed to that booking only and
 does not count, and only a proven address (see *Accounts*) can save one: a card
@@ -231,10 +222,9 @@ processing retain their original idempotent retry, since money may have moved.
 
 Inês sees which lessons a newly saved card now pays for in Needs you. One the
 student already paid her for by hand is ticked `Already paid` (below) before it
-is charged, and no later card takes it back. A lesson she records after it has
-happened is never put on a card.
+is charged, and no later card takes it back.
 
-**Already paid** (16 October 2026, Dan). Any lesson, past or to come, can be
+**Already paid.** Any lesson, past or to come, can be
 ticked as paid to her by hand: as she adds it (`paid: true` on `POST
 /admin/bookings`) or later from its dialog (`POST /admin/bookings/:id/paid`,
 `{ paid: true | false }`, teacher only like every `/admin/` route; nothing is
@@ -245,16 +235,16 @@ status:
 - A lesson to come is `not_required` with the mark. Card saving, card removal,
   charging, recovery, chasers and repricing all skip the mark, so it is never
   charged, linked, chased or moved onto a card (the `not_required` pitfall
-  does not reach it), and a student cannot change its length (409). Inês can
-  (11 November 2026): her change of time, place or length goes through, past
-  or to come, and the lesson stays ticked at the price of what it now is. The
-  agreement it carried stays on it, so unticking can restore it.
+  does not reach it), and a student cannot change its length (409). Inês can:
+  her change of time, place or length goes through, past or to come, and the
+  lesson stays ticked at the price of what it now is. The agreement it carried
+  stays on it, so unticking can restore it.
 - A lesson she records after it happened stays `recorded`, with the mark and
   its price in `amount_cents`, so it keeps every record rule (no email, no
   Meet, no move into the future). Ticking one kept before records carried a
   price writes the student's price for its length now. Unticked, it stays a
-  record with that price still on it and is open again (11 November 2026);
-  it has no line in Receipts until it is ticked or paid.
+  record with that price still on it and is open again; it has no line in
+  Receipts until it is ticked or paid.
 - Ticked lessons are in **Receipts as paid by hand, ready**, from the moment
   they are ticked (the money is in), including after cancellation. Untick a lesson to come
   before it is charged and it is billed as it would be booked now: her lesson
@@ -265,7 +255,7 @@ status:
   lesson booked on the earlier lesson-day terms never comes back on stricter
   ones. Unticked after it happened, a lesson of hers is open again as it
   stood, `not_required` at its own price and off the card, as a record is: one
-  already had goes on a card only when a link names it. Its price is the student's current one,
+  already had goes on a card only when an approval names it. Its price is the student's current one,
   never above what they agreed at checkout, and €0 makes it free.
 - Offered only where nothing is settled by card: `scheduled` or
   `not_required` with no charge started, or `recorded`. A free lesson has
@@ -274,19 +264,20 @@ status:
 - Per lesson: a weekly run can't be added ticked (400); each lesson of it is
   ticked from its own dialog, and new weeks are born unticked.
 - The tick covers the lesson price only, not a late change fee.
-- The older `POST /admin/bookings/:id/paid-by-hand` (her lesson on a card,
-  ticked) still answers for any open page, but the site no longer calls it.
-- Her student list's `to be paid by hand` count and the student's `Pay by card`
-  prompt leave ticked lessons out; emails show their price as `paid`.
+- `POST /admin/bookings/:id/paid-by-hand` (her lesson on a card, ticked)
+  still answers for any open page; the site does not call it.
+- Her student list's count of lessons to come still paid by hand
+  (`unpaidUpcoming`) and the student's `Pay by card` prompt leave ticked
+  lessons out; emails show their price as `paid`.
 
 Cancelling a lesson never records a refund of money paid by hand. In Student
 history, `Record refund` opens an explicit confirmation that Inês already
 returned the money directly. `POST /admin/bookings/:id/refund-by-hand` requires
 `{ refunded: true }`, teacher access, a cancelled paid-by-hand lesson and no
 Stripe payment or charge in progress. It records `payment_status = 'refunded'`
-and retains the receipt as `by hand / refunded`, no longer ready to issue.
+and retains the receipt as `by hand / refunded`, not ready to issue.
 Repeated acknowledgments are harmless. It sends no email and makes no payment
-provider call. This is Dan's confirmed receipt rule (18 October 2026).
+provider call.
 
 `GET /admin/students` lists each student with whether they have signed in, a
 card and the standing agreement, their next lesson, how many lessons to come are
@@ -296,29 +287,26 @@ ask for (the same rule `GET …/card-link` lists them by: confirmed, expected,
 nothing charged, not ticked paid, a price above €0; a lesson she recorded
 after it happened is one of them), and `invitedAt`, when the
 newest of their sign-in links still unspent and unexpired was made (`null`
-once each is used or expired), so her list can say `Link sent 5 Sept` (2
-November 2026). `Students` on `/schedule` groups them by whose move it is:
+once each is used or expired), so her list can say `Link sent 5 Sept`.
+`Students` on `/schedule` groups them by whose move it is:
 `To do` (her link to send), `Waiting on them` (a link out, not yet used) and
 `All set`, after `Needs you`. All set is a student fully set up and paying for
-their own lessons (11 November 2026, Dan): signed in, nothing open from the
+their own lessons: signed in, nothing open from the
 past, and a card saved with no lesson she added to come still paid by hand.
 The standing agreement does not stand in for that last part: while
 `unpaidUpcoming` is above zero they are not all set, whatever they have agreed
 to. Someone who books and pays for their own lessons, with none of hers
-waiting, is all set without it (9 November 2026). Her link is
+waiting, is all set without it. Her link is
 a WhatsApp message, or for someone with an email `Email instead`, which is the
 welcome email (`POST /admin/students/:id/welcome`, three an hour per
 student). It is only ever sent by her press: nothing sends it on its own.
-Concurrent first-welcome requests share one durable delivery key and original
-sign-in link. Retries preserve that exact request; `Email instead` for
-someone already welcomed still creates a fresh link. The recipient's captured address and account version
-must match at link creation, email dispatch and the final welcome-state update.
-A student needs no lesson to be welcomed (16 October 2026, Inês); with no
+`Email instead` for someone already welcomed creates a fresh link. The
+recipient's captured address and account version must match at link creation,
+email dispatch and the final welcome-state update.
+A student needs no lesson to be welcomed; with no
 lesson to come the email invites them to sign in and book their next one,
-with no lesson list, and a student free at every length is asked for no card. Accounts the opt-in live check registers
-(`launch-check-…@example.invalid`, from `scripts/qa-recurring-rates.mjs`) are
-left out of the list; the four made on 5 September 2026 were deleted from
-production on 13 October 2026 at Dan's request.
+with no lesson list, and a student free at every length is asked for no card. Accounts an old launch check
+registered (`launch-check-…@example.invalid`) are left out of the list.
 
 Selecting a student opens their lesson history. The teacher UI reads
 `GET /admin/bookings?from=1970-01-01T00:00:00.000Z` through the existing teacher
@@ -337,8 +325,8 @@ makes: the password, every session and any pending reset or address change are
 cleared, before the lesson exists, so no earlier session can read it or its
 manage link. The mailbox's owner gets back in with the one-click sign-in link
 that booking's confirmation always carries, with Google, or by choosing a new
-password. A proven address, a teacher account and the password-less accounts
-created here are never touched.
+password. A proven address, a teacher account and an account with no password
+are never touched.
 
 ## Expressions collection — Stage 1
 
@@ -347,8 +335,9 @@ and writes pass through `handleAdmin`, so either any account with `role = 'teach
 existing shared `ADMIN_TOKEN` can use them. Students and anonymous callers are
 refused before any collection data is read or changed. Existing origin, JSON
 content-type, bounded request-body and no-cache rules apply. The student picker
-has separate authenticated endpoints below. There is no anonymous expression
-endpoint, and this feature sends no email.
+has separate authenticated endpoints below. There is no anonymous collection
+endpoint (only approved translations are public, below), and this feature
+sends no email.
 
 | Method and path | Request and result |
 | --- | --- |
@@ -402,25 +391,15 @@ writes to the Worker. `Open full page` opens the same painting and reading at
 `/idioms/`, under the shared site header. It checks the signed-in account before
 loading her collection and links back to the Expressions tab.
 
-The migration includes 52 drafts, preserving the original expression IDs,
-Portuguese meaning, literal English, idiomatic English equivalent (in
-`meaning_en`), notes and references. The bundle supplies no usage examples or
-themes, so those start empty. `scripts/import-expressions.mjs` parses only
-literal arrays from the bundle with the installed TypeScript parser; it never
-executes bundle code. Regenerate the seed as plain SQL with:
-
-```sh
-node scripts/import-expressions.mjs /path/to/ines-idioms-app/current-app/lib/expressions.ts
-```
-
-The output is the seed section of `0026-expressions.sql`. Repeating it preserves
-existing IDs and teacher edits (`ON CONFLICT(id) DO NOTHING`); it does not refresh
-or overwrite an existing collection. Reorder is bounded to 500 entries.
+The migration seeds 52 drafts from her earlier idioms app, with their original
+expression IDs, Portuguese meaning, literal English, idiomatic English
+equivalent (in `meaning_en`), notes and references. Its inserts use
+`ON CONFLICT(id) DO NOTHING`, so applying `0026-expressions.sql` again never
+overwrites her edits.
 
 ## Student expression picker
 
-**Closed to students until Dan opens it** (14 October 2026, Dan: "publish them
-but not for students just for ines currently"). The Worker var
+**Closed to students until Dan opens it.** The Worker var
 `EXPRESSIONS_FOR_STUDENTS` is the one switch, and only exactly `"1"` opens it;
 `workers/booking/wrangler.jsonc` sets `"0"`. Sign-in and the student-role check
 come first, as below. Then, while closed, `GET /me/expressions` answers
@@ -464,30 +443,26 @@ student reset or repeat action. Failed or lost replies retain the request UUID
 for retry. All replies use the existing no-cache and origin rules; POST bodies
 are bounded to 1 KiB.
 
-**Released on 14 October 2026** (PR #133). Migrations 0026 and 0027 were
-applied by hand to staging and production D1 that day, before the Worker and
-site release. Expressions stay closed to students until
-`EXPRESSIONS_FOR_STUDENTS` is `"1"`. Missing tables would still produce a
-controlled 503 on the affected endpoint while the rest of the portal works.
+Missing tables produce a controlled 503 on the affected endpoint while the
+rest of the portal works.
 
 The content inventory, original schema and feature map are in
 [Expressions: source and scope](docs/expressions-stage-1.md). A public Expressões
-page and optional home-page expression remain plan only. `/idioms/` is an
-authenticated painting page: teachers use their local try-out, students use the
-same feature-gated endpoints, and signed-out visitors sign in first. It adds no
-anonymous collection access or main-menu item. A weekly selection policy is
-also outside this change. Students' own translations are below.
+page, an optional home-page expression and a weekly selection policy are plan
+only. `/idioms/` is an authenticated painting page: teachers use their local
+try-out, students use the same feature-gated endpoints, and signed-out visitors
+sign in first. It adds no anonymous collection access or main-menu item.
+Students' own translations are below.
 
 ## Students' translations of an expression
 
-Added 30 October 2026 (Dan, for Inês); since 7 November 2026 it is one of
-the painted reading's facts, `Noutras línguas`, after its examples, rather
-than a toggle at its foot. It loads when the reading opens. Everyone reading
+Students' translations are one of the painted reading's facts,
+`Noutras línguas`, after its examples. It loads when the reading opens. Everyone reading
 sees the versions Inês has approved, as a language label and the text. A
 signed-in student's `Add yours` opens a small form in place that asks only
 how they say it; its `language` is their device's language setting, named in
 English (`Other` when the browser can't name it). It waits for Inês and is
-shown only once she approves it. The Worker and the `expression_translations` table are unchanged.
+shown only once she approves it.
 The painting page needs an account, so a visitor who is signed out sees its
 sign-in panel, which says they can add translations once signed in. If a
 student's session has lapsed when they send one, the 401 forgets it and the
@@ -504,7 +479,7 @@ rejected ones). `GET /admin/expressions` also returns `pendingTranslations`.
 | `POST /me/expressions/:id/translations` | Signed-in `role = 'student'` | Only `{ language, text }`, each trimmed: language 1 to 40 characters, text 1 to 500. `{ status: "pending" }`, HTTP 201. |
 | `GET /admin/expression-translations?status=pending` | Admin | `pending` (default), `approved` or `rejected`, up to 200: `{ translations: [{ id, expressionId, expression, language, text, status, createdAt, reviewedAt, studentFirstName }], pendingCount }`. |
 | `POST /admin/expression-translations/:id/approve` and `/reject` | Admin | Sets `status` and `reviewed_at`; `{ ok: true, pendingCount }`. |
-| `DELETE /admin/expression-translations/:id` | Admin | Removes it; `{ ok: true, pendingCount }`. CORS now allows `DELETE`. |
+| `DELETE /admin/expression-translations/:id` | Admin | Removes it; `{ ok: true, pendingCount }`. CORS allows `DELETE`. |
 
 Admin means the usual `handleAdmin` path: `ADMIN_TOKEN`, or any signed-in
 account with `role = 'teacher'`, rechecked at each write. Adding is refused for
@@ -531,7 +506,7 @@ review, and a partial unique index on `(student_id, expression_id)` where
 
 **Ship order:** apply 0037 to staging and production D1, deploy the Worker,
 then merge the site. The Worker tolerates a missing table, but the site's
-panel needs the endpoints. The UI journey is `npm run test:expression-translations`
+panel needs the endpoints. The UI journey is `node scripts/qa-expression-translations.mjs`
 with `QA_BASE_URL` pointing at a served build; its Worker replies are fixtures.
 
 ## Teacher calendar
@@ -548,19 +523,18 @@ heading while the timetable reloads; a failed read retains that position and
 offers its existing reload action. Reloading never moves focus from a control
 Inês selects while it is pending.
 
-When Inês cancels a lesson she can include an optional **Message for {first
-name}**,
-up to 1,000 characters. It appears as **Message from Inês** in the student's
-cancellation email and in her own copy, with line breaks preserved and markup
-treated as text. An empty message leaves the existing email unchanged. The
-message is stored separately from lesson notes, atomically with cancellation
-or the refund claim, so refund reconciliation and email retries retain it.
-Migration `0024-cancellation-message.sql` adds that nullable booking field and
-must be applied to each database before deploying this Worker. Her existing
-no-fee cancellation and automatic refund rules remain the same.
+When Inês cancels a lesson, `Add a message to the email` takes an optional
+message of up to 1,000 characters. It appears as **Message from Inês** in the
+student's cancellation email and in her own copy, with line
+breaks preserved and markup treated as text. An empty message leaves the email
+unchanged. The message is stored separately from lesson notes, atomically with
+cancellation or the refund claim, so refund reconciliation and email retries
+retain it. Migration `0024-cancellation-message.sql` adds that nullable booking
+field. The message does not change her no-fee cancellation or automatic refund
+rules.
 
 The week itself is where Inês takes time off, labels online-only time and
-adds extra hours; there is no separate Time off tab (11 November 2026).
+adds extra hours; there is no separate Time off tab.
 Pressing a free time, or dragging over several on one date, opens a small
 choice at them: `Add a lesson here` (for a single time), `From` and `Until`
 to the minute, then `Time off`, `Online only` or `Extra hours`. Nothing is
@@ -589,7 +563,8 @@ each lesson to come that time off or online-only hours left standing: booked
 on a day off, inside hours off, or in person inside online-only hours
 (`timeOffClashes`, proved in `scripts/test-teacher-calendar.mjs`). It is a
 read of what the page already holds; no lesson is moved or cancelled by
-taking time off. Each is a card whose `Change` opens that lesson's own
+taking time off: it stays on the calendar and needs its own move or cancel.
+Each is a card whose `Change` opens that lesson's own
 move/cancel dialog. `Coming up` beside it lists what is set beyond the week
 in view (`timeAhead`; extra hours as `Extra 16:00–18:00`, not on a day off),
 and pressing one turns to that week. Reopening a day
@@ -611,8 +586,6 @@ Leaving the teacher page releases its queue: an already submitted write may
 finish, but no later queued write starts. Unreadable time-off or weekly-hours
 acknowledgments show an error instead of claiming success. Past dates and
 weekly blocks such as lunch are shown but not toggled.
-Existing lessons are never cancelled by time off — they stay on the calendar
-and need their own move or cancel.
 
 `POST /admin/exceptions/day` takes `{ date, dayOff?, blocks?, extra? }`. The
 three parts are independent and each replaces only its own one-off rows in one
@@ -639,7 +612,7 @@ takes `expected`, the week's ranges as the page last read or saved them, and
 `POST /admin/exceptions/day` takes `expectedIds`, the ids of that date's
 one-off rows; a refused hours save says to reload, and after a refused date
 her page reads her days again and shows them as they are. Both fields are
-optional, so a page opened before the Worker took them saves as it always did.
+optional; a save without one is not checked.
 On her Timetable, taking a stretch out of a date's extra hours (`Not working`,
 or time off over them) takes the lesson starts inside it and leaves every
 other start where it was, so times typed off her start grid never shift the
@@ -659,17 +632,15 @@ The tools bar groups `Students`, `Timetable`,
 `Receipts`, `Expressions` and `Profile`, opening on `Timetable`. An old
 `?tab=time-off` link opens Timetable.
 Profile holds her sign-in email change, password reset link, Google Meet
-connection and Sign out. Email changes use the existing new-address confirmation
-flow; password changes use the existing reset email. Google callbacks open Profile
-directly. Students combines setup and ongoing care; the Timetable retains a
-three-card strip for operational notices under her next lesson.
+connection and Sign out. Email changes use the new-address confirmation flow;
+password changes use the reset email. Google callbacks open Profile directly.
 
-Lessons only belong to students (13 October 2026, Dan: no loose lessons).
+Lessons only belong to students: there are no loose lessons.
 `POST /admin/bookings` names the student by `studentId` (their account, which
 works for a student with no email yet) or, for older callers, by `email`; one
 who isn't on the site is refused ("Add them as a student first.", 404), and
 students come from `POST /admin/students`. Each student's card is their profile
-from their first invite to regular use (14 October 2026, Dan; 2 November 2026).
+from their first invite to regular use.
 Its name opens their details, prices and all-time lesson history in place;
 the student fills the Students view, and the card's Close returns to the lanes.
 Each detail and price is edited where it stands; lesson creation uses the same card. A past lesson she
@@ -677,19 +648,16 @@ added and nothing charged can be ticked paid there (`POST
 /admin/bookings/:id/paid`), which takes it out of `unpaidPast`. A new student or a
 free timetable time can start in the creation/student-choice dialog, then opens
 the chosen row's lesson calendar with the selected date and time preserved.
-History matches the linked student ID first and only falls back to an exact
-email for older unlinked lessons; stale requests and session changes cannot
-show another student's history. Default teacher-list splats derive from the
+Default teacher-list splats derive from the
 student ID without replacing a chosen mark or writing account data.
 All teacher actions still use the authenticated admin endpoints and their
 existing booking, payment and email safeguards.
 
-Onboarding (13 October 2026, Dan) lets Inês set a student up before they hear
-anything. `POST /admin/students` takes `email`, `name` and optional `phone`,
-`nif` (checked as `/me` checks it) and `mark`, creates the account with no
-password and `awaiting_welcome = 1` (migration `0025-awaiting-welcome.sql`,
-applied to staging and production on 13 October 2026), and sends nothing; an
-address already on the site is refused. A student she creates from the lesson
+Onboarding lets Inês set a student up before they hear anything.
+`POST /admin/students` takes `name` and optional `email`, `phone`, `nif`
+(checked as `/me` checks it) and `mark`, creates the account with no password
+and `awaiting_welcome = 1` (migration `0025-awaiting-welcome.sql`), and sends
+nothing; an address already on the site is refused. A student she creates from the lesson
 form is set up the same way. While a student is awaiting their welcome and has
 never signed in, every `student_*` email about them is held at the one sending
 point (lessons added, moved or cancelled, the Meet link, charges); her Google
@@ -700,15 +668,12 @@ no address at all: one who has signed in from her WhatsApp link is no longer
 held for a welcome, and still has nowhere to be emailed. `POST /admin/students/:id/welcome` sends
 their upcoming lessons and prices (below) and the one-click way in, then clears
 the flag, after which emails reach them as usual. Signing in themselves also
-ends the hold. Students made before this keep `awaiting_welcome = 0`, so
-nothing about them changes.
+ends the hold.
 
-The welcome's lessons (14 October 2026, Dan: "all their lessons and prices
-already done properly") are read from the lessons themselves, so they are right
+The welcome's lessons are read from the lessons themselves, so they are right
 whenever she added them and whatever she has since changed. Each of a student's
 upcoming confirmed lessons becomes a bullet of two short lines, in the site's
-email design (11 November 2026, Dan: "retain all the info easily and clearly
-and concisely"): when it is, then its place, length and price. A weekly run is
+email design: when it is, then its place, length and price. A weekly run is
 **one** bullet (`Every Tuesday, 17:00` over `Online · 60 minutes · €22 a
 lesson`, then `From 20 October`, or `From 20 October to 8 December` for one
 that ends), a lesson on its own is one bullet (`Tuesday 20 October, 17:00` over
@@ -737,13 +702,13 @@ prices follow under `Your price`, one bullet for each length she has priced
 are left to the website. The layout's rows carry this as `title` rows (a small
 label with no dab) and `fact` rows (one line beside a dab), beside the labelled
 rows every other email uses.
-How they pay is as before: a link that adds their card where the site takes
+For paying, it carries a link that adds their card where the site takes
 cards, or the plain sign-in link.
 
-A name alone is enough to set a student up (13 October 2026, Dan: she builds
-on it later), and a student with no email yet has lessons like anyone else
-(14 October 2026, Dan). `students.email` and `bookings.student_email` stay
-`NOT NULL`, so a student without an address stores `no-email:<id>` in both,
+A name alone is enough to set a student up, since she completes the rest
+later, and a student with no email yet has lessons like anyone else.
+`students.email` and `bookings.student_email` stay `NOT NULL`, so a student
+without an address stores `no-email:<id>` in both,
 as the key that stands in for it. No address can equal that, and every
 sign-in, registration, reset and email-change path checks for a real address
 first. The stand-in never leaves the database (`workers/booking/no-email.mjs`):
@@ -760,8 +725,7 @@ first. The stand-in never leaves the database (`workers/booking/no-email.mjs`):
   show `""` for it.
 
 `POST /admin/students/:id/welcome` is refused (400) until she gives an email.
-Her way to them instead is the WhatsApp invite (2 November 2026, Dan: most of
-her students never gave an email, and only two had signed in):
+Her way to them instead is the WhatsApp invite:
 `POST /admin/students/:id/invite-link` makes the same one-click sign-in link a
 welcome carries (14 days, single use, issued under the welcome's authorization
 so a teacher session can make it), returns `{ url }` and sends nothing; her page
@@ -799,11 +763,11 @@ to an account that has never signed in.
 
 ### Students and attention
 
-`Students` (14 October 2026) combines setup and ongoing care. Each student
+`Students` combines setup and ongoing care. Each student
 appears once, with inline setup while incomplete and a regular student row
-when ready. The Timetable keeps up to three operational notices, with
-`See all in Students` when there are more. It does not repeat onboarding tasks.
-The strip stays absent when empty.
+when ready. The Timetable keeps up to three operational notices under her next
+lesson, with `See all in Students` when there are more. It does not repeat
+onboarding tasks. The strip stays absent when empty.
 It is built in the browser by the pure `needsYou()` in
 `src/lib/teacher-calendar.ts` from reads the page already makes:
 
@@ -811,7 +775,7 @@ It is built in the browser by the pure `needsYou()` in
   `student_changed_at` stamp; the cancelled rows the timetable drops are kept
   client-side, so a student's cancellation (`cancelled_by = 'student'`) can be
   listed;
-- `manualPaymentReconciliation`, which now carries `student_name`, `starts_at`
+- `manualPaymentReconciliation`, which carries `student_name`, `starts_at`
   and the Stripe payment intent ids, for `Open in Stripe` (a link to the
   payment when the id looks like `pi_…`, otherwise to Stripe's payments list);
 - `GET /admin/students` (`awaitingWelcome`, `nextLessonAt`, `email`, `signedIn`,
@@ -823,7 +787,6 @@ Meet first, then payments in the Worker's order, then
 student changes newest first, then undated tasks by next lesson and name:
 Google Meet; a payment Stripe never confirmed; a student
 she set up and has not emailed, at any time once they have an email; a
-student with no email, whose Add email opens their inline details editor; a
 student with no confirmed lessons, whose Add a lesson opens the inline lesson
 form; a lesson a
 student changed in the last 72 hours (one card per weekly run and stamp); a
@@ -836,9 +799,9 @@ never reads as a first lesson, even after the student moves it). The
 older-by-email check in `first_lesson` is written `+legacy.status` so SQLite
 stays on `idx_bookings_student`; without the plus it scans every earlier
 booking for each row returned. A lesson appears
-once. The internal `no-email:` placeholder never appears; their email reads
-as empty and the action opens their details, never sends. Two notices that
-used to be emails to her (16 October 2026, Dan) come from `GET /admin/students`:
+once. The internal `no-email:` placeholder never appears; a student with no
+email is not a task, and their email reads as empty. Two notices that are not
+emailed to her come from `GET /admin/students`:
 `cardDeclined` (each saved-card lesson payment, no-show fee or late change fee
 still `payment_due`, listed with the payments until it is paid, `Open` going to
 the student) and `cardAdded` (for `CARD_ADDED_NOTICE_DAYS`, 7, after a card is
@@ -848,9 +811,8 @@ own link are listed the same way, from when they agreed). Declined cards also st
 when done, after 72 hours, or once the lesson begins; the windows are
 `NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. The four that only tell
 Inês something (a student changed or cancelled a lesson, a student's first
-lesson, a student added a card) can also be dismissed with a small cross
-(11 November 2026, Dan: "can Inês have a dismiss button on these
-notifications"); work still to do (Google Meet, a payment to check, a declined
+lesson, a student added a card) can also be dismissed with a small cross;
+work still to do (Google Meet, a payment to check, a declined
 card, no lessons, a welcome not sent) cannot. `POST /admin/needs-you/dismiss`
 with `{ key }` (teacher only, the authorisation checked inside the write)
 keeps the key in one `settings` row, `needs_you_dismissed`, a JSON object of
@@ -860,13 +822,14 @@ cannot lose one (entries older than 30 days go; at most the newest 100 stay);
 as `dismissed`, so her phone and her laptop agree. A key names what happened
 and when (`changed:<booking>:<changed at>`, `cancelled:<booking>:<cancelled
 at>`, `first:<booking>:<starts at>`, `card:<student>:<added at>`), so a second
-change to the same lesson is a new notice. A dismissed notice no longer counts
-on the Students badge. `studentWorkspace()` groups operational notices by student ID, or an
-unambiguous real email for legacy bookings. Payments match through their
-booking ID; unmatched notices and Meet remain above the list. It ranks payments,
-recent changes, Inês's setup work, first lessons, waiting students, then ready
-students. The Students badge counts each actionable student once, plus general
-notices; it excludes waiting on student sign-in or cards. Returning after five minutes away reloads lessons and
+change to the same lesson is a new notice. A dismissed notice does not count
+on the Students badge. `studentWorkspace()` groups operational notices by
+student ID, or an unambiguous real email for legacy bookings. Payments match
+through their booking ID; unmatched notices and Meet remain above the list. It
+ranks payments, then recent changes, then homework to review, then other
+notices, above `To do`, `Waiting on them` and `All set`. The Students badge
+counts each student with something that needs her once, plus general notices;
+a link still to send, or waiting on a student's sign-in or card, adds nothing. Returning after five minutes away reloads lessons and
 students, quietly: if the read fails, the lessons on screen stay and no error
 replaces them. It reloads her weekly hours, time off and online-only periods
 too, unless she has hours unsaved or a save under way: each save sends the
@@ -877,44 +840,49 @@ open student card reads its lessons again whenever her list is read. Nothing pol
 The views add no endpoint or stored setup flags. A first welcome uses
 `{ "onlyIfWaiting": true }`: the Worker answers 409 `Their welcome has already
 been sent.` before spending the rate limit once the student has been welcomed
-or signed in. The Students card can still re-send deliberately. First welcomes
-share one durable send per student, address and Porto day, so a racing press
-sends nothing twice and a send that failed and ran out of retries does not stop
-a later day's press.
+or signed in. First welcomes share one durable send, and its original sign-in
+link, per student, address and Porto day: a retry or a racing press reuses
+that exact request, so nothing is sent twice, and a send that failed and ran
+out of retries does not stop a later day's press. `Email instead` for someone
+already welcomed re-sends deliberately: it omits `onlyIfWaiting`, never sends
+without an email, and surfaces the endpoint's three-an-hour 429 message.
 
-Inline setup uses the pure `gettingStarted()` selector over the same read:
-Email, Price, Lessons, Welcome, Signed in and Card. Checks mark completed
-steps, an outline marks the next action, and a clock marks waiting on a student. Standard prices count as ready; setting a custom price is optional.
+Inline setup uses the pure `studentProgress()` over the same read: three
+checks (signed in; a card saved with her lessons to come on it; nothing open
+from the past), then the one next step. A card and what is open count only
+where the site takes cards and the student pays something.
 `hasLessons` includes confirmed past lessons and legacy lessons matched by email,
 so returning students do not appear to need a first lesson. `hasCard` is returned
 from the saved Stripe customer and payment method, consistent with `/me`.
-The card step does not block setup when cards are unavailable.
 
 Her steps expand in the row, reusing the details, prices and lesson forms.
 Lesson creation includes a calendar and available start times from the existing
 availability read, refreshed for the chosen lesson length. Choosing a slot
 fills the date and Porto time. The calendar pages back twelve months: a past
 day (or today's earlier times) offers every quarter hour from 07:00 to 21:45;
-for a past time, Where and How often step aside and only the length and a
-coral `Add past lesson` follow. A past time in the timetable offers
-only `Add a lesson here`. There is no manual date or time entry in this form. The existing creation
+for a past time, How often steps aside and only the length, Where, the
+`Already paid` tick and a coral `Add past lesson` follow. A past time in the
+timetable offers only `Add a lesson here`. There is no manual date or time
+entry in this form. The existing creation
 endpoint still checks clashes and validates a weekly run. A saved change
 refreshes the student list and timetable.
-Each step opens its editor in the row. The student's name opens their full
-profile and lesson history, during and after setup. Welcomes remain a separate explicit action. Each row says
-what is needed; help uses short bullets. Sign-in and card belong to the student. `Send the link again` deliberately omits `onlyIfWaiting`, never sends
-without an email, and surfaces the existing 3-per-hour endpoint's 429 message.
-Waiting on students adds no badge count. All writes use the existing teacher
-permission path and validation.
+Each row says what is needed; help uses short bullets. Sign-in and card belong
+to the student.
+
+Migration `0028-student-changed-at.sql` adds `bookings.student_changed_at`.
+A student's own move (`handleReschedule`, `handleRescheduleSeries`) stamps it in
+a separate guarded statement after the move succeeds, only on the rows and
+sequence it wrote; Inês's move (`adminReschedule`) clears it the same way. Both
+tolerate the column being absent (a warning, `student-changed-at`, in the
+Worker's log), so the move itself never depends on the migration. It plays no
+part in fee detection.
 
 ### Notes & homework and her plan
 
 Each student's dashboard (their open card in Students) carries her notes and
 their homework on each past lesson's row, and her plan for them beside their
-details (9 November 2026, Dan: "a homework page for each student and lesson
-structure … Ines can input notes about each lesson etc and it can build up
-over time"; then "a simple dashboard for all things for that student"). It is
-hers alone. The dashboard reads the lessons and the notes side by side and
+details. It is hers alone. The dashboard reads the lessons and the notes side
+by side and
 matches them by booking id. `GET /admin/students/:id/notes` returns her plan and every confirmed
 lesson of theirs that has started (no-shows left out), newest first, with the
 private notes from `lesson_homework`, its level and one homework state:
@@ -932,14 +900,13 @@ and saving one answers 503; nothing else depends on it.
 
 ### Dormant students and the come-back email
 
-Dormant (22 October 2026, Dan: "an option for Ines to add students to dormant
-and also create a custom email to say you haven't had a lesson in a while but
-here is the new website") is hers alone. Migration `0036-dormant-students.sql`
+Dormant marks a student who hasn't had a lesson in a while, so Inês can send
+them a come-back email. It is hers alone. Migration `0036-dormant-students.sql`
 adds `students.dormant_at` and `students.dormant_emailed_at`; nothing a student
 sees, books or is charged reads either.
 
 - **Marking.** A student's profile (their name, then the lesson history panel)
-  offers a lilac `Mark as dormant` button while they have no lesson to come,
+  offers a `Mark as dormant` button while they have no lesson to come,
   and `Mark as active` once dormant. `POST /admin/students/:id/dormant` with
   `{ dormant: true | false }` sets or clears `dormant_at`, teacher only; a
   lesson to come answers 409. Nothing is emailed.
@@ -947,22 +914,20 @@ sees, books or is charged reads either.
   has brought them back since `dormant_at` (`dormantSql()` in the Worker): a
   confirmed lesson ending after the mark (one they book, one she adds, or one
   she records as had) makes them active again with nobody unmarking them, and
-  so does one booked after the mark and then cancelled (Dan: "they can be
-  active after that"). A lesson recorded from before the mark, or cancelled
-  before it, does not.
+  so does one booked after the mark and then cancelled. A lesson recorded
+  from before the mark, or cancelled before it, does not.
 - **Her list.** Dormant students leave the main list for a `Dormant · n`
   section beneath it, by name, labelled `Dormant`, with no setup steps and no
   setup count on the Students badge. One with something new for her (a
   payment, a change, homework) stays up top until it clears.
-- **Each student's email** (22 October 2026, Dan: "can the email be for each
-  individual student but there be the default email already written for
-  each"). A dormant student with an email has `Come-back email` in place of
-  `Sign-in link` among their row's controls, since it carries one. Its panel
+- **Each student's email.** A dormant student with an email has
+  `Come-back email` in place of `Sign-in link` among their row's controls,
+  since it carries one. Its panel
   is written for them: the subject, and `Olá <first name>,` above the default
   message, both hers to change for that student (150 and 3,000 characters),
   with `Start again` once she has, then coral `Send to Marta`.
 - **The default** is what each panel starts from: the standard words in
-  `DORMANT_EMAIL` until she saves her own (`settings.dormant_email_subject`
+  `dormantEmail()` until she saves her own (`settings.dormant_email_subject`
   and `dormant_email_message`) from `Default come-back email` above the
   dormant rows. Changing one student's email never changes the default; an
   email open and untouched when she saves a new default takes it up.
@@ -983,14 +948,6 @@ sees, books or is charged reads either.
   never held for a welcome: for someone she set up and never welcomed, it is
   their welcome, and `awaiting_welcome` clears once it is sent, so their
   lesson emails may follow.
-
-Migration `0028-student-changed-at.sql` adds `bookings.student_changed_at`.
-A student's own move (`handleReschedule`, `handleRescheduleSeries`) stamps it in
-a separate guarded statement after the move succeeds, only on the rows and
-sequence it wrote; Inês's move (`adminReschedule`) clears it the same way. Both
-tolerate the column being absent (a warning, `student-changed-at`, in the
-Worker's log), so the move itself never depends on the migration; changes made
-before it is applied simply never show. The fee-detection SQL is not touched.
 
 ## Accounts
 
@@ -1041,18 +998,17 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   button simply does not render. Returning accounts match Google's stable id.
   First email matching requires Gmail/Workspace authority or a matching,
   already mail-verified site session, as described below.
-  Google renders that button itself and will not be styled, so the coral button
-  a student sees is ours and Google's own is stretched over it at zero opacity.
-  The click, the ID token and the Worker's verification are all still Google's;
-  only the paint is hers. It means the button's hit area has to be checked
-  whenever its size changes — Google sizes its own to 40px and its own width,
-  and anything it does not cover is coral that looks like a button and is not.
+  Google renders that button itself and will not be styled, so a student sees
+  Google's own button, visible and untouched, inside a coral frame of ours.
+  Nothing of ours is drawn over or under it: Google replaces its first button
+  with a cross-origin iframe of a different size, so anything pinned to the
+  first is wrong once the second arrives. The ID token and the Worker's
+  verification are Google's.
 - **Only one JavaScript origin is registered**: `https://portuguesewithines.com`.
   Google's ID-token flow consults that list and ignores the redirect URIs, so the
   button renders anywhere but can only complete there. Local development ships
   the client id and fails on click until its origin is added to the OAuth
-  client. (The `dakibwa.github.io` preview behaved the same way until it was
-  retired on 17 September 2026.)
+  client.
 - **Which tab leads follows who is likely to be there.** At the end of a booking
   the panel opens on *Create an account*, because almost nobody reaching that
   step has booked before; `/my-lessons` and `/schedule` open on *I have an
@@ -1067,8 +1023,8 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   hold off the real student, the accepted trade against guessing.
 - **Sign-up does say when an address already has an account** ("Try signing in
   instead"). That lets someone test whether an address is registered, which
-  sign-in, forgotten-password and email change avoid. It is deliberate (Dan,
-  24 September 2026): hiding it would mean mailing every new student a
+  sign-in, forgotten-password and email change avoid. It is deliberate:
+  hiding it would mean mailing every new student a
   confirmation link before they can book, and telling a returning student to
   sign in is the more useful answer. Five new-account attempts per connection
   an hour (IPv6 counted per /64), taken before the address is looked up, limit
@@ -1093,16 +1049,12 @@ removes its unopened card-setup hold while retaining confirmed lessons.
 - **An address counts as proven once it has received mail.**
   `students.email_verified_at` (migration 0020) is set by any Google sign-in,
   a completed password reset or a confirmed email change; registering with a
-  password leaves it empty. Migration 0020 marks every Google-linked account as
-  proven, and 0021 marks existing password accounts that already have a
-  confirmed lesson as proven too, so Inês's regular students are never signed
-  out by it; accounts with no confirmed lesson start unproven. It decides
+  password leaves it empty. It decides
   whether a lesson Inês adds for that address clears a password first (see
   *Who can do what*): for an unproven password account it signs them out once,
-  and that confirmation tells them how to get back in. Apply
-  `workers/booking/migrations/0020-verified-email.sql` and then `0021` to both
-  databases before deploying the Worker that writes the column: sign-in,
-  password reset and email confirmation fail without it, and `/health` reports
+  and that confirmation tells them how to get back in. Sign-in, password reset
+  and email confirmation fail without the column
+  (`workers/booking/migrations/0020-verified-email.sql`), and `/health` reports
   `schema` until it exists.
 - Sessions are signed bearer tokens in `localStorage`, not cookies: the site
   and the API are different origins, so a cookie would need `SameSite=None` and
@@ -1126,8 +1078,6 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   read refuses that session; network failures retain the existing read retry.
   The profile editor focuses its initial field when it opens, before the student
   can choose another; delayed frame callbacks cannot steal later typing.
-- The emailed manage link still works on its own, so a forgotten password never
-  blocks someone from changing a lesson.
 - **Booking, the learner's calendar, and lesson changes share one workspace.**
   Anyone signed out lands on the booking calendar at `/book`, ready to book,
   beneath one pre-filled choices bar: `Trial` (for a first-time visitor, and
@@ -1146,13 +1096,15 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   calendar four weeks at a time, without free-time choices. There is no
   separate list to keep in step with it.
   Signed-out visitors can browse lesson types, dates, and times before they are
-  asked to sign in; `Already booked? Sign in` asks immediately because the
-  data is private, while booking asks only at confirmation. It is a coral
-  button in the bar's head on a browser where a student with a booked lesson
-  has signed in before (a local flag that outlives the session and grants
-  nothing; Inês or an unused account does not set it), and a quiet
-  line beneath the calendar for anyone else. It opens the `Your account` card
-  on its own; the header's `Booking` is the way back to booking.
+  asked to sign in; booking asks only at confirmation. Their way to lessons
+  already booked is the site header's `Sign in`, beside the bar's menu button
+  where there is room and as the last row of every menu. It opens
+  `/book/?view=lessons`, which asks at once because the data is private and
+  shows the `Your account` card on its own; the header's `Booking` is the way
+  back to booking. A browser where a student with a booked lesson has signed in
+  keeps a local flag that outlives the session and grants nothing (Inês or an
+  unused account does not set it); it decides only whether the trial is
+  offered.
   Every booked lesson is marked there, weekly lessons in lilac and one-off
   lessons in coral. Choosing a date with one lesson opens that lesson; a date
   with several lists them in a dialog titled by that date; a free future date opens booking
@@ -1186,7 +1138,7 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   for links already in the world, then normalise to `/book`.
 - **The signed-in account lives in the lessons card.** The account has one
   menu: `Your lessons` with the upcoming count, `Edit details` and `Sign out`.
-  Your lessons is one schedule (9 November 2026): the calendar of lessons to
+  Your lessons is one schedule: the calendar of lessons to
   come, then `Past lessons` beneath it on the same card, each a two-line row
   with its homework (`/me/homework`, matched by the lesson's start) at the
   row's end. On a wide card the places sit open in the header as one sliding
@@ -1211,9 +1163,9 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   little person (in Porto), the next lesson's day is filled in, and hovering or
   focusing a day shows its lessons in full; on phones and narrow cards, or when
   the next lesson is beyond the first four weeks, the next lesson also leads
-  the card as a row with its Meet link. Weekly lessons are
-  lilac and one-off lessons coral; a weekly lesson's dialog offers `Manage
-  weekly lessons` for the whole run, and `Your lessons` counts an active repeat once.
+  the card as a row with its Meet link. A weekly lesson's `Change` and
+  `Cancel` each choose `This lesson` or `Every week`, and `Your lessons` counts
+  an active repeat once.
   The `?` beside the calendar's month explains that booked lessons open and
   other days start a booking. Once booked, ordinary lessons use the compact duration label (`60
   mins` or `90 mins`) instead of repeating the product name; trial lessons keep
@@ -1238,15 +1190,12 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   The current date and time are selected when it opens, and the calendar and
   choices sit on one modal surface without nested framed panels. `Cancel` stays in the overlay for
   explicit confirmation. Recurring
-  occurrences are identified there as part of a sequence: either action affects
-  only that lesson. Stopping prevents future top-ups
-  without cancelling dates that are already booked, and those retained dates
-  then show as ordinary one-off lessons on the calendar.
+  occurrences are identified there as part of a sequence: with `This lesson`
+  chosen, as it is at first, either action affects only that lesson.
 
 ### Repeating bookings
 
-**Selecting several lessons together** (released 11 September 2026; Worker
-version `09d37a19`): one request can select up to eight
+**Selecting several lessons together.** One request can select up to eight
 single-lesson dates, or two weekly starting times within the same Porto
 Monday–Sunday week. Duration, location and repeat period are shared. Trials
 remain single. `POST /bookings` accepts `startAts`; the existing `startAt` route
@@ -1260,7 +1209,7 @@ The two recurring times use separate existing `booking_series` recipes. One
 D1 transaction inserts all planned lesson rows after an atomic overlap check,
 or leaves no selection or empty recipes behind if another booking wins the
 race. Later unavailable occurrences are previewed and skipped individually;
-both initial times must still be free. No database migration is needed.
+both initial times must still be free.
 Availability excludes occupied single-lesson times as well as recurring ones;
 rescheduling ignores only the specific lesson or series being moved.
 
@@ -1292,7 +1241,7 @@ claiming; a weekly move refuses a plan that crosses a source or target boundary
 while validation runs. Inês's explicit calendar additions retain their override.
 
 - **The occurrences are ordinary rows in `bookings`.** A series is only the
-  recipe that made them. That is what puts the time in Ines's calendar for real,
+  recipe that made them. That is what puts the time in Inês's calendar for real,
   and it means every per-lesson behaviour already built keeps working without
   knowing series exist — the manage link, the iCalendar `UID` and `SEQUENCE`,
   the late change fee, moving one week for a dentist appointment.
@@ -1305,26 +1254,27 @@ while validation runs. Inês's explicit calendar additions retain their override
   must not stop someone booking the other eleven.
 - **Series occurrences ignore `booking_horizon_days`.** That horizon stops a
   stranger reaching in and taking a slot months out; a student keeping their own
-  standing time is the case it is meant to allow. Even at the current 84 days,
+  standing time is the case it is meant to allow. Even at 84 days,
   a run starting a few weeks out would otherwise quietly lose its last weeks.
 - **A recipe is never swept while it is being written.** The housekeeping on
   an availability read removes a recipe with no lessons (an abandoned card
   setup's, once its 35-minute holds lapse) only when it is more than ten
   minutes old: a recipe is written a moment before its first lesson is tied
-  to it, and taking it then failed that booking part way.
+  to it, and taking it then would fail that booking part way.
 - **One initial email each way, carrying every current lesson in one calendar
   file**, each event under its own booking's UID so a later change to one week
   still matches the entry already in her calendar. Twelve lessons must not mean
   twelve emails. When an open-ended run is topped up, the new lesson appears in
   the student's booking calendar without another confirmation email. When
   teacher notifications are enabled, Inês gets one calendar update so the added
-  time reaches her external calendar; that copy is currently paused during development.
+  time reaches her external calendar.
 - **Existing open-ended series are topped up by the nightly scheduled sweep**, not on a page view: her
   calendar has to be right whether or not anyone has opened the site, and a read
   path that quietly writes bookings is impossible to reason about later.
 - **Stopping a repeat keeps the lessons already booked.** Someone who stops
   repeating almost always still means to attend the ones in their calendar;
-  cancelling those silently would be the worse of the two mistakes. Passing
+  cancelling those silently would be the worse of the two mistakes. The
+  lessons kept then show as ordinary one-off lessons on the calendar. Passing
   `cancelRemaining` cancels them too. It applies the same payment policy as an
   individual cancellation: a future paid lesson is refunded, an uncharged one
   is never charged, and a lesson inside the 14-hour window remains booked. A selected
@@ -1356,12 +1306,11 @@ while validation runs. Inês's explicit calendar additions retain their override
   calendar UID, increments its sequence, and the student receives one combined
   updated calendar email, for every move: its `email_log` key names the run,
   the lesson the move began from and that lesson's sequence, since a run's
-  sequences begin again at 0 with each week the top-up adds. Inês's copy
-  follows the existing development pause.
+  sequences begin again at 0 with each week the top-up adds. Inês gets her
+  copy when teacher notifications are enabled.
 - **Inês can change the length of, or cancel, a weekly lesson and every later
-  week of its run in one go** (9 November 2026, Dan: "change recurring ones
-  from 60 to 90 and they all change and she can cancel them all too"). Both
-  start from the lesson she opened, which must still be to come to take the
+  week of its run in one go.** Both start from the lesson she opened, which
+  must still be to come to take the
   weeks after it too; lessons before it are never touched, and a lesson
   already had changes only on its own (see correcting one, below).
   `POST /admin/bookings/:id/length` takes `lessonType` (`single` or `long`),
@@ -1370,10 +1319,9 @@ while validation runs. Inês's explicit calendar additions retain their override
   with a payment due or going through, a free one going to a priced length,
   or one the longer lesson would run into another lesson, keeps its length
   and comes back under `kept` with a short reason; her own lessons keep no
-  gap, as when she adds one. One ticked `Already paid` is no longer held
-  (11 November 2026, Dan: "even if it's already marked as paid Ines should be
-  able to change it"): it changes like any other and stays ticked, at the
-  price of the new length. A student still cannot change the length of one. The rest change in one JSON-backed write that
+  gap, as when she adds one. One ticked `Already paid` is not held: it changes
+  like any other and stays ticked, at the price of the new length. A student
+  cannot change the length of one. The rest change in one JSON-backed write that
   checks each row's sequence, length, payment state and price snapshot, that
   the run has gained or lost no lesson since the read, and that nothing
   overlaps: all of them or none. Each keeps its calendar UID with a higher
@@ -1381,9 +1329,7 @@ while validation runs. Inês's explicit calendar additions retain their override
   run's recipe takes the new length so later top-ups use it. One email tells
   the student (`Inês has changed your lessons to 90 minutes`), or the single
   lesson's own when only one changed.
-- **Inês can change when, how long and where in one go** (10 November 2026,
-  Dan: "allow her malleability to change wholesale recurring stuff from 60 to
-  90, 90 to 60, the dates, the in porto or online etc"). `POST
+- **Inês can change when, how long and where in one go.** `POST
   /admin/bookings/:id/change` takes any of `startAt`, `lessonType` with
   `expectedPriceCents`, and `location`, plus `following`. For a lesson still
   to come a new time must be to come too (a lesson already had is corrected
@@ -1409,8 +1355,8 @@ while validation runs. Inês's explicit calendar additions retain their override
   setting (a list of run ids, pruned to runs still going each time one is
   added, so no migration), and the nightly top-up plans a run in it as it
   plans one she added: held only by her days off and her other lessons, with
-  no gap and no notice. Without that, a student's own run she had moved
-  outside her published hours had every new week skipped and ran out with
+  no gap and no notice. Without that, a student's own run she moved outside
+  her published hours would have every new week skipped and run out with
   nobody told. Its weeks stay the student's own in how they are paid
   (`added_by_teacher` is unchanged), and the student moving the whole run
   themselves takes it off the list. A place change is handled as a student's:
@@ -1419,8 +1365,7 @@ while validation runs. Inês's explicit calendar additions retain their override
   off or online-only periods. One email tells the student (`Inês has changed
   your lesson` / `Inês has changed your weekly lessons`), naming any week
   that stayed; a time-only move of one lesson keeps the words it always had.
-- **Inês can correct a lesson already had** (11 November 2026, Dan: "Ines
-  should be able to change previous lessons to like from 60 to 90 too").
+- **Inês can correct a lesson already had.**
   `/change` and `/length` take a lesson that has started, a record included,
   while nothing of it is on a card: `not_required` or `recorded`, no charge
   started, ticked `Already paid` or not (a ticked one stays ticked, at the
@@ -1440,7 +1385,7 @@ while validation runs. Inês's explicit calendar additions retain their override
   lesson`), plus `it's on their card` for one scheduled on a card and not
   yet charged: what a card is about to be charged for is never changed
   behind the student's back. Her page uses `/reschedule` only for a past lesson that keeps
-  its length and place for one of those reasons, to move its time as before.
+  its length and place for one of those reasons, to move its time.
   `POST /admin/bookings/:id/cancel` with `following: true` ends the run first,
   so the nightly top-up cannot add a week, then cancels each confirmed lesson
   from this one on exactly as her single cancellation does: a card payment is
@@ -1455,7 +1400,7 @@ while validation runs. Inês's explicit calendar additions retain their override
   *The no-show policy*). Open-ended top-ups inherit the same consent
   and scheduled state. A declined charge marks the row `payment_due` and emails
   the student a hosted pay-now link; Inês sees it as a Needs you card until it
-  is paid (16 October 2026: no longer emailed to her).
+  is paid, and it is not emailed to her.
 
 ### Changing your name or email
 
@@ -1470,9 +1415,10 @@ while validation runs. Inês's explicit calendar additions retain their override
   which sign-in and forgotten-password already go out of their way not to reveal.
   Nothing is written and nothing is sent when it is taken.
 - **Google sign-in matches on the Google account id, not the address.** Matching
-  on email alone and overwriting `google_sub` was an account takeover: point your
-  own row at an address someone else uses with Google, and their next sign-in
-  hands you their account with your password still on it. Email is kept only as a
+  on email alone and overwriting `google_sub` would be an account takeover: point
+  your own row at an address someone else uses with Google, and their next
+  sign-in would hand you their account with your password still on it. Email
+  is kept only as a
   fallback for someone who registered with a password first, and never claims a
   row already linked to a different Google account.
   First email matching requires Google to be authoritative for that address:
@@ -1488,7 +1434,7 @@ while validation runs. Inês's explicit calendar additions retain their override
   change fee is still to settle: a card is charged after the lesson, so its
   receipt or pay-now email goes to the new address. Still to settle includes a
   lesson already had and open to pay Inês (`not_required` or `recorded`, not
-  ticked `Already paid`), since a link of hers can put it on a card. A lesson
+  ticked `Already paid`), since an approval can put it on a card. A lesson
   still holding the no-email stand-in always takes the address. Other past and
   cancelled lessons keep the address they were taken under, which is the record
   of what happened.
@@ -1589,7 +1535,7 @@ while validation runs. Inês's explicit calendar additions retain their override
   restore stale values in D1. Account creation handles an email claimed after
   its lookup: password registration offers sign-in; Google resolves the winning
   row through the existing verified identity and first-link rules.
-- **Receipts (13 October 2026, Dan).** `GET /admin/receipts?month=YYYY-MM`
+- **Receipts.** `GET /admin/receipts?month=YYYY-MM`
   (teacher session or `ADMIN_TOKEN`) answers every amount for lessons starting
   in that Porto month: one line per lesson price (or the no-show amount that
   replaced it) and one per late change fee, each with a stable `id`
@@ -1600,10 +1546,9 @@ while validation runs. Inês's explicit calendar additions retain their override
   nothing on a card counts as paid by hand once it has happened; a cancelled
   lesson appears only if money moved; a lesson still to come only once paid.
   One ticked `Already paid` is paid by hand, ready, past or to come. A free
-  lesson (`free`, €0) and an unticked record (`recorded`) never have a line:
-  there is nothing to issue for either (16 October 2026, Dan). That holds
-  now a record is open until paid (11 November 2026): it gets its line when
-  it is ticked or a card pays it.
+  lesson (`free`, €0) never has a line, and an unticked record (`recorded`)
+  has none while it is open: it gets its line when it is ticked or a card
+  pays it.
   Her Receipts tab shows the same lines and downloads them as CSV, so her
   automation can work from the JSON, the CSV or the table and remember each
   `id` it has issued. The rules live in `workers/booking/receipts.mjs`.
@@ -1613,28 +1558,24 @@ while validation runs. Inês's explicit calendar additions retain their override
   carries a `NIF` row beside the student, with the number or
   `Not given (consumidor final)`, read when the email is sent. Her Receipts
   tab and her student profiles state it the same way; her lesson details are
-  about the lesson and no longer carry it. The student's own payment email shows it,
+  about the lesson and do not carry it. The student's own payment email shows it,
   when given, so they can check it before the receipt is issued; their other
   booking emails do not. It is never sent to Stripe or written to logs, and it
   stays out of the shareable Google Calendar events.
-- **Release order.** Apply `workers/booking/migrations/0017-student-nif.sql` to
-  both databases before deploying the Worker that writes it. `/health` reports
-  `schema` until the column exists, so the site's release gate refuses to
-  publish against an unmigrated database. Released 15 September 2026: 0017 on
-  staging and production (existing accounts start without a NIF), Worker on
-  both, site `592b622`.
+- **Release order.** The Worker that writes `students.nif` needs
+  `workers/booking/migrations/0017-student-nif.sql` applied first. `/health`
+  reports `schema` until the column exists, so the site's release gate refuses
+  to publish against an unmigrated database.
 
 ### How far ahead you can book
 
-`booking_horizon_days` is **84** (Dan, 22 September 2026, migration 0018):
-students can choose a lesson up to twelve weeks ahead, and the calendar shows
-that window four weeks at a time rather than as one long scroll. It was 56
-(eight weeks) from 30 August 2026.
+`booking_horizon_days` is **84**: students can choose a lesson up to twelve
+weeks ahead, and the calendar shows that window four weeks at a time rather
+than as one long scroll.
 
 - The front end asks for a window wider than the horizon and lets the Worker
-  clamp it. It used to ask for a fixed 62 days while sizing the grid from whatever
-  horizon the API reported, so raising the horizon past 62 would have drawn weeks
-  of empty cells saying "no times free" — a lie rather than a gap.
+  clamp it: a fixed window shorter than the horizon would draw weeks of empty
+  cells saying "no times free" — a lie rather than a gap.
 - The calendar pages through the window four Monday-to-Sunday weeks at a time.
   A repeating series may already own lessons beyond the window. The lessons
   view keeps paging until its last booked lesson, `Later weeks` counts what
@@ -1649,22 +1590,19 @@ that window four weeks at a time rather than as one long scroll. It was 56
   warning banner or a failed booking. The site also leaves the trial out for a
   student already signed in, or on a browser where a student with a booked
   lesson has signed in before; that is decided as booking opens, so an account created at the
-  confirmation keeps the trial being booked. The Worker's rule is unchanged.
+  confirmation keeps the trial being booked. The Worker does not apply this.
 - The confirmation carries the same choices bar as the calendar, so location,
   length, kind and repeat change in place there; there is no separate
   `Change details` route or setup screen to return to.
-- **When she moves a lesson, the emails say so.** They used to go out in the
-  student's own voice — "that's done" — and tell her the student had moved it.
+- **When she moves a lesson, the emails say so**, never in the student's own
+  voice, and her copy does not say the student moved it.
 
 ### What stops two people booking one lesson
 
-The availability check and the insert used to be two statements with nothing
-between them, which is a race, and not a theoretical one — under load, four
-different students were confirmed into the same lesson in testing.
-
 - **The decision and the write are one statement.** A booking row is inserted
   only if nothing overlapping exists, and zero rows affected is the 409. The
-  same guard is on rescheduling and on every occurrence of a series.
+  same guard is on rescheduling and on every occurrence of a series. A check
+  and a separate insert are a race, and not a theoretical one.
 - **Overlap, not equality.** Lessons are 60 and 90 minutes and can start on
   any quarter hour, so a 90-minute lesson at 17:00 and a 60-minute one at 17:30
   collide while starting at different times. A unique index on the start time
@@ -1675,16 +1613,19 @@ different students were confirmed into the same lesson in testing.
 
 ### Notes on the email and calendar output
 
-- **Sixteen templates.** `workers/booking/email-templates.mjs` owns every
+- **Seventeen templates.** `workers/booking/email-templates.mjs` owns every
   email's words and structure; callers pass formatted facts. Student booked
   (one lesson or a run, by them or by Inês, with or without her welcome
   steps), Inês's booked copy (including a run carried forward), reminder and
   Meet link, student and teacher moved, student and teacher cancelled, the
   student's receipt (lesson, no-show or late change fee), Inês's payment
   received, the student's declined card, welcome, sign-in link, password
-  reset, email-change confirmation and notice, and homework to review.
-  Her notification subjects, and the heading and preheader of her payment
-  emails, stay stable because her filters and receipt automation read them.
+  reset, email-change confirmation and notice, homework to review, and a
+  dormant student's come-back email.
+  Her notification subjects stay stable because her filters and receipt
+  automation read them; her payment-received emails keep their subject,
+  heading, preheader, Portal das Finanças note and `Lesson`, `Reference` and
+  `NIF` rows exactly, because her records read them.
   Student welcome subjects identify the lessons or the invitation to book;
   any card setup is explained in the body.
   `node scripts/render-email-previews-v2.mjs [dir]` writes every variant as
@@ -1697,47 +1638,43 @@ different students were confirmed into the same lesson in testing.
   explicit colour so a client that inverts backgrounds cannot leave it unreadable.
 - Customer emails use short introductions and one action button. HTML keeps
   the complete action link in that button; the plain-text alternative includes
-  the URL. A lesson's facts are bullets (11 November 2026): its place,
-  length and amount on one line (`Online · 60 minutes · €25`), how it is paid
+  the URL. A lesson's facts are bullets: its place, length and amount on one
+  line (`Online · 60 minutes · €25`), how it is paid
   on the next (the `priceValue` terms), the Meet link as its own. The footer
   keeps the applicable change rule in the site's words (FeeFacts) without
   repeating payment timing, or a fee or refund the note above it already
   states (a late move on a saved card ends `This fee applies once per
   lesson.`). Receipts and declined-card emails state the amount once, in the
   introduction and on the button; Inês's copies of a move show what changed
-  under `Before`. Her payment-received emails keep their subject, heading,
-  preheader, Portal das Finanças note and `Lesson`, `Reference` and `NIF`
-  rows exactly, because her records read them. A cancellation names its
-  place rather than linking its call, and an automatic notice ends `Sent
-  automatically by the booking system.` above the site's link.
+  under `Before`. A cancellation names its place rather than linking its call,
+  and an automatic notice ends `Sent automatically by the booking system.`
+  above the site's link.
   Amounts are written as the site writes them: whole euros bare (€25), anything
   else with its cents (€22.50), never rounded.
 - Email fonts use the existing local font stack with Arial/Helvetica fallbacks;
   no external font stylesheet is loaded. Welcome emails explain that Inês sent
   the invitation, name `portuguesewithines.com`, and explain how to open the
   website directly or reply to her. Prices, card requirements and the signed
-  one-click link remain in both HTML and plain text.
+  one-click link are in both HTML and plain text.
 - `email/receipt-kit/README.md` and `scripts/build-receipt-email-kit.mjs` provide
   the matching Gmail/Codex receipt-email kit. It attaches the original fiscal
   PDF issued by Inês's separate automation; it does not issue documents or send
   customer receipts from the booking Worker.
-
-- **Everything a student typed is escaped.** Four fields reached the HTML raw so
-  that callers could pass `<br>` — meaning a name, an address or a lesson note
-  arrived in Inês's inbox as markup, and she is the one person who reads every
-  one of these. Callers now send `\n` and the template turns it into a break.
+- **Everything a student typed is escaped.** Callers send `\n`, never `<br>`,
+  and the template turns it into a break, so a name, an address or a lesson
+  note never reaches Inês's inbox as markup; she is the one person who reads
+  every one of these.
 - **`CN=` is a parameter, not a text value.** iCalendar text escaping is wrong
   there — a semicolon starts the next parameter and a colon ends the list — so a
   student's own name could forge calendar properties or cut the address off the
-  ATTENDEE line. Parameter values are quoted per RFC 5545 §3.1 instead.
+  ATTENDEE line. Parameter values are quoted per RFC 5545 §3.1.
 
 ### Email authentication and inbox placement
 
-Students have reported invitations arriving in spam (27 October 2026).
-The cause is unconfirmed.
+Students have reported invitations arriving in spam; the cause is unconfirmed.
 
 The sending domain is `portuguesewithines.com`, through Resend in `eu-west-1`.
-Its public DNS and Resend configuration were checked on 27 October 2026:
+Its public DNS and Resend configuration:
 
 | Purpose | DNS name | Configuration |
 | --- | --- | --- |
@@ -1761,12 +1698,12 @@ spam reason, then compare SPF, DKIM and DMARC results, sending IP, dates and
 Resend's Deliverability Insights. Redact recipient addresses and private sign-in
 links before sharing diagnostic material outside the account.
 
-No DNS repair was identified in this check. Optional DMARC aggregate reporting
-needs an agreed reporting mailbox or service before adding a `rua` address;
-do not tighten the policy as a speculative spam fix. Students who expected the
-invitation can mark it as not spam and add the sender to their contacts. Confirm
-the effect of any changes on a newly received message; template changes do not
-prove improved inbox placement or justify resending every invitation.
+Optional DMARC aggregate reporting needs an agreed reporting mailbox or service
+before adding a `rua` address; do not tighten the policy as a speculative spam
+fix. Students who expected the invitation can mark it as not spam and add the
+sender to their contacts. Confirm the effect of any changes on a newly received
+message; template changes do not prove improved inbox placement or justify
+resending every invitation.
 
 Sources: [Resend's spam troubleshooting](https://resend.com/docs/knowledge-base/why-are-my-emails-going-to-spam),
 [Google's sender guidelines](https://support.google.com/a/answer/81126?hl=en),
@@ -1821,8 +1758,9 @@ attempts are never reported as delivered, and retries reuse the original bytes
 and first-attempt time rather than rendering a different message.
 
 Retries stop after 23 hours, within Resend's 24-hour idempotency retention.
-Legacy attempts without a saved body/key, recipient changes and expired attempts
-become `unconfirmed` for manual reconciliation. No automatic resend can turn an
+Legacy attempts without a saved body/key (or, for a lesson email, a saved
+snapshot), recipient changes and expired attempts become `unconfirmed` for
+manual reconciliation. No automatic resend can turn an
 ambiguous old attempt into a duplicate. Saved bodies, including private links,
 are purged after success, dry-run or expiry.
 
@@ -1835,7 +1773,8 @@ Messages held until a welcome, or skipped for a missing address, never count as
 delivered Meet links. A proven earlier send can repair a lost delivery marker.
 A cancelled run remains one combined email rather than one send per lesson.
 Per-lesson and combined lifecycle messages store every included lesson's
-identity, version, owner, dates and rendered financial facts. The sweep filters
+identity, version, owner, dates and rendered financial facts in
+`email_log.lifecycle_json`. The sweep filters
 that complete snapshot before its batch limit and the send claim checks it
 again. A changed member cannot replay a stale combined confirmation. Snapshot
 metadata is purged with the private body after delivery or expiry.
@@ -1846,10 +1785,8 @@ than presenting the first lesson's price as the price of every lesson.
 
 For a confirmed saved-card lesson, the teacher schedule's lesson dialog offers
 a `No-show` tick beside `Already paid` (its accessible name `Mark no-show`)
-from the scheduled start until **the scheduled end** (Dan, 2 November 2026:
-"charged at the time of when the lessons ends"; it was an hour after the end
-from 22 October, and six hours before that; `NO_SHOW_WINDOW_HOURS = 0` in
-`policy.mjs`). So Inês marks a no-show while the lesson is on, typically a few
+from the scheduled start until **the scheduled end** (`NO_SHOW_WINDOW_HOURS = 0`
+in `policy.mjs`). So Inês marks a no-show while the lesson is on, typically a few
 minutes in, and ticks `Already paid` for a cash lesson before it ends. The same
 control can undo the mark during that window. `POST /admin/bookings/:id/no-show`
 (`{ "noShow": false }` undoes) accepts the change only inside that window and
@@ -1876,8 +1813,7 @@ a same-time edit and already committed payment retain attendance evidence.
   `not_required`; the teacher control is not offered for them.
 - Moving or cancelling less than 14 hours before the lesson is a separate €5
   action fee, stored independently so a retry or second edit cannot duplicate
-  it, and still charged when the change is made. Its columns keep their
-  original `same_day_*` names.
+  it, and still charged when the change is made.
 - **It is said before booking, not only after.** A charge someone first learns
   about by being charged is the kind that costs a relationship. It appears on the
   booking page's policy band, directly above the confirm button, on the
@@ -1898,9 +1834,8 @@ get wrong:
 
 ### Time and availability
 
-**Online-only periods** (10 November 2026; on the Timetable from 11
-November 2026). Inês labels a whole day with its `Online only` switch, and
-some hours from the choice at the times, on the teaching clock. A date may
+**Online-only periods.** Inês labels a whole day with its `Online only` switch,
+and some hours from the choice at the times, on the teaching clock. A date may
 hold several online-only spans. The service stores periods, not days: each
 includes both dates and is either all day or one daily window, with `00:00`
 as Until meaning the end of that day. The website converts between the two
@@ -1939,20 +1874,19 @@ move a lesson herself using her normal teacher override; an existing series
 she created keeps that override too. No period changes a lesson, sends mail,
 changes a meeting link or charges anyone.
 
-The bounded list (at most 100) lives as JSON in `settings.online_only_periods`;
-no migration is needed. `POST /admin/online-only` takes `{ periods,
-expectedRevision }`, with period fields `{ id, fromDate, toDate, startMinute,
-endMinute }`, and returns the saved list and its new `revision`.
+The bounded list (at most 100) lives as JSON in `settings.online_only_periods`.
+`POST /admin/online-only` takes `{ periods, expectedRevision }`, with period
+fields `{ id, fromDate, toDate, startMinute, endMinute }`, and returns the saved
+list and its new `revision`.
 `GET /admin/availability` supplies `settings.onlineOnlyPeriods` and
 `settings.onlineOnlyRevision`. Saves check the teacher's live session and
 `online_only_revision` in the transaction, returning 409 for a stale editor,
 and bump `availability_revision` so already-planned booking writes cannot
-ignore a newly saved restriction. Deploy the Worker before the website.
+ignore a newly saved restriction.
 
 Instants are stored as ISO-8601 UTC. Inês's weekly hours are stored as
 minutes-from-midnight in Porto time and resolved against `Europe/Lisbon` at query
-time, so the rules survive DST instead of drifting an hour twice a year. The
-25-hour and 23-hour transition days are covered by tests.
+time, so the rules survive DST instead of drifting an hour twice a year.
 
 Student bookings and moves require at least **14 elapsed hours** of notice,
 including across Porto clock changes. Slots inside that window are omitted from
@@ -1960,23 +1894,21 @@ availability and rejected again when a booking or move is submitted; exactly
 14 hours is allowed. Switching only between online and Porto, at the same start
 and length, is not a new time and is not refused by this rule; inside the window
 it is a late change like any other (see *Late changes*).
-`settings.minimum_notice_hours` controls the live rule;
-the seed and missing-setting fallback are both 14. Dan requested this change
-from the previous live setting of 24 hours on 13 September 2026. Since
-21 September 2026 the same setting is also the free-change window (see
-*Late changes*), so it affects both booking notice and fee terms. Admin changes
-may relax it to a whole number from 0 through 14 hours. A stricter window
-requires updated published terms and student consent before implementation.
+`settings.minimum_notice_hours` controls the live rule; the seed and
+missing-setting fallback are both 14. The same setting is also the free-change
+window (see *Late changes*), so it affects both booking notice and fee terms.
+Admin changes may relax it to a whole number from 0 through 14 hours. A
+stricter window requires updated published terms and student consent before
+implementation.
 
 `availability_rules.last_start_minute` is the latest a lesson may **begin**, not
-when she finishes. That distinction matters: treating it as a finishing time
-silently shortened the 90-minute format to an 18:30 last start while the
-60-minute one kept 19:00.
+when she finishes: read as a finishing time, it would give the 90-minute lesson
+an earlier last start (18:30) than the 60-minute one (19:00).
 
-`settings.lesson_buffer_minutes` is **15** (Dan, 22 September 2026, migration
-0019): the 15 minutes after every lesson stay free. A student cannot book a
-lesson that starts within 15 minutes of another ending, or that would end
-within 15 minutes of the next one starting. Availability, every write guard for
+`settings.lesson_buffer_minutes` is **15**: the 15 minutes after every lesson
+stay free. A student cannot book a lesson that starts within 15 minutes of
+another ending, or that would end within 15 minutes of the next one starting.
+Availability, every write guard for
 a student's lesson (single, several at once, weekly runs and moves) and the
 booking page's check between a student's own picks all apply it; `/availability`
 reports it as `bufferMinutes`. Inês's own bookings and moves are exempt, so she
@@ -1990,10 +1922,9 @@ Confirmed lessons, active checkout holds and time off still block overlapping
 choices. Teacher accounts and the emergency access key can use this endpoint;
 the public `/availability` keeps student rules even for a teacher's own booking.
 
-`settings.slot_interval_minutes` is **15** (same migration): within her hours a
-lesson can start on any quarter hour, so the next lesson can begin as soon as
-the free 15 minutes end, where starts used to fall only on the hour and half
-hour. Inês's schedule keeps half-hour rows; a lesson at :15 or :45 sits at its
+`settings.slot_interval_minutes` is **15**: within her hours a lesson can start
+on any quarter hour, so the next lesson can begin as soon as the free 15 minutes
+end. Inês's schedule keeps half-hour rows; a lesson at :15 or :45 sits at its
 exact time there, and the exact-time editor sets quarter-hour first and last
 starts.
 
@@ -2051,9 +1982,8 @@ repeat it. The footer links to `Terms & privacy`; old policy URLs and the
 The visible payment and €5 summary precedes a required `Agree to terms & privacy`
 toggle in postpay mode. It explicitly authorises the existing card charges and
 acknowledges the privacy notice. The final button states both the lesson count
-and the obligation to pay. The toggle still sends the existing `paymentConsent`
-boolean; payment amounts, timing, enforcement and the monetary agreement version
-are unchanged. Reading the combined notice preserves the selection and agreement.
+and the obligation to pay. The toggle sends the `paymentConsent` boolean.
+Reading the combined notice preserves the selection and agreement.
 The underlined terms text inside the agreement opens the dialog independently
 of the toggle. The page shows one payment summary, without a separate reading
 link or repeated authorisation sentence. Escape, the close button or clicking
@@ -2079,31 +2009,31 @@ invalid price. Main-menu and footer booking links use ordinary document
 navigation so explicit destinations and browser history initialize the matching
 booking or lessons view, including navigation from an already open booking page.
 
-Dan confirmed the public contact email `aprenderportugues.ines@gmail.com`,
+The public notice gives the contact email `aprenderportugues.ines@gmail.com`,
 Época as the contact address, Inês's own NIF and her status as a sole trader
-(trabalhadora independente) on 13 September 2026. The
-identifier is maintained only in the public notice; do not duplicate it here.
+(trabalhadora independente). The identifier is maintained only in the public
+notice; do not duplicate it here.
 [Época's own site](https://epocaporto.net/) verifies Rua do Rosário, 22, Porto.
-The existing published WhatsApp number is retained. The 11 September review found that
-`bookings@portuguesewithines.com` is a verified sending address, but the domain
-has no incoming-mail MX records and Resend receiving is disabled. Do not offer
-that address as an inbox until incoming delivery has been configured and verified.
+The published WhatsApp number stays. `bookings@portuguesewithines.com` is a
+verified sending address, but the domain has no incoming-mail MX records and
+Resend receiving is disabled. Do not offer that address as an inbox until
+incoming delivery has been configured and verified.
 
-The 13 September notice review used [DL 24/2014](https://diariodarepublica.pt/dr/legislacao-consolidada/decreto-lei/2014-73222992)
+The notice draws on [DL 24/2014](https://diariodarepublica.pt/dr/legislacao-consolidada/decreto-lei/2014-73222992)
 for paid-order wording and statutory withdrawal, [DL 7/2004, article 10](https://diariodarepublica.pt/dr/detalhe/decreto-lei/7-2004-240775)
 for trader identification, [GDPR article 13](https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng)
 for privacy information and [AT's record-retention guidance](https://info.portaldasfinancas.gov.pt/pt/informacao_fiscal/legislacao/instrucoes_administrativas/Documents/Oficio_Circulado_30213_2019.pdf)
 for the normal ten-year fiscal archive. Provider transfer details link to the
 providers' own published terms; this is not an account-specific transfer audit.
-Account/booking deletion and closure remain requests handled by Inês, not an
+Account/booking deletion and closure are requests handled by Inês, not an
 automatic inactivity purge; legal financial and unresolved-dispute records
 can limit deletion.
 
 **Legal limits still requiring operational resolution:** the notice offers
 statutory withdrawal via Inês's confirmed email and says the ordinary €5 fee
-does not override those rights. The current automatic fee logic does not
+does not override those rights. The automatic fee logic does not
 distinguish statutory withdrawal, so Inês must handle valid requests and any
-refunds within the legal deadline. This UI change does not introduce an
+refunds within the legal deadline. Booking does not provide an
 early-performance request/acknowledgement, a durable copy of the full contract
 and withdrawal form in confirmation emails, or the online withdrawal function
 introduced by [Directive 2023/2673](https://eur-lex.europa.eu/legal-content/en/ALL/?uri=CELEX%3A32023L2673).
@@ -2111,11 +2041,11 @@ The applicable Portuguese requirements and their implementation need review.
 Inês's own electronic complaints-book registration also remains unverified;
 Época's registration must not be assumed to cover her teaching business.
 See [DL 156/2005, articles 2 and 5-B](https://diariodarepublica.pt/dr/legislacao-consolidada/decreto-lei/2005-34431675).
-Do not represent this presentation update as certification of legal compliance.
+Do not represent the notice as certification of legal compliance.
 
-Production uses `payment_mode=postpay` as of 11 September 2026. A new database
-defaults to `off`, where every booking confirms on creation without a card.
-With `postpay` and Stripe configured:
+Production uses `payment_mode=postpay`. A new database defaults to `off`,
+where every booking confirms on creation without a card. With `postpay` and
+Stripe configured:
 
 - booking fails closed with a temporary payment error if the Worker does not
   have a complete key/webhook pair in its declared `test` or `live` mode;
@@ -2130,8 +2060,7 @@ With `postpay` and Stripe configured:
   token, including weekly runs and multiple-date selections. The page confirms
   only when that lesson becomes `confirmed`; `card=saved` alone and older
   account bookings do not prove this checkout succeeded. A missing token or
-  delayed webhook leaves the page asking the student to check their lessons.
-  Publish the Worker return-link change before the website confirmation guard;
+  delayed webhook leaves the page asking the student to check their lessons;
 - a student's next `POST /bookings` replaces their own unfinished card setup,
   so backing out of the form, reloading or closing the tab never leaves them
   refused by their own hold or treated as having had a trial. The replaced
@@ -2139,9 +2068,7 @@ With `postpay` and Stripe configured:
   the Checkout Session `expired`, which Stripe does only to a session that can
   no longer complete; a lapsed hold goes regardless. A completed setup, or one
   Stripe cannot answer for, keeps its hold for the webhook. Should a released
-  session's completion still arrive, it finds no booking and confirms nothing.
-  Availability and the weekly preview, asked with the student's session,
-  already show their own held times as free;
+  session's completion still arrive, it finds no booking and confirms nothing;
 - the webhook signature is verified before the payload is trusted for anything,
   and events are recorded so each is handled exactly once;
 - Checkout creation, saved-card charges and refunds use a stable booking-based
@@ -2152,21 +2079,20 @@ With `postpay` and Stripe configured:
   whose checkout was abandoned loses its orphaned `booking_series` row in the
   same sweep.
 
-**The after-lesson policy** (Dan, 1 September 2026, `policy.mjs` is the single
-home): booking saves a card but takes no money. A scheduled row charges its
-booked amount when the lesson ends, at `ends_at` (Dan, 2 November 2026; an
-hour after it from 22 October). Moving or cancelling at least 14 hours
-before the lesson is free; doing either later schedules one €5 action fee and
-prevents the full price from charging if the lesson was cancelled (the 14-hour
-rule, Dan, 21 September 2026). A no-show recorded between the lesson's start
-and its end changes the end charge from the booked price to €5.
-Inês is never charged a fee for a move or cancellation she makes. Older `paid`
-rows retain their earlier lock/refund promise inside the window; `not_required` rows keep
-their original pay-in-person terms. The card itself never touches the database
-— Stripe keeps it; `students` holds only opaque customer and payment-method ids.
+**The after-lesson policy** (`policy.mjs` is the single home): booking saves a
+card but takes no money. A scheduled row charges its booked amount when the
+lesson ends, at `ends_at`. Moving or cancelling at least 14 hours before the
+lesson is free; doing either later schedules one €5 action fee and prevents the
+full price from charging if the lesson was cancelled. A no-show recorded
+between the lesson's start and its end changes the end charge from the booked
+price to €5. Inês is never charged a fee for a move or cancellation she makes.
+Older `paid` rows keep their lock/refund promise inside the window;
+`not_required` rows keep their original pay-in-person terms. The card itself
+never touches the database — Stripe keeps it; `students` holds only opaque
+customer and payment-method ids.
 
-Changing an ordinary lesson from 60 to 90 minutes (or back) uses that same
-reschedule endpoint. Legacy `not_required` bookings can change length directly;
+Changing an ordinary lesson from 60 to 90 minutes (or back) uses the same
+reschedule endpoint as a move. Legacy `not_required` bookings can change length directly;
 a future recurring lesson with `scheduled` payment follows the new lesson
 price. A `paid` or `payment_due` lesson is never silently repriced: the student
 must cancel/refund and book the other length, or settle the outstanding payment.
@@ -2183,20 +2109,22 @@ while her IVA basis remains an owner/accountant decision.
 cancelled is refused the trial at creation, kindly, and pointed at a single
 lesson. Their own unfinished card setup is released before that check, so it
 still counts only if Stripe has completed it or cannot confirm it expired. This
-is live now, independent of payment mode.
+holds in every payment mode.
 
 Stripe is used because Square does not serve Portugal and Stripe supports
 reusable cards with explicit off-session setup. A least-privilege `rk_test_`
 key is used for the test journey; the account's general secret key never
 belongs in the Worker.
 
-**The account structure** (chosen 28 August, provisioned 31 August 2026):
-**Inês's own Stripe account, with Dan as Administrator** — cheapest
-fees (no Connect platform surcharges), EUR settlement on a Portuguese account,
-her name on statements natively, and Dan runs everything day-to-day through
-the Administrator role and a restricted API key. Payments are created directly
-in her account; there is no platform, connected account, destination charge, or
-second settlement hop.
+**The account structure**: **Inês's own Stripe account, with Dan as
+Administrator** — cheapest fees (no Connect platform surcharges), EUR
+settlement on a Portuguese account, her name on statements natively, and Dan
+runs everything day-to-day through the Administrator role and a restricted API
+key. Payments are created directly in her account; there is no platform,
+connected account, destination charge, or second settlement hop. Its
+representative is Inês Dias Baía and its business is Português com a Inês.
+Fiscal treatment remains the owner's responsibility; do not infer tax
+registration from payments activation.
 
 **Payment methods**: enable **cards only** for card setup and automatic
 off-session charges. Leave MB WAY and Multibanco off for this flow: neither is
@@ -2218,89 +2146,63 @@ Deploy it with:
 npx wrangler deploy --config workers/booking/wrangler.jsonc --env staging
 ```
 
-On 30 October 2026 staging moved from its separate Stripe sandbox to built-in
-test mode. Its restricted key grants Checkout Sessions, Payment Intents, and
-Charges and Refunds write access, plus Setup Intents read access. The test-mode
-`checkout.session.completed` webhook targets the staging Worker and keeps API
-version `2026-08-26.dahlia`. Hosted card setup through staging and its signed
-webhook were verified, followed by a successful EUR 1 test payment and full
-test refund using the replacement key. The old synthetic student's saved-card
-references were cleared because Stripe objects do not cross environments.
-The staging database, dry-run emails, and paused teacher notifications remain
-separate from production. The separate Stripe sandbox was then deleted. The
-September sandbox acceptance below is historical.
+Staging's restricted key grants Checkout Sessions, Payment Intents, and Charges
+and Refunds write access, plus Setup Intents read access. Its test-mode
+`checkout.session.completed` webhook targets the staging Worker on API version
+`2026-08-26.dahlia`. Stripe objects do not cross environments: a student's
+saved-card references from another Stripe environment must be cleared. The
+staging database, dry-run emails and paused teacher notifications are separate
+from production.
 
 The source-level `STRIPE_UI_MODE=embedded` setting maps to Stripe API
-2026-08-26.dahlia's `ui_mode=embedded_page`. Stripe.js still mounts the returned
+2026-08-26.dahlia's `ui_mode=embedded_page`. Stripe.js mounts the returned
 client secret with `initEmbeddedCheckout`.
 
-The 5 September 2026 sandbox acceptance used a labelled `example.invalid`
-student and published Stripe test cards only: declined setup remained
-unconfirmed; successful setup saved the card without payment; signed Checkout
-delivery confirmed the booking; a same-day move charged €5 separately, then
-the minute cron charged €25 after the moved lesson's end; hosted €25 recovery
-completed and a later cancellation completed an actual sandbox refund. Emails
-were dry-run. Synthetic dates were moved in the isolated D1 database to exercise
-the time boundaries; concurrency, DST, no-show and ambiguous provider outcomes
-are covered by the real-SQLite integration suite.
-
-This run corrected the sandbox webhook destination to the staging Worker (it
-had pointed at production), verified a recovered signed delivery answered 200,
-and found that off-session PaymentIntents must explicitly select `card` when
-using `error_on_requires_action`. Checkout also disables Adaptive Pricing per
-session, keeping the agreed EUR amount instead of inheriting an optional
-Dashboard currency conversion with an additional FX fee. These sandbox results
-do not establish live-key configuration or evidence of a genuine customer
-payment in production.
+Off-session PaymentIntents must explicitly select `card` when using
+`error_on_requires_action`. Checkout disables Adaptive Pricing per session,
+keeping the agreed EUR amount instead of inheriting an optional Dashboard
+currency conversion with an additional FX fee.
 
 **Go-live checklist**:
 
-1. Apply migrations 0012–0015 to both databases while production payment remains
-   off. It adds lesson-end charge state, attendance, no-show and independent
-   same-day-fee fields.
-2. ~~Open Inês's Stripe account and invite Dan as **Administrator**~~ — done,
-   31 August 2026. On 5 September 2026 the live merchant's account status showed
-   Payments and Payouts active with no outstanding tasks. Its representative is
-   Inês Dias Baía and its business is Português com a Inês. Fiscal treatment
-   remains the owner's responsibility; do not infer tax registration from
-   payments activation.
-3. Checkout explicitly allows cards only for setup and payment recovery. In live
-   mode, leave other payment methods off. Confirm the
-   business name, support contact, statement descriptor and payout schedule.
-4. Create a least-privilege live restricted key and install it with the live
-   webhook signing secret in the production Worker. Production's
+1. Checkout explicitly allows cards only for setup and payment recovery. In live
+   mode, leave other payment methods off. Confirm the business name, support
+   contact, statement descriptor and payout schedule.
+2. Create a least-privilege live restricted key and install it with the live
+   webhook signing secret in the production Worker's encrypted secret store.
+   The production key, `ines-booking-production`, grants write access only to
+   Charges and Refunds, Customers, Payment Intents, Payment Methods, Products,
+   Setup Intents, Prices and Checkout Sessions. Production's
    `STRIPE_EXPECTED_MODE=live` rejects a sandbox key even if one is present.
-5. Set the repository variable `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` to the live
-   publishable key. The Pages build's `NEXT_PUBLIC_STRIPE_EXPECTED_MODE=live`
-   refuses to mount Stripe.js with a test key.
-6. The live `/stripe/webhook` destination was created and verified Active on
-   5 September for `checkout.session.completed` only. Its signing secret was
-   installed in the production Worker's encrypted secret store on 11 September.
-   A first signed live delivery remains to be observed in Stripe's event log.
-7. Run the redesigned full test-mode journey: setup mode takes no money;
+3. Set the repository variable `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` to the same
+   live merchant's publishable key. The Pages build's
+   `NEXT_PUBLIC_STRIPE_EXPECTED_MODE=live` refuses to mount Stripe.js with a
+   test key.
+4. The live `/stripe/webhook` destination is for `checkout.session.completed`
+   only.
+5. Run the full test-mode journey: setup mode takes no money;
    signed webhook confirmation; full lesson-end charge; no-show €5 replacement;
    same-day move/cancel €5; decline to `payment_due`; and dry-run notices.
-8. Deploy the customer terms, privacy notice and required saved-card
-   checkbox while production still has `payment_mode=off`.
-9. After the sandbox journey passes and the authorised live credentials are
+6. After the test-mode journey passes and the authorised live credentials are
    installed, verify the key mode and permissions, live webhook destination,
    public publishable key and production health. Then activate
    `payment_mode=postpay` and re-run the production health/release gate.
-   [Stripe's testing guidance](https://docs.stripe.com/testing), checked on
-   6 September 2026, prohibits testing in live mode with real payment details:
-   do not create an artificial €25 lesson or €5 fee just to prove the rails.
-   Verify the first genuine authorised customer booking and any applicable
-   charge against Stripe, the Worker, email and the public return journey;
-   describe production payment observation as outstanding until that happens.
+   [Stripe's testing guidance](https://docs.stripe.com/testing) prohibits
+   testing in live mode with real payment details: do not create an artificial
+   €25 lesson or €5 fee just to prove the rails. Verify the first genuine
+   authorised customer booking (its card setup, signed live webhook delivery in
+   Stripe's event log and any resulting charge) against Stripe, the Worker,
+   email and the public return journey. That is still to be observed, so
+   describe production payment observation as outstanding until it happens.
 
 ### Late changes
 
-One 14-hour rule (Dan, 21 September 2026) covers booking, moving and
-cancelling. The window is `settings.minimum_notice_hours` elapsed hours before
-the lesson being moved or cancelled; exactly 14 hours is still free. Elapsed
-hours need no time zone, so the rule reads the same for every student. The
-columns, API fields and Stripe purpose keys keep their original `same_day_*`
-names; they now mean "inside the window".
+One 14-hour rule covers booking, moving and cancelling. The window is
+`settings.minimum_notice_hours` elapsed hours before the lesson being moved or
+cancelled; exactly 14 hours is still free. Elapsed hours need no time zone, so
+the rule reads the same for every student. The columns, API fields and Stripe
+purpose keys keep their original `same_day_*` names; they mean "inside the
+window".
 
 `same_day_change_fee_cents` may be 0 (waived) or a whole number from 50 through
 500 cents. Positive fees meet Stripe's €0.50 EUR minimum, and configuration
@@ -2328,7 +2230,7 @@ keep their original parameters.
   change fee`. Metadata keeps `charge_reason = same_day_change` and the
   idempotency key keeps its `same-day-fee` purpose, so a retry across the
   change cannot create a second charge.
-- **Inês's fiscal reminder** still says "same-day fee" in its subject, heading
+- **Inês's fiscal reminder** says "same-day fee" in its subject, heading
   and preheader, because her receipt automation classifies payments by those
   words. Rename them only together with that automation.
 - **Series**: stopping or moving a whole run keeps any occurrence inside the
@@ -2343,12 +2245,9 @@ keep their original parameters.
 
 ### Booking a cancelled lesson again
 
-A student who cancelled a lesson can take the time back from the same link
-(10 November 2026, Dan relaying Inês: a student she had set up by hand
-cancelled, "wanted to book a lesson" and could not, because booking asked for
-an account and a card they did not have). `POST /bookings/:token/rebook` with
-`{ expectedPriceCents }` needs no session: the link is the authority, as for
-cancelling.
+A student who cancelled a lesson can take the time back from the same link.
+`POST /bookings/:token/rebook` with `{ expectedPriceCents }` needs no session:
+the link is the authority, as for cancelling.
 
 - **Only their own free cancellation.** The lesson must be cancelled by the
   student, not late (`same_day_change = 0`, no late fee on it), and with
@@ -2403,10 +2302,8 @@ link.
 ### Paying by card from a lesson's link
 
 A student Inês set up by hand can start paying by card from a lesson's own
-page, with no sign-in (10 November 2026, Dan: "can you put the allowance for
-the student to subscribe and pay for that lesson if they want from there?";
-he chose straight from the page, and charged at the end of the lesson as
-every card lesson is today).
+page, with no sign-in, and is charged at the end of the lesson as for every
+card lesson.
 
 - **Who is offered it.** `GET /bookings/:token` adds `cardOffer { priceCents,
   everyWeek, replacesCard }` only for a lesson Inês added that is confirmed,
@@ -2473,7 +2370,7 @@ every card lesson is today).
 
 ### A student's own price, private codes and security
 
-**One price per student per length (13 October 2026, Dan).** A student's own
+**One price per student per length.** A student's own
 price for a length, whether from a code they added or set by Inês, prices every
 lesson of theirs at that length, one-off or weekly. By definition their
 90-minute price is 1.5 times their own 60-minute price unless a 90-minute
@@ -2496,30 +2393,23 @@ was to the amount it showed; a card saved from their account
 (`STUDENT_CARD_CONSENT_VERSION`) agreed to every lesson's price, so those
 follow either way. The reply says how many lessons moved.
 
-**Free lessons: a price of €0 (16 October 2026, Dan: "can Inês set a
-student's price to €0 so that student never needs to add a card?").** Before
-this, €0 was refused three times over (her form, `teacherRate`, and the rates
-table's `CHECK (amount_cents > 0)`), and nothing in booking asked whether a
-lesson cost anything: a €0 lesson would still have asked for the card
-agreement and a card, been charged €0 after it (Stripe refuses that, so it
-fell into `payment_due` and a recovery link retried every minute), shown in
-Receipts as `Paid by hand` once it happened, and been moved onto a card the
-day one was saved. Now:
+**Free lessons: a price of €0**, so that the student never needs to add a
+card. Stripe refuses a €0 charge, so none is ever attempted:
 
 - Inês may type `0` for either length, here or when she adds a student.
   Migration 0031 rebuilds `student_recurring_rates` with `CHECK (amount_cents
   >= 0)`; until it is applied, saving €0 answers 503 (`Free lessons need a
   database update first`) and changes nothing. A free 60 makes the 90 free
   too, as 1.5 × 0, unless she gives the 90 a price of its own. Codes are never
-  free (`findRecurringCode` still requires €1 or more). The trial is never
+  free (`findRecurringCode` requires €1 or more). The trial is never
   per-student, so it keeps its standard price and its card step; it is only
   for someone with no lesson yet, so a student she has added a lesson for
   cannot book it.
 - A lesson born at €0 is stored as **`payment_status = 'free'`,
   `amount_cents = 0`**, with no consent: a student's own booking (one lesson,
   several dates or a weekly run), a lesson or weekly run Inês adds (card on
-  file or not), and every week a run adds while the price is €0. No existing
-  status was neutral: `not_required` is Receipts' `Paid by hand` and a card
+  file or not), and every week a run adds while the price is €0. No other
+  status is neutral: `not_required` is Receipts' `Paid by hand` and a card
   saved later charges it; `recorded` is a past lesson nobody was told of,
   open until paid.
   `bookings.payment_status` has no CHECK constraint, so `free` needs no
@@ -2536,7 +2426,7 @@ day one was saved. Now:
   of naming €5. It is a real lesson: the booking, calendar, Meet and day-before
   reminder emails go as for any other, their price row reading `Free`.
 - Her welcome to a student free at both lengths asks for no card (`card:
-  false`, one step), lists `Your price · 60 minutes: Free`, and her setup
+  false`, one step), lists `60 minutes: Free` under `Your price`, and her setup
   checklist drops its Card step. Their account hides the Card row unless a card
   is already saved, and lists their prices as `Free`.
 - Setting a length to €0 makes their lessons still to come at that length free,
@@ -2553,8 +2443,6 @@ day one was saved. Now:
 - A free lesson changes length only onto another free length; a priced length
   is refused (409, cancel it and book that length instead). A priced lesson
   moved onto a free length becomes free.
-
-
 
 `PRIVATE_RECURRING_CODES` is a private Worker binding containing the exact
 approved code, duration and cents triples. The canonical owner list is outside
@@ -2609,9 +2497,8 @@ Old rates lookups cannot overwrite a saved code's prices or show a stale
 lookup error, in either the editor or the booking workspace.
 Saving there tells the booking workspace at once,
 so the next booking is priced from it without a reload or the code being
-typed again. **Sign-up deliberately has no code field** (decided 28 September
-2026): only some students have a code, and a field there would suggest most new
-students should have one.
+typed again. **Sign-up deliberately has no code field**: only some students
+have a code, and a field there would suggest most new students should have one.
 
 If Stripe's idempotent charge response still says processing, the Worker reads
 that same PaymentIntent to observe its current state. A later success settles
@@ -2719,27 +2606,16 @@ amount and currency; expired card-setup holds cannot reclaim a slot.
 
 ## Deploying the Worker
 
-Migration `0033-card-setup-version.sql` adds the card-setup revocation generation.
-It was applied and its type, NOT NULL constraint and default verified in staging and
-production on 18 October 2026, using the connected Cloudflare app. The local
-runtime's Cloudflare token did not grant D1 query access.
-
-Migration `0034-email-recovery.sql` adds four nullable delivery-payload/lease
-fields and quarantines ambiguous legacy attempts as `unconfirmed`. It was
-applied to staging, then production, and all four TEXT columns and nullable
-constraints verified on 18 October 2026 through the connected Cloudflare app.
-Both databases had zero pending, failed or unconfirmed messages afterward.
-Do not replay the full schema or older migrations against an existing database.
-
-Migration `0035-email-lifecycle.sql` was applied to staging, then production on
-18 October 2026 through the connected Cloudflare app. The new nullable TEXT
-column `email_log.lifecycle_json` was verified in both databases; both had zero
-pending, failed or unconfirmed messages afterward. It quarantines legacy
-lifecycle attempts whose included booking snapshots are unknown.
+Apply a new migration by hand, to staging and then production, before the
+Worker that reads it deploys (so before merging): execute its file directly, as
+`schema.sql` is below. The `d1_migrations` ledger is empty, so
+`wrangler d1 migrations apply` would re-run every migration. Do not replay the
+full schema or older migrations against an existing database.
 
 ```bash
 npx wrangler d1 create ines-booking          # put the id in wrangler.jsonc
 npx wrangler d1 execute ines-booking --remote --config workers/booking/wrangler.jsonc --file workers/booking/schema.sql
+# New database only: seed.sql replaces her weekly hours, prices and settings.
 npx wrangler d1 execute ines-booking --remote --config workers/booking/wrangler.jsonc --file workers/booking/seed.sql
 npx wrangler deploy --config workers/booking/wrangler.jsonc
 ```
@@ -2758,15 +2634,16 @@ Secrets, each via `npx wrangler secret put <NAME> --config workers/booking/wrang
 Non-secret vars in `wrangler.jsonc`: `GOOGLE_CLIENT_ID` enables Google Sign-In
 (it is public by design — the Worker verifies every token against it).
 Production uses `TEACHER_NOTIFICATIONS_ENABLED=1` to send Inês's booking,
-change and failed-payment copies, and her "Homework to review" notices. Setting it to `0` pauses these copies;
-student mail and successful-payment fiscal reminders remain enabled, and
-`TEACHER_EMAIL` remains the student messages' reply-to. Staging keeps teacher
-booking copies paused and all email in dry-run mode.
+change and cancellation copies, and her "Homework to review" notices. Setting
+it to `0` pauses these copies; student mail and successful-payment fiscal
+reminders remain enabled, and `TEACHER_EMAIL` remains the student messages'
+reply-to. Staging keeps teacher booking copies paused and all email in dry-run
+mode.
 
-Then set `EMAIL_DRY_RUN=0` in `wrangler.jsonc` and redeploy. Until that happens
-the Worker records every message in `email_log` and sends nothing — and
-`npm run check:booking` refuses to pass, because a site that confirms bookings
-while silently sending no confirmations is worse than one that is visibly down.
+Production has `EMAIL_DRY_RUN=0`. With `1` the Worker records every message in
+`email_log` and sends nothing — and `npm run check:booking` refuses to pass,
+because a site that confirms bookings while silently sending no confirmations
+is worse than one that is visibly down.
 
 `.dev.vars` overrides **secrets only**, not `vars`. For local development against
 a different origin, pass `--var ALLOWED_ORIGIN:… --var SITE_URL:…` to
@@ -2774,11 +2651,21 @@ a different origin, pass `--var ALLOWED_ORIGIN:… --var SITE_URL:…` to
 
 ## Site configuration
 
+```bash
+NEXT_PUBLIC_BOOKING_API_BASE_URL=https://ines-booking.<subdomain>.workers.dev
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+NEXT_PUBLIC_STRIPE_EXPECTED_MODE=live
+NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS=500
+```
+
+With no API URL the booking page degrades to its setup placeholder and points
+students at WhatsApp, rather than rendering a calendar that cannot work.
+
 The tutor's identity is not configuration here: name, brand, language, city,
 time zone, currency, domain, sender, booking reference prefix and calendar UID
 domain come from [tutors/ines/tutor.json](./tutors/ines/tutor.json), read by
 `workers/booking/tutor.mjs` (`tutorOf(env)`) and `src/lib/tutor.ts`. The
-Worker's `SITE_URL`, `MAIL_FROM` and `MAIL_SENDER_ADDRESS` still override the
+Worker's `SITE_URL`, `MAIL_FROM` and `MAIL_SENDER_ADDRESS` override the
 record's site URL and sender, which is how staging and local runs point
 elsewhere. Never change `bookings.referencePrefix` or
 `bookings.calendarUidDomain` for a tutor who has lessons: calendars match
@@ -2788,12 +2675,12 @@ updates by the UID, and students and receipts quote the reference.
 
 One Worker can serve several tutors. `workers/booking/directory.mjs` lists them
 (`TUTORS`), and each has their own D1 database, bound under the name in their
-record's `database`. Inês's is `DB`, as it always was.
+record's `database`. Inês's is `DB`.
 
 - **Whose request.** A request is a tutor's when its `Origin` is one of their
   `site.origins`, or when it arrives on one of their `api.hosts`. Everything
   else, including the Stripe webhook, the Google Calendar callback and the
-  release probe, is Inês's, so her site behaves exactly as before.
+  release probe, is Inês's.
 - **Inês's env is the deploy's own object, untouched.** Another tutor's env is
   built from nothing: their database, the shared mail, marking and Google
   sign-in keys, signing secrets (`BOOKING_TOKEN_SECRET`, `ADMIN_TOKEN`) derived
@@ -2805,8 +2692,8 @@ record's `database`. Inês's is `DB`, as it always was.
 - **Fail closed.** A tutor whose database binding is missing gets a 500 on every
   call, never someone else's data; the scheduled sweeps skip and log them
   (`tutor-database-missing`) and run once for every other tutor.
-- **Expressions is Inês's add-on**, not part of the platform (9 November 2026,
-  Dan). Only a record with `features.expressions` serves its routes; for any
+- **Expressions is Inês's add-on**, not part of the platform. Only a record
+  with `features.expressions` serves its routes; for any
   other tutor they answer 404, and the directory refuses a second tutor who
   claims it.
 
@@ -2834,94 +2721,22 @@ connected account), Google Calendar (its callback has to carry the tutor), the
 site itself (built for her), the Portuguese tax number and Portal das Finanças
 reminders, and `'porto'` as the stored key for an in-person lesson.
 
-```bash
-NEXT_PUBLIC_BOOKING_API_BASE_URL=https://ines-booking.<subdomain>.workers.dev
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
-NEXT_PUBLIC_STRIPE_EXPECTED_MODE=live
-LESSON_PRICE_CENTS=2500
-LESSON_CURRENCY=eur
-NEXT_PUBLIC_LESSON_DURATION_MINUTES=60
-NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS=500
-```
-
-With no API URL the booking page degrades to its setup placeholder and points
-students at WhatsApp, rather than rendering a calendar that cannot work.
-
 ## Not yet built
 
-Readiness check, 11 September 2026: production `47b86a7` passed CI's build,
-student journeys, payment-recovery fixtures and teacher-calendar browser checks.
-Fresh local checks passed 89 booking tests, 33 SQLite integration tests and five
-teacher-calendar tests. Live mobile and desktop checks reached trial, single and
-recurring confirmation, with private-rate controls, correct prices and no browser
-errors. Inês has the teacher role; the live teacher page rejects a student account.
-Resend verified delivery of earlier student and teacher messages; the booking log
-has no pending or failed emails. No new live booking or email was created, and no
-fresh sign-in as Inês or real payment was performed. At that point payments
-remained off; activation followed below. The
-secondary www redirect is deployed. Dan approved the policy contact-link repairs
-and quieter bottom-right footer privacy link for publication in the same release.
-Release `ee812d2` passed all CI gates and published to Cloudflare Pages on
-11 September; the public footer, contact links and HTTPS redirects were verified.
-
-- **Live payment activation.** The live merchant was rechecked on 11 September:
-  its business URL matches this site, charges and payouts are enabled, and no
-  requirements are currently due. Dan approved activation and completed
-  Stripe's email verification on 11 September. The live webhook signing secret
-  and `ines-booking-production` restricted key are installed in Cloudflare's
-  encrypted production secret store. The saved key grants write access only
-  to Charges and Refunds, Customers, Payment Intents, Payment Methods, Products,
-  Setup Intents, Prices and Checkout Sessions. The public publishable key
-  belongs to the same live merchant. Production now has `payment_mode=postpay`;
-  `npm run check:booking` passes with live keys, `stripeReady:true`, live email
-  and no missing configuration. The every-minute cron is configured. The live
-  confirmation screen shows the after-lesson and €5 terms, blocks submission
-  until consent, and enables it when checked, without console errors. No
-  booking was submitted during this check. All 24 pre-existing bookings retain
-  `not_required` payment and same-day-fee status. The sandbox journey is
-  complete; the first genuine customer card setup, signed live webhook and
-  resulting charge remain to be observed. No artificial live payment was made.
 - **Fiscal documents.** She must issue a fatura-recibo per lesson, and CIVA art.
   36.º gives 5 working days from the lesson. See
   `Documents/Work/Português com a Inês/Billing and Booking - Operating Context
   and Options.md` for the full position, including the unresolved IVA exemption
   code.
-- **Migration 0023** (`workers/booking/migrations/0023-transition-kit.sql`) was
-  applied by hand to staging and production D1 on 12 October 2026, before the
-  Worker that reads it: adding a lesson writes `added_by_teacher` and sign-in
-  links need their table. Existing rows were unchanged.
-- **Migration 0028** (`workers/booking/migrations/0028-student-changed-at.sql`)
-  was applied by hand to staging, then production D1 on 14 October 2026,
-  before the Worker release. The column was absent before each application;
-  `pragma_table_info('bookings')` confirmed `student_changed_at TEXT` in both
-  afterwards. Existing rows stay NULL; changes after release can appear in
-  Needs you. The migration file was executed directly, without replaying the
-  empty migration ledger.
-- **Migration 0031** (`workers/booking/migrations/0031-free-prices.sql`) is
-  applied in staging and production. Both live table definitions were verified
-  on 18 October 2026 to allow `amount_cents >= 0`; do not replay the rebuild.
-- **Migration 0032** (`workers/booking/migrations/0032-also-student.sql`) is
-  applied by hand to staging, then production D1, on 17 October 2026, before
-  the Worker that reads it. It adds `students.also_student`, default 0.
-- **Migration 0036** (`workers/booking/migrations/0036-dormant-students.sql`)
-  was applied by hand to staging, then production D1, on 22 October 2026,
-  before the Worker that reads it (`GET /admin/students` selects both new
-  columns, so without them her Students tab cannot load). It adds nullable
-  `students.dormant_at` and `students.dormant_emailed_at`. Both columns were
-  absent before each application, and `pragma_table_info('students')`
-  confirmed them afterwards. Existing rows stay NULL, so nobody starts
-  dormant. The file was executed directly, without replaying the empty
-  migration ledger.
 - **Two-way Google Calendar sync**, once OAuth verification is worth doing.
 
 ## Google Calendar and Meet setup
 
 The Google app is configured in the dedicated `portugues-com-a-ines` project
 and published to Production. Calendar API, migration 0016, Worker secrets and
-the feature flag are configured in production and staging (14 September 2026).
-Sync starts only after Inês connects her account; Google sign-in alone does not
-grant calendar permission. Live event creation still needs verification after
-that connection. The existing Google sign-in client remains separate.
+the feature flag are configured in production and staging. Sync starts only
+after Inês connects her account; Google sign-in alone does not grant calendar
+permission. The Google sign-in client is separate.
 
 ### Behaviour
 
@@ -2950,9 +2765,9 @@ that connection. The existing Google sign-in client remains separate.
   explicitly shared read-only viewers can see lesson names, times, location and
   Meet links. No student email, phone, notes or payment details are copied into
   these Google events. No attendees or extra Google invitations are created.
-- Students keep their emailed calendar invitations with existing UID/sequence
-  handling. Once the teacher calendar is connected, new teacher emails omit ICS
-  attachments. Old invitations previously imported into her primary calendar may
+- Students keep their emailed calendar invitations with the usual UID/sequence
+  handling; her copies stop carrying them (see *How her calendar stays
+  current*). Old invitations previously imported into her primary calendar may
   need one-time manual cleanup after checking the new calendar; never remove
   personal appointments or silently delete old records.
 - Inês can share this specific calendar with `dakibwa@gmail.com` using **Settings
@@ -2999,23 +2814,14 @@ that connection. The existing Google sign-in client remains separate.
    no Meet link. Verify changing online ↔ Porto preserves the event identity.
    Only then enable production and connect Inês’s production account.
 
-Until 10 October 2026 no online lesson had received a Meet link: every event
-existed but each retry asked Google for its room under the same `requestId`,
-which Google treats as the request it already has, and a request Google held
-as pending was never asked for again at all. Each request now carries its own
-`requestId` and the time it was made; one still pending after ten minutes
-(`STALE_CONFERENCE_MS`), or made before requests were dated, is replaced with
-a fresh request on the same event. A link still pending logs `meeting_pending` with what
-Google reports (`none`, `no-request`, `pending`), visible with `npx wrangler
-tail`. If links still do not arrive after the Worker is deployed, that log line
-names the cause.
-
-A lesson booked before then gets its link, on the booking page and in a `Your
-online lesson link` email, within a couple of minutes of the Worker carrying
-the fix being deployed. Anything booked since gets its link straight away, in
-the confirmation or, when Google is slower, in its own email a couple of
-minutes later. Google itself emails no one: events carry no attendees and are
-written with `sendUpdates=none`.
+Each conference request carries its own `requestId` and the time it was made,
+because Google treats a repeated `requestId` as the request it already has.
+One still pending after ten minutes (`STALE_CONFERENCE_MS`), or made before
+requests were dated, is replaced with a fresh request on the same event. A
+link still pending logs `meeting_pending` with what Google reports (`none`,
+`no-request`, `pending`), visible with `npx wrangler tail`; if links do not
+arrive, that log line names the cause. Google itself emails no one: events
+carry no attendees and are written with `sendUpdates=none`.
 
 Expired or revoked Google permission shows **Needs reconnecting** on her Google
 Profile tab and `Google Meet needs reconnecting` in Needs you; **Profile → Google Meet →
@@ -3042,14 +2848,14 @@ Provider references: [Calendar scopes](https://developers.google.com/workspace/c
 [event conferences](https://developers.google.com/workspace/calendar/api/guides/create-events),
 [OAuth production readiness](https://developers.google.com/identity/protocols/oauth2/production-readiness/overview).
 
-### Approval for unpaid lessons and future lessons — 27 October 2026, several lessons 2 November 2026
+### Approval for unpaid lessons and future lessons
 
 From an unpaid lesson's details, Inês can create a payment approval link
 (**Create payment link**). `GET /admin/bookings/:id/card-link` lists what she
 can tick into it: the lesson she opened and that student's other unpaid
-lessons she added that have already started, records included (11 November
-2026), newest first, at most 20. The
-lesson she opened starts ticked; every other one only when she ticks it,
+lessons she added that have already started, records included, newest first,
+at most 20. The lesson she opened starts ticked; every other one only when she
+ticks it,
 because many past lessons were paid to her by hand without being marked
 **Already paid**. When nothing else is unpaid there is no list and the link
 is made at once. `POST /admin/bookings/:id/card-link` with `{ bookingIds }`
@@ -3067,8 +2873,8 @@ she sends it on WhatsApp, and confirming its sign-in is what verifies the
 account before a card is saved.
 
 While she ticks, the invite panel on Students says what is owed now apart from
-what agreeing would also do (9 November 2026), so she does not send a link
-whose reach she cannot see: `Owed now` is the ticked total, charged once they
+what agreeing would also do, so she does not send a link whose reach she cannot
+see: `Owed now` is the ticked total, charged once they
 agree; `Future lessons` are not owed yet, and are the lessons she added, still
 to come, with nothing settled on them (confirmed, `not_required`, not paid by
 hand, not already charging), which agreeing puts on their card, charged at the
@@ -3100,23 +2906,19 @@ session, or a paid/edited lesson refuses the approval.
 Without a saved card, Stripe setup collects one and only its verified
 completion schedules the selected lessons, including ones that have started
 or ended. Each is pinned in the session's metadata as `approved_booking_<n>`
-(`id start end amount`); a setup opened before 2 November carries the older
-`approved_booking_id/amount/start/end` keys and is still honoured. The
+(`id start end amount`); the older single-lesson keys
+`approved_booking_id/amount/start/end` are honoured too. The
 webhook checks ownership, confirmed/unpaid status, attendance, card
 generations and each snapshot at the write. A changed, cancelled or
 already-paid lesson is skipped; no other past lesson is included. Future
 teacher-added lessons and active repeats use the existing standing consent.
-The existing hourly-after-end scheduler collects each lesson on its own, with
-its own receipt email, once due, or on its next tick after later card
-confirmation. Creating or viewing the link cannot take payment. Old welcome
-links retain their future-only behaviour. The lessons and card consent stay
+The charge sweep collects each lesson on its own, with its own receipt email,
+once due, or on its next tick after later card confirmation. Creating or
+viewing the link cannot take payment. The lessons and card consent stay
 unchanged until the student completes their own approval (and Stripe setup if
 a card is needed).
 
-**Asked at every sign-in (11 November 2026).** Dan: "can it be really obvious
-for them so when they sign in it prompts them to add their card for their
-recurring lessons and pay for any outstanding lessons?", "even if they are
-already a user too". The same step now opens by itself, with no link from
+**Asked at every sign-in.** The same step opens by itself, with no link from
 Inês: `GET /me` returns `outstandingLessons`, the ids of the student's lessons
 she added that have started (`starts_at <= now`) and that a card can still
 pay for (`CARD_LESSON_SQL`: confirmed, `not_required` or one she added after
@@ -3128,19 +2930,19 @@ which holds the same account card) shows the step for any student account
 with such a lesson, whatever card they have: no card, a saved card, or a
 standing agreement. The ids go to the existing `POST /me/card/preview` and
 `POST /me/card`, which check each lesson's time and amount again when they
-write, so the list itself grants nothing and the Worker's approval, webhook
-and charging are unchanged. A link from Inês still wins and shows exactly the
+write, so the list itself grants nothing and changes nothing in the Worker's
+approval, webhook or charging. A link from Inês wins and shows exactly the
 lessons she ticked.
 
 Because nobody ticked these (many past lessons were paid to her by hand and
 never marked), the student can leave any of them out by pressing it, and only
-the lessons still in are sent for approval; never charge twice (12 October
-2026). Leaving one out changes nothing on the Worker: the lesson stays open
+the lessons still in are sent for approval; never charge twice. Leaving one
+out changes nothing on the Worker: the lesson stays open
 on Inês's page until it is paid or she ticks it. What was left out is kept
 only in that browser tab's `sessionStorage` (`ines-card-left-out:<studentId>`),
 so the same visit does not ask again and a new visit does. With every lesson
 left out, the step is the plain card ask if lessons to come still need a card
-("card first" stands), and otherwise closes for the visit.
+(the card comes first, with no `Not now`), and otherwise closes for the visit.
 
 Reuse this workflow whenever a student needs to authorise teacher-added
 lessons that have already happened, including a student who already saved a
@@ -3168,6 +2970,4 @@ For an assistant preparing this on Dan's behalf, create the link and a
 preview first, then ask Inês to approve the proposed student message. Keep
 the private sign-in link out of screenshots and review drafts. Hold the
 student message until Inês approves, and never authorise payment on the
-student's behalf. Creating
-and reviewing the link cannot charge the card; the student's own completed
-approval lets the normal scheduler collect the named lessons when due.
+student's behalf.

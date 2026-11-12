@@ -7,6 +7,7 @@ import { HOMEWORK_PHOTO_LIMIT, prepareHomeworkPhoto, teacherHomeworkRequest, tra
 import { readSession } from "@/lib/auth-api";
 import { HomeworkSplat } from "./HomeworkArt";
 import { HomeworkWorksheet } from "./HomeworkWorksheet";
+import "@/app/homework.css";
 
 const emptySheet = (): HomeworkSheet => ({
   title: "Vamos praticar", objective: "", reminder: "Amanhã, tenta recordar três coisas que praticaste, sem olhar para a ficha.",

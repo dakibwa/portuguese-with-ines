@@ -44,20 +44,3 @@ export function lessonSplat({ lessonTypeId, durationMinutes, location = "online"
 export function LessonMark(props: LessonMarkProps) {
   return <AssetMark asset={lessonSplat(props)} className={props.className} lands={props.lands} />;
 }
-
-/**
- * A hand-drawn rule between the step trail and the step itself, so the seam
- * carries the same drawn quality as the display type rather than a hairline.
- */
-export function SquiggleRule({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden="true" className={className} viewBox="0 0 300 12" fill="none" preserveAspectRatio="none">
-      <path
-        d="M2 7c14-6 28 4 42-1s28 5 42 0 28 4 42-1 28 5 42 0 28 4 42-1 28 5 42 0"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="2.6"
-      />
-    </svg>
-  );
-}
