@@ -220,9 +220,9 @@ current agreement inside their writes. Charge initiation checks it again;
 withdrawn agreements cannot leave stale scheduled charges. Charges already
 processing retain their original idempotent retry, since money may have moved.
 
-Inês sees which lessons a newly saved card now pays for in Needs you. One the
-student already paid her for by hand is ticked `Already paid` (below) before it
-is charged, and no later card takes it back.
+A lesson the student already paid her for by hand is ticked `Already paid`
+(below) before it is charged, and no later card takes it back. A newly saved
+card is not a Needs you notice: the student's row says `Card saved`.
 
 **Already paid.** Any lesson, past or to come, can be
 ticked as paid to her by hand: as she adds it (`paid: true` on `POST
@@ -800,18 +800,18 @@ older-by-email check in `first_lesson` is written `+legacy.status` so SQLite
 stays on `idx_bookings_student`; without the plus it scans every earlier
 booking for each row returned. A lesson appears
 once. The internal `no-email:` placeholder never appears; a student with no
-email is not a task, and their email reads as empty. Two notices that are not
-emailed to her come from `GET /admin/students`:
+email is not a task, and their email reads as empty. One notice that is not
+emailed to her comes from `GET /admin/students`:
 `cardDeclined` (each saved-card lesson payment, no-show fee or late change fee
 still `payment_due`, listed with the payments until it is paid, `Open` going to
-the student) and `cardAdded` (for `CARD_ADDED_NOTICE_DAYS`, 7, after a card is
-saved: the lessons she added that it now pays for, so one already paid by hand
-can be ticked `Already paid`; lessons a student put on a card from a lesson's
-own link are listed the same way, from when they agreed). Declined cards also stay in Receipts. Items clear
+the student). Declined cards also stay in Receipts. A card a student saves is
+not a notice (12 November 2026, Dan: "doesn't feel like it's needed as a
+notification unless Ines needs to act"; until then `cardAdded` listed the
+lessons it paid for, for a week): their row's `Card saved` says it. Items clear
 when done, after 72 hours, or once the lesson begins; the windows are
-`NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. The four that only tell
+`NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. The three that only tell
 Inês something (a student changed or cancelled a lesson, a student's first
-lesson, a student added a card) can also be dismissed with a small cross;
+lesson) can also be dismissed with a small cross;
 work still to do (Google Meet, a payment to check, a declined
 card, no lessons, a welcome not sent) cannot. `POST /admin/needs-you/dismiss`
 with `{ key }` (teacher only, the authorisation checked inside the write)
@@ -2362,11 +2362,11 @@ card lesson.
   lesson off the card; unticked, it is paid to her directly again. Cancelled
   with notice and booked again, the new lesson is paid to her directly until
   it is put on a card again.
-- **Who is told.** Inês sees `… added a card` in Needs you for a week, with
-  the lessons it now pays for (`cardAdded`), so one already paid by hand can
-  be ticked `Already paid`. The student gets no separate email (there is none
-  for a saved card); the page says the card is saved, and each charge is
-  emailed as usual.
+- **Who is told.** Inês sees `Card saved` on the student's row; it is not a
+  Needs you notice, since it asks nothing of her (12 November 2026, Dan). One
+  already paid by hand is ticked `Already paid`. The student gets no separate
+  email (there is none for a saved card); the page says the card is saved, and
+  each charge is emailed as usual.
 
 ### A student's own price, private codes and security
 

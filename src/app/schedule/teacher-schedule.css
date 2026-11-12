@@ -2304,7 +2304,7 @@
 /* Its chip is the cross's height on a phone too; its tap is still 44 px. */
 .teacher-notice__actions > .teacher-quiet { position: relative; min-height: 32px; }
 .teacher-notice__actions > .teacher-quiet::after { content: ""; position: absolute; inset: -6px 0; }
-/* A title that wraps breaks evenly ("Jessica Riley / added a card"), never
+/* A title that wraps breaks evenly ("Jessica Riley / changed their lesson"), never
    leaving two words alone on its second line. */
 .teacher-notice__title { display: block; font: 600 0.88rem/1.35 var(--ui); overflow-wrap: anywhere; text-wrap: balance; }
 .teacher-notice__facts { display: block; margin-top: 0.1rem; color: var(--lavender-ink); font-size: 0.75rem; text-wrap: pretty; }

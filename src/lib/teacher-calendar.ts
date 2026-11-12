@@ -714,10 +714,13 @@ export const NEEDS_YOU_AHEAD_DAYS = 7;
 
 /**
  * One thing waiting on Inês (Phase 2, 14 October 2026). Every kind clears
- * itself. The four that only tell her something (11 November 2026, Dan) can
+ * itself. The three that only tell her something (11 November 2026, Dan) can
  * also be dismissed: their `dismiss` names what happened and when, so a
  * second change to the same lesson is a new notice. Work still to do never
- * has one.
+ * has one. A card a student saved is not one (12 November 2026, Dan: "doesn't
+ * feel like it's needed as a notification unless Ines needs to act"): their
+ * row's `Card saved` says it, and a lesson paid to her by hand still comes off
+ * the card with `Already paid`.
  */
 export type NeedsYouItem =
   | { kind: "meet"; key: "meet"; reconnect: boolean }
@@ -728,9 +731,7 @@ export type NeedsYouItem =
   | { kind: "cancelled"; key: string; dismiss: string; booking: AdminBooking; count: number }
   | { kind: "first"; key: string; dismiss: string; booking: AdminBooking }
   /** A saved card was declined; clears once the student pays (16 October 2026: no longer emailed to her). */
-  | { kind: "declined"; key: string; student: AdminStudent; payment: NonNullable<AdminStudent["cardDeclined"]>[number] }
-  /** A student added a card in the last week; lists the lessons she added that it now pays for. */
-  | { kind: "card"; key: string; dismiss: string; student: AdminStudent; added: NonNullable<AdminStudent["cardAdded"]> };
+  | { kind: "declined"; key: string; student: AdminStudent; payment: NonNullable<AdminStudent["cardDeclined"]>[number] };
 
 /** Students she set up with no email hold this in place of one; nothing is ever shown or sent to it. */
 const NO_EMAIL_YET = "no-email:";
@@ -937,8 +938,6 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
       timed.push({ time, changed: 0, item: { kind: "welcome", key: `welcome:${student.id}`, student, at: student.nextLessonAt } });
     if (!hasLessons(student))
       timed.push({ time, changed: 0, item: { kind: "lessons", key: `lessons:${student.id}`, student } });
-    if (student.cardAdded && student.hasCard)
-      timed.push({ time, changed: Date.parse(student.cardAdded.at) || 0, item: { kind: "card", key: `card:${student.id}`, dismiss: `card:${student.id}:${Date.parse(student.cardAdded.at) || 0}`, student, added: student.cardAdded } });
   }
 
   const confirmed = lessons.filter((row) => row.status === "confirmed" && real(row));

@@ -44,8 +44,6 @@ export type AdminStudent = {
   homeworkToReview?: { bookingId: string; submittedAt: string }[];
   /** Saved-card charges that were declined and are still to pay; the student has a secure payment link. */
   cardDeclined?: { bookingId: string; reference: string; startsAt: string; amountCents: number | null; part: "lesson" | "no-show" | "fee" }[];
-  /** A card added in the last week, and the lessons she added that it now pays for. */
-  cardAdded?: { at: string; lessons: { bookingId: string; startsAt: string }[] } | null;
 };
 
 /** A length mapped to cents, or to null for the standard price again. */
@@ -350,9 +348,7 @@ function validStudent(value: unknown): value is AdminStudent {
     isApiRecord(row) && typeof row.bookingId === "string" && isApiInstant(row.submittedAt)))) &&
     (value.cardDeclined === undefined || (Array.isArray(value.cardDeclined) && value.cardDeclined.every(row =>
       lesson(row) && isApiRecord(row) && typeof row.reference === "string" && ["lesson", "no-show", "fee"].includes(row.part as string) &&
-      (row.amountCents === null || (Number.isInteger(row.amountCents) && Number(row.amountCents) >= 0))))) &&
-    (value.cardAdded == null || (isApiRecord(value.cardAdded) && isApiInstant(value.cardAdded.at) &&
-      Array.isArray(value.cardAdded.lessons) && value.cardAdded.lessons.every(lesson)));
+      (row.amountCents === null || (Number.isInteger(row.amountCents) && Number(row.amountCents) >= 0)))));
 }
 
 function studentReply<T extends { student: AdminStudent }>(data: T, studentId?: string) {

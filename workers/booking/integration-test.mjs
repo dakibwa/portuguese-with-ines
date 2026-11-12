@@ -549,7 +549,7 @@ await test("a dismissed Needs you notice stays dismissed for the teacher alone, 
   // A month on, old dismissals give way to new ones; the row never grows for ever.
   clock += 31 * 86400000;
   try {
-    assert.deepEqual((await (await dismiss("card:alice:1788000000000")).json()).dismissed, ["card:alice:1788000000000"]);
+    assert.deepEqual((await (await dismiss("first:alice:1788000000000")).json()).dismissed, ["first:alice:1788000000000"]);
   } finally {
     clock -= 31 * 86400000;
     db.prepare("DELETE FROM settings WHERE key = 'needs_you_dismissed'").run();
@@ -4017,12 +4017,10 @@ await test("a card saved from the account pays for the lessons Inês added from 
     Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "1", TEACHER_EMAIL: "ines@example.invalid" });
     try { assert.equal((await webhook(event)).status, 200); } finally { Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "0", TEACHER_EMAIL: undefined }); }
     assert.equal((await webhook(event)).status, 200, "a replay is harmless");
-    // Inês is not emailed; her Needs you lists the lessons the card now pays for.
+    // Inês is not emailed; her list of students says Card saved.
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log WHERE kind='teacher_student_card'").get().n, 0);
     const { students: listed } = await (await call("/admin/students", { method: "GET", user: "teacher" })).json();
-    const added = listed.find((row) => row.id === id).cardAdded;
-    assert.ok(added?.at, JSON.stringify(added));
-    assert.deepEqual(added.lessons.map((lesson) => lesson.startsAt).slice(0, 2), ["2026-10-02T02:00:00.000Z", "2026-10-03T02:00:00.000Z"]);
+    assert.equal(listed.find((row) => row.id === id).cardForAllLessons, true);
 
     const saved = db.prepare("SELECT * FROM students WHERE id=?").get(id);
     assert.deepEqual([saved.stripe_customer_id, saved.stripe_payment_method, Boolean(saved.card_consent_at)], ["cus_card_later", "pm_card_later", true]);
@@ -6735,10 +6733,6 @@ await test("a hand-set-up student pays for every week by card from a lesson's li
     assert.deepEqual({ ...after.student, stripe_customer_id: null, stripe_payment_method: null }, before.student, "the standing agreement and the address are untouched");
     assert.equal(charges.length, chargeCount, "nothing is charged");
     assert.equal(await cardOfferOf(manage), undefined, "on a card now, so not offered again");
-    // Inês's Needs you card, as for a card saved from the account.
-    const listed = (await (await call("/admin/students", { method: "GET", user: "teacher" })).json()).students.find((row) => row.id === id);
-    assert.equal(listed.cardAdded.at, agreedAt);
-    assert.deepEqual(listed.cardAdded.lessons.map((lesson) => lesson.bookingId), after.bookings.filter((row) => row.payment_status === "scheduled").map((row) => row.id));
 
     // Replayed, or the same session delivered again: nothing changes.
     assert.equal((await webhook(event)).status, 200);

@@ -1609,9 +1609,6 @@ async function sendDormantInvite(env, { student, settings, words, owner }) {
 }
 
 /** Her students at a glance: who is in, who has a card, what comes next. */
-/** How long her Needs you shows that a student has just added a card. */
-const CARD_ADDED_NOTICE_DAYS = 7;
-
 async function teacherStudentList(env) {
   const now = new Date().toISOString();
   const { results } = await env.DB.prepare(
@@ -1645,10 +1642,11 @@ async function teacherStudentList(env) {
     .bind(now, now, now, now, now)
     .all();
   /*
-   * Two things that used to be emails to her and are now cards in Needs you
-   * (16 October 2026, Dan): a saved card that was declined, until it is paid,
-   * and a card just added, for a week, with the lessons she added that it now
-   * pays for, so one already paid by hand can be taken off it.
+   * A saved card that was declined used to be an email to her and is now a
+   * card in Needs you until it is paid (16 October 2026, Dan). A card just
+   * added was one too, for a week, until 12 November 2026 (Dan: "doesn't feel
+   * like it's needed as a notification unless Ines needs to act"): their row
+   * says Card saved, and `Already paid` still takes a lesson off it.
    */
   const { results: declinedRows } = await env.DB.prepare(
     `SELECT id, student_id, reference, starts_at, attendance_status, payment_status, same_day_fee_status,
@@ -1666,27 +1664,6 @@ async function teacherStudentList(env) {
     if (row.same_day_fee_status === "payment_due") {
       list.push({ bookingId: row.id, reference: row.reference, startsAt: row.starts_at, amountCents: row.same_day_fee_cents ?? null, part: "fee" });
     }
-  }
-  const noticeFrom = new Date(Date.now() - CARD_ADDED_NOTICE_DAYS * 86400000).toISOString();
-  const { results: onCardRows } = await env.DB.prepare(
-    `SELECT b.id, b.student_id, b.starts_at FROM bookings b JOIN students s ON s.id = b.student_id
-     WHERE s.card_consent_at > ? AND b.added_by_teacher = 1 AND b.status = 'confirmed' AND b.payment_status = 'scheduled'
-       AND b.payment_consent_at = s.card_consent_at AND b.starts_at > ? ORDER BY b.starts_at`
-  ).bind(noticeFrom, now).all();
-  const onCard = {};
-  for (const row of onCardRows ?? []) (onCard[row.student_id] ??= []).push({ bookingId: row.id, startsAt: row.starts_at });
-  // Lessons of hers a student put on a card from the lesson's own link
-  // (10 November 2026): the same card in Needs you, from when they agreed.
-  const { results: linkCardRows } = await env.DB.prepare(
-    `SELECT id, student_id, starts_at, payment_consent_at FROM bookings
-     WHERE added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'scheduled' AND payment_consent_version = ?
-       AND payment_consent_at > ? AND starts_at > ? ORDER BY starts_at`
-  ).bind(PAYMENT_CONSENT_VERSION, noticeFrom, now).all();
-  const linkCard = {};
-  for (const row of linkCardRows ?? []) {
-    const entry = (linkCard[row.student_id] ??= { at: row.payment_consent_at, lessons: [] });
-    if (row.payment_consent_at > entry.at) entry.at = row.payment_consent_at;
-    entry.lessons.push({ bookingId: row.id, startsAt: row.starts_at });
   }
   const { results: rates } = await env.DB.prepare("SELECT student_id, duration_minutes, amount_cents FROM student_recurring_rates").all();
   const own = {};
@@ -1715,12 +1692,7 @@ async function teacherStudentList(env) {
     // and the prices set for them, which is what she edits.
     prices: withDerived(own[row.id] ?? {}),
     ownPrices: own[row.id] ?? {},
-    cardDeclined: declined[row.id] ?? [],
-    cardAdded: row.has_card && row.card_consent_at && row.card_consent_at > noticeFrom
-      ? { at: row.card_consent_at, lessons: (onCard[row.id] ?? []).slice(0, 30) }
-      : row.has_card && linkCard[row.id]
-        ? { at: linkCard[row.id].at, lessons: linkCard[row.id].lessons.slice(0, 30) }
-        : null
+    cardDeclined: declined[row.id] ?? []
   }));
 }
 
@@ -2060,10 +2032,10 @@ async function confirmStudentCard(env, session) {
   }
 
   /*
-   * Inês sees which of her lessons the card now pays for in Needs you
-   * (`cardAdded` on GET /admin/students), so one a student already paid her
-   * for by hand can be taken off the card before it ends (12 October 2026:
-   * never charge twice). It is no longer emailed (16 October 2026, Dan).
+   * Nothing is sent to Inês: their row says Card saved (12 November 2026,
+   * Dan; until then a week in Needs you, and before 16 October an email). A
+   * lesson a student already paid her for by hand comes off the card with
+   * `Already paid` before it ends (12 October 2026: never charge twice).
    */
   return new Response("ok", { status: 200 });
 }
@@ -5206,9 +5178,8 @@ async function confirmLessonCard(env, session) {
     return new Response("ok", { status: 200 });
   }
   /*
-   * Inês sees the lessons the card now pays for in Needs you, as for a card
-   * saved from the account (`cardAdded` on GET /admin/students). There is no
-   * card-saved email to the student to send.
+   * Nothing is sent to Inês, as for a card saved from the account: their row
+   * says Card saved. There is no card-saved email to the student to send.
    */
   return new Response("ok", { status: 200 });
 }
@@ -7222,7 +7193,7 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
  * the kinds that merely inform, each key ending in when it happened.
  */
 const DISMISSED_SETTING = "needs_you_dismissed";
-const DISMISS_KEY = /^(changed|cancelled|first|card):[A-Za-z0-9_-]{1,64}:\d{1,15}$/;
+const DISMISS_KEY = /^(changed|cancelled|first):[A-Za-z0-9_-]{1,64}:\d{1,15}$/;
 // Every dismissible notice clears itself within a week, so a month is ample;
 // the newest hundred bound the row however busy she is.
 const DISMISS_KEEP_MS = 30 * 86400000;
