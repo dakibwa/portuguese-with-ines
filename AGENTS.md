@@ -2,6 +2,7 @@
 
 ## Verification and release
 
+- Push every change live by default (12 November 2026, Dan: "by default can we push stuff live too please"): once the checks for what changed pass, open its pull request and squash-merge it into `main`, whose release publishes it.
 - During implementation, run the smallest relevant check. Use `npm run test:booking` for Worker logic and the focused Playwright smoke test for affected customer journeys.
 - Keep tests lean (13 October 2026, Dan: "always be as lean as possible"). A test earns its place only by protecting a student, Inês or money in a way no other check already does. Prove logic once, at the lowest layer (Worker or unit tests); a browser journey covers only the path through the UI, at one desktop and one phone width, not a sweep. Prefer extending an existing check to adding a new one, and delete checks that only repeat others.
 - Locally, run the one or two checks for what changed, never the whole suite; the release runs the customer journeys across four machines in about two minutes and stops a broken one from publishing. It runs only the journeys named on a `journeys` line in `.github/workflows/deploy-pages.yml`, so a new one must be added to a line there.
