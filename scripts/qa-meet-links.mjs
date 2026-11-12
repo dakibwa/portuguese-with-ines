@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
 import { chromium, expect } from "@playwright/test";
 
 // Every booking/account request is a fixture; this never creates a real room or lesson.
@@ -26,7 +25,6 @@ const bookings = cases.map((entry, index) => ({
   notes: "", studentName: student.name, studentEmail: student.email,
   studentTimezone: student.timezone, rescheduleCount: 0, sameDayFeeCents: 500,
 }));
-await mkdir("tmp/qa/meet", { recursive: true });
 function deferred() {
   let resolve;
   const promise = new Promise(done => { resolve = done; });
@@ -126,7 +124,6 @@ try {
       await expect(page.locator("#lesson-calendar .calendar-week button.is-next")).toHaveCount(1);
       await expect(upcoming).toBeHidden();
     }
-    await page.locator(".lesson-overview").screenshot({ path: `tmp/qa/meet/upcoming-${width}.png` });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Overflow at ${width}`);
     for (const booking of bookings) {
       await page.goto(`${base}/book/?manage=${booking.manageToken}`);
@@ -143,7 +140,6 @@ try {
       if (booking.reference === "ONLINE") {
         await expect(join).toHaveAttribute("href", meetingUrl);
         await expect(join).toHaveAttribute("target", "_blank");
-        await dialog.screenshot({ path: `tmp/qa/meet/details-${width}.png` });
       }
       if (booking.reference === "PORTO") {
         // Cancelled with notice to spare, its time still free: Book again puts
@@ -156,7 +152,6 @@ try {
         await expect(dialog.locator(".booking-outcome")).toHaveText("Your lesson is booked again. We’ve emailed you and updated your calendar.");
         await expect(dialog.locator(".lesson-calendar__status")).toHaveText("Booked");
         assert.equal(new URL(page.url()).searchParams.get("manage"), "REBOOKED");
-        await dialog.screenshot({ path: `tmp/qa/meet/booked-again-${width}.png` });
       }
       if (booking.reference === "CARD") {
         // Pay by card, then Every week: the dabs say what is agreed, here with
@@ -173,7 +168,6 @@ try {
           "€25 a lesson, charged at the end of each lesson", "Free to change or cancel a lesson up to 14\u00a0hours before",
           "€5 to move or cancel later, or if you don’t show up", "Weekly lessons carry on until you stop them",
           "This card replaces the one saved before", "The full rules are in terms & privacy"]);
-        await dialog.screenshot({ path: `tmp/qa/meet/pay-by-card-${width}.png` });
         await dialog.getByRole("button", { name: "Agree & add card", exact: true }).click();
         await page.waitForURL("https://checkout.stripe.com/c/pay/fixture");
         assert.deepEqual(cardStarted, { scope: "run", expectedPriceCents: 2500 });
@@ -185,7 +179,6 @@ try {
         await expect(back.locator(".booking-outcome")).toHaveText("Card saved. Your weekly lessons are charged at the end of each lesson.", { timeout: 15000 });
         await expect(back.getByRole("button", { name: "Pay by card", exact: true })).toHaveCount(0);
         assert.deepEqual([new URL(page.url()).searchParams.get("manage"), new URL(page.url()).searchParams.has("card")], ["CARD", false]);
-        await back.screenshot({ path: `tmp/qa/meet/card-saved-${width}.png` });
       }
       if (booking.reference === "PENDING") {
         // Hold a missing-link poll across an accepted online move. Its older
