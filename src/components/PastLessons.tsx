@@ -5,7 +5,7 @@ import { ArrowRight, CheckCircle2, ChevronDown, CircleX, Send } from "lucide-rea
 import { readSession, type MyBooking } from "@/lib/auth-api";
 import { clockDiffersFromPorto, formatBookedLessonLabel, formatShortDay, formatSlotTime, formatTimeIn } from "@/lib/booking-api";
 import { BOOKING_TIME_ZONE } from "@/lib/config";
-import { fetchHomework, type HomeworkSummary } from "@/lib/homework-api";
+import type { HomeworkSummary } from "@/lib/homework-api";
 import { HOMEWORK, IN_PERSON, LANGUAGE_CODE, TUTOR_NAME } from "@/lib/tutor";
 
 /** The latest few, then the rest on request, so a long history stays short. */
@@ -64,10 +64,10 @@ export function PastLessons({ bookings, clock, onOpenHomework, onOpenLesson, zon
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
-    // Hidden, homework is not even asked for.
+    // Hidden, homework is not even asked for, and its code never loads.
     if (!token || !HOMEWORK) return;
     const controller = new AbortController();
-    void fetchHomework(token, controller.signal).then(result => {
+    void import("@/lib/homework-api").then(({ fetchHomework }) => fetchHomework(token, controller.signal)).then(result => {
       if (readSession() !== token) return;
       setHomework(result); setFailed(false);
     }).catch(() => { if (!controller.signal.aborted) setFailed(true); });

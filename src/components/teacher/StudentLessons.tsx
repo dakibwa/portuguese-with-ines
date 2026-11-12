@@ -2,7 +2,7 @@
 
 import { Fragment, useState, type ReactNode } from "react";
 import { ChevronDown, Pencil, Repeat, X } from "lucide-react";
-import { TeacherHomework } from "@/components/homework/TeacherHomework";
+import { TeacherHomework } from "@/components/homework/lazy";
 import { PaidTick } from "@/components/teacher/PaidTick";
 import { addedByTeacher, paidByHand, setLessonPaid, type AdminBooking, type NoteHomework, type StudentNoteLesson } from "@/lib/admin-api";
 import { formatBookedLessonLabel, formatSlotTime } from "@/lib/booking-api";

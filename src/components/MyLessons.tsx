@@ -28,7 +28,11 @@ import {
 import { STUDENT_MARKS } from "@/lib/student-marks";
 import { TUTOR_NAME, TUTOR_OBJECT } from "@/lib/tutor";
 import { hasStudentSide } from "@/lib/account-workspace";
-import { StudentHomework } from "@/components/homework/StudentHomework";
+import { deferred } from "@/lib/deferred";
+
+/* Homework comes with its own code and stylesheet, fetched only when a
+   lesson's homework opens. Nothing opens it while features.homework is false. */
+const { Component: StudentHomework } = deferred(() => import("@/components/homework/StudentHomework").then((m) => m.StudentHomework), { waiting: "Loading…" });
 
 /** The two lengths a code from Inês can set a weekly price for. */
 const RATE_LENGTHS = [60, 90] as const;

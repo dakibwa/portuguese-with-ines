@@ -30,7 +30,7 @@ import { MeetingLink } from "@/components/MeetingLink";
 import { restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { useDialogBackdrop } from "@/lib/dialog-backdrop";
-import { TeacherHomework } from "@/components/homework/TeacherHomework";
+import { TeacherHomework } from "@/components/homework/lazy";
 import { PaidTick } from "@/components/teacher/PaidTick";
 import { CardApprovalLink } from "@/components/teacher/CardApprovalLink";
 import { priceFor } from "@/components/teacher/StudentPrice";
