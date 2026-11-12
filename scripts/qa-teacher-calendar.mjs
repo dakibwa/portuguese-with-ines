@@ -1409,8 +1409,10 @@ try {
   await nora.getByRole("button", { name: "Close", exact: true }).click();
 
   await showLessons(page);
+  // Paging ahead asks for nothing: her lessons from yesterday on are read
+  // already. Paging back to last week reads again, and that read fails here.
   state.failBookings = true;
-  await page.getByRole("button", { name: "Next week" }).click();
+  await page.getByRole("button", { name: "Previous week" }).click();
   await page
     .getByRole("alert")
     .filter({ hasText: "Lessons could not be loaded" })
