@@ -7,6 +7,7 @@ import { fetchHomeworkSheet, saveHomeworkAnswers, type HomeworkProgress, type St
 import { TUTOR_NAME, TUTOR_SUBJECT } from "@/lib/tutor";
 import { HomeworkSplat } from "./HomeworkArt";
 import { HomeworkWorksheet } from "./HomeworkWorksheet";
+import "@/app/homework.css";
 
 /**
  * One lesson's homework sheet, opened from that lesson's row beneath their

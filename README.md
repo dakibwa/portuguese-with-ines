@@ -60,6 +60,9 @@ once, and only for the exact request it would have made. Free times are reused
 for a minute. The sign-in form's code is left out of the first load and
 fetched while the page is idle, with the next likely step's free times, and
 the account's own code comes with the page whenever a session is stored.
+Expressions' code comes only with a student's lessons, and homework's code and
+styles only with homework itself, so an add-on that is closed to students, or
+a feature that is hidden, adds nothing to a visitor's first load.
 
 Two settings look incidental and are not. Both were wrong at some point and
 cost real bytes:
@@ -373,9 +376,6 @@ NEXT_PUBLIC_BOOKING_API_BASE_URL=https://ines-booking.<subdomain>.workers.dev
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=          # optional; absent hides the Google button
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=    # optional; needed for the embedded card form once postpay is on
 NEXT_PUBLIC_STRIPE_EXPECTED_MODE=live  # use test only with the isolated staging Worker
-LESSON_PRICE_CENTS=2500
-LESSON_CURRENCY=eur
-NEXT_PUBLIC_LESSON_DURATION_MINUTES=60
 NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS=500
 ```
 

@@ -4091,6 +4091,16 @@ textarea,
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .past-lesson__homework svg {
+    transition: none;
+  }
+
+  .past-lesson__homework:hover svg:last-child {
+    transform: none;
+  }
+}
+
 .past-lessons__more,
 .past-lessons__retry {
   display: inline-flex;
@@ -8476,10 +8486,6 @@ p.lesson-when > span {
    is not doubled while it loads or after it fails. */
 .booking-payment__mount:empty {
   display: none;
-}
-
-.manage-booking {
-  margin-top: 1.75rem;
 }
 
 .manage-booking__actions {

@@ -6,8 +6,6 @@
  * one (docs/expressions-paint-assets.md lists them, with sizes and colours).
  */
 
-import { PAINTS } from "@/lib/expression-paint";
-
 export const PAPER = "#FBF4E5";
 
 export type Rand = () => number;
@@ -465,97 +463,4 @@ export function layoutPhrase(text: string, m: PhraseMetrics, family: string): { 
     return parts;
   });
   return result(fs, wrap(fs, pieces) ?? pieces);
-}
-
-/**
- * How far each row of wax is set in, in a loose cascade: the first two clear
- * of the pool beside them, even once the press's dab has swollen in it, so
- * the wax still reads while the reply is on its way.
- */
-const waxIndent = (index: number, fs: number) => (index === 0 ? fs * 1.35 : index === 1 ? fs * 0.95 : fs * 0.4);
-
-/** The phrases that fit the sheet, up to three, each at the largest size that fits. */
-export function waxRows(g: CanvasRenderingContext2D, w: number, m: WaxMetrics, phrases: string[], family: string) {
-  const rows: { text: string; size: number }[] = [];
-  for (const phrase of phrases) {
-    if (rows.length === 3) break;
-    const available = w - m.padL - m.padR - 6 - waxIndent(rows.length, m.waxFs) - m.waxFs * 0.3;
-    for (const size of [m.waxFs, m.waxFs * 0.86, m.waxFs * 0.74]) {
-      g.font = `${size}px ${family}`;
-      if (g.measureText(phrase).width <= available) {
-        rows.push({ text: phrase, size });
-        break;
-      }
-    }
-  }
-  return rows;
-}
-
-export type WaxMetrics = { padL: number; padR: number; wide: boolean; waxFs: number };
-
-/** How tall the wax writing stands: rows of phrases, or three lines of loops. */
-export function waxHeight(rows: number, m: WaxMetrics) {
-  return rows ? (rows - 1) * m.waxFs * 1.95 + m.waxFs * 1.5 : 2 * (m.wide ? 40 : 27) * 1.55 + (m.wide ? 40 : 27);
-}
-
-/**
- * The resting sheet: real phrases from her collection in dark blue, readable
- * on the cream paper. With no phrases to show, pale joined-up loops in her
- * slant instead.
- * Centred between `top` and `bottom`, which the sheet keeps at its top.
- */
-export function paintWax(g: CanvasRenderingContext2D, w: number, top: number, bottom: number, m: WaxMetrics, phrases: string[], family: string, R: Rand) {
-  const fs = m.waxFs;
-  const pitch = fs * 1.95;
-  const centre = (top + bottom) / 2;
-  g.textBaseline = "alphabetic";
-  const rows = waxRows(g, w, m, phrases, family);
-  if (rows.length) {
-    const y0 = centre - ((rows.length - 1) * pitch) / 2 + fs * 0.32;
-    rows.forEach((row, index) => {
-      g.font = `${row.size}px ${family}`;
-      const x = m.padL + waxIndent(index, fs) + R() * fs * 0.3;
-      const y = y0 + index * pitch;
-      g.fillStyle = PAINTS.deep.paint;
-      g.fillText(row.text, x, y);
-    });
-    return;
-  }
-  const lines = 3;
-  const size = m.wide ? 40 : 27;
-  const linePitch = size * 1.55;
-  const first = centre - ((lines - 1) * linePitch) / 2 + size * 0.2;
-  const xHeight = size * 0.32;
-  g.lineCap = "round";
-  g.lineJoin = "round";
-  for (let row = 0; row < lines; row++) {
-    const span = (w - m.padL - m.padR - 24) * (row === lines - 1 ? 0.5 + R() * 0.2 : 0.78 + R() * 0.2);
-    let x = m.padL + waxIndent(row, size);
-    const base = first + row * linePitch;
-    while (x < m.padL + span - size * 0.8) {
-      const letters = 2 + Math.floor(R() * 6);
-      const points: [number, number][] = [];
-      for (let letter = 0; letter < letters; letter++) {
-        const kind = R();
-        const tall = kind < 0.22;
-        const loop = tall || kind < 0.55;
-        const height = tall ? xHeight * (2.3 + R() * 0.5) : xHeight * (0.85 + R() * 0.3);
-        const width = size * (tall ? 0.26 : 0.3 + R() * 0.12);
-        for (let i = 0; i <= 16; i++) {
-          const t = (i / 16) * Math.PI * 2;
-          const yy = base - height * (1 - Math.cos(t)) / 2;
-          points.push([x + (width / (Math.PI * 2)) * t - (loop ? width * 0.26 : width * 0.06) * Math.sin(t) + (base - yy) * 0.22, yy]);
-        }
-        x += width;
-      }
-      for (const [style, dx, dy, lineWidth] of [["rgba(26,49,105,0.06)", 0.5, 0.8, 1.4], ["rgba(255,255,253,0.95)", 0, 0, 1.15]] as const) {
-        g.strokeStyle = style;
-        g.lineWidth = lineWidth;
-        g.beginPath();
-        points.forEach((point, index) => (index ? g.lineTo(point[0] + dx, point[1] + dy) : g.moveTo(point[0] + dx, point[1] + dy)));
-        g.stroke();
-      }
-      x += size * (0.35 + R() * 0.15);
-    }
-  }
 }

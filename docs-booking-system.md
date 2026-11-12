@@ -531,7 +531,7 @@ review, and a partial unique index on `(student_id, expression_id)` where
 
 **Ship order:** apply 0037 to staging and production D1, deploy the Worker,
 then merge the site. The Worker tolerates a missing table, but the site's
-panel needs the endpoints. The UI journey is `npm run test:expression-translations`
+panel needs the endpoints. The UI journey is `node scripts/qa-expression-translations.mjs`
 with `QA_BASE_URL` pointing at a served build; its Worker replies are fixtures.
 
 ## Teacher calendar
@@ -2740,6 +2740,7 @@ lifecycle attempts whose included booking snapshots are unknown.
 ```bash
 npx wrangler d1 create ines-booking          # put the id in wrangler.jsonc
 npx wrangler d1 execute ines-booking --remote --config workers/booking/wrangler.jsonc --file workers/booking/schema.sql
+# New database only: seed.sql replaces her weekly hours, prices and settings.
 npx wrangler d1 execute ines-booking --remote --config workers/booking/wrangler.jsonc --file workers/booking/seed.sql
 npx wrangler deploy --config workers/booking/wrangler.jsonc
 ```
@@ -2838,9 +2839,6 @@ reminders, and `'porto'` as the stored key for an in-person lesson.
 NEXT_PUBLIC_BOOKING_API_BASE_URL=https://ines-booking.<subdomain>.workers.dev
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
 NEXT_PUBLIC_STRIPE_EXPECTED_MODE=live
-LESSON_PRICE_CENTS=2500
-LESSON_CURRENCY=eur
-NEXT_PUBLIC_LESSON_DURATION_MINUTES=60
 NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS=500
 ```
 

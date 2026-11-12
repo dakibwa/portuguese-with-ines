@@ -55,8 +55,3 @@ export function asTutor(tutor, work) {
 export function currentTutor() {
   return running.getStore() ?? DEFAULT_TUTOR;
 }
-
-/** What the site calls an in-person lesson's place: "In Porto". */
-export function inPersonPlace(tutor) {
-  return `In ${tutor.place.city}`;
-}

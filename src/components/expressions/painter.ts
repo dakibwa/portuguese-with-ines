@@ -1,6 +1,6 @@
 import { LANGUAGE_CODE } from "@/lib/tutor";
 import { PAINTS, hash, type PaintKey } from "@/lib/expression-paint";
-import { blob, layoutPhrase, makeCanvas, paintBead, paintLetters, paintStroke, rng, type PhraseLine, type Rand, type Solid, type WaxMetrics } from "./paint-art";
+import { blob, layoutPhrase, makeCanvas, paintBead, paintLetters, paintStroke, rng, type PhraseLine, type Rand, type Solid } from "./paint-art";
 
 const EASE_OUT = "cubic-bezier(0.16, 1, 0.3, 1)";
 const STROKE_EASE = "cubic-bezier(0.42, 0.04, 0.24, 1)";
@@ -67,8 +67,11 @@ const BAND = 2.5;
 /** A body runs this far past where its dry brush starts, and ends rounded, under the brush's bead. */
 const BODY_RUN = 6;
 
-type Metrics = WaxMetrics & {
+type Metrics = {
   w: number;
+  wide: boolean;
+  padL: number;
+  padR: number;
   /** The sheet sits beside the facts: its right edge is the gap before them. */
   beside: boolean;
   /** Around the painted block, above and below. */
@@ -95,10 +98,10 @@ function metricsFor(w: number, textX: number, labelRoom: number, beside: boolean
   const room = (fs: number) => w - start(fs) - padR - fs * (MARGIN_R + 0.3 + TAIL * BAND);
   const shared = { w, wide, beside, padL, padR, labelRoom, textX: start, room };
   // The pool sits far enough in that its dab, swollen and lobed, never reaches the sheet's edge.
-  if (wide) return { ...shared, marginV: 22, poolX: 45, poolSize: 70, sizes: [[46, 1], [40, 2], [34, 3], [30, 4]], tempo: 1.12, decoyFs: 28, waxFs: 31 };
+  if (wide) return { ...shared, marginV: 22, poolX: 45, poolSize: 70, sizes: [[46, 1], [40, 2], [34, 3], [30, 4]], tempo: 1.12, decoyFs: 28 };
   return {
     ...shared, marginV: tight ? 14 : 16, poolX: tight ? 32 : 36, poolSize: tight ? 50 : 56,
-    sizes: tight ? [[27, 3], [24, 3], [21, 3], [18, 4]] : [[30, 3], [27, 3], [23, 3], [20, 4]], tempo: 1, decoyFs: tight ? 20 : 22, waxFs: tight ? 19 : 21,
+    sizes: tight ? [[27, 3], [24, 3], [21, 3], [18, 4]] : [[30, 3], [27, 3], [23, 3], [20, 4]], tempo: 1, decoyFs: tight ? 20 : 22,
   };
 }
 

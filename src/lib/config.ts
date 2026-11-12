@@ -1,9 +1,4 @@
 import { TUTOR, TUTOR_TIME_ZONE } from "@/lib/tutor";
-export const LESSON_PRICE_CENTS = Number(
-  process.env.NEXT_PUBLIC_LESSON_PRICE_CENTS ?? process.env.LESSON_PRICE_CENTS ?? 2500
-);
-export const LESSON_CURRENCY = process.env.LESSON_CURRENCY ?? TUTOR.place.currency.toLowerCase();
-export const LESSON_DURATION_MINUTES = Number(process.env.NEXT_PUBLIC_LESSON_DURATION_MINUTES ?? 60);
 export const SAME_DAY_RESCHEDULE_FEE_CENTS = Number(
   process.env.NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS ?? TUTOR.defaults.lateChangeFeeCents
 );
@@ -74,14 +69,13 @@ export const GOOGLE_CLIENT_ID = (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "")
 
 export const CONTACT_WHATSAPP_NUMBER = TUTOR.contact.whatsapp;
 export const CONTACT_WHATSAPP_URL = `https://wa.me/${TUTOR.contact.whatsapp.replace(/\D/g, "")}`;
-export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "";
 
 /**
  * Whole euros print bare ("€25"); anything else keeps its cents ("€22.50").
  * Rounding to whole euros showed a €22.50 private rate as "€23" on the button
  * that asks the student to agree to the price.
  */
-export function formatMoney(cents = LESSON_PRICE_CENTS, currency = LESSON_CURRENCY) {
+export function formatMoney(cents: number, currency = TUTOR.place.currency) {
   const fraction = cents % 100 === 0 ? 0 : 2;
   return new Intl.NumberFormat("en-GB", {
     style: "currency",
@@ -101,6 +95,6 @@ export const SAME_DAY_FEE_LABEL = formatMoney(SAME_DAY_RESCHEDULE_FEE_CENTS);
  * column on a phone. One unit compares at a glance and never wraps.
  */
 /** The length as a lesson's adjective: a `60-minute` lesson. */
-export function formatLessonDuration(minutes = LESSON_DURATION_MINUTES) {
+export function formatLessonDuration(minutes: number) {
   return `${minutes}-minute`;
 }

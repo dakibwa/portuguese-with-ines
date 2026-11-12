@@ -3,7 +3,6 @@
 import { HOME_CLOCK, IN_PERSON, LANGUAGE, TUTOR_CITY, TUTOR_NAME } from "@/lib/tutor";
 import { MeetingLink } from "@/components/MeetingLink";
 import { LessonsLoading } from "@/components/LessonsLoading";
-import { StudentExpressions } from "@/components/expressions/StudentExpressions";
 
 import { type ComponentType, type CSSProperties, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -43,6 +42,13 @@ import { CHARGED_EACH, CHARGED_IT, FeeFacts } from "@/components/CardOnFile";
 const { Component: AuthPanel, load: loadAuthPanel } = deferred(() => import("@/components/AuthPanel").then((m) => m.AuthPanel), "Loading…");
 const { Component: AccountControls, load: loadAccountControls } = deferred(() => import("@/components/MyLessons").then((m) => m.MyLessons));
 if (typeof window !== "undefined" && readSession()) void loadAccountControls();
+/*
+ * Expressions, with their painter, come only with a student's lessons. They
+ * draw nothing while the Worker keeps them closed to students, so a visitor
+ * booking a lesson never waits for them, and one that fails to load leaves
+ * the lessons as they are.
+ */
+const { Component: StudentExpressions } = deferred(() => import("@/components/expressions/StudentExpressions").then((m) => m.StudentExpressions), "", true);
 import { LessonMark } from "@/components/LessonMarks";
 import { clearSession, confirmSignInLink, fetchMe, requestEmailChange, requestSignInLink, isReturningDevice, readSession, rememberedAccount, rememberReturningStudent, SessionStorageError, SIGN_IN_LINK_SENT, storeSession, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
 import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
@@ -762,9 +768,11 @@ function glideBarGroups(stage: HTMLElement, before: BarGroup[]) {
  * decision's transition eases to its real height. (next/dynamic suspended on
  * every first render, even with the code already fetched, and React then held
  * its fallback for 300ms before the form popped in.) Code still on its way
- * eases in when it arrives.
+ * eases in when it arrives. A `quiet` one is an add-on that may draw nothing:
+ * its code arrives without a transition, and if it cannot load the page
+ * carries on without it rather than asking to try again.
  */
-function deferred<Props extends object>(fetchComponent: () => Promise<ComponentType<Props>>, waiting = "") {
+function deferred<Props extends object>(fetchComponent: () => Promise<ComponentType<Props>>, waiting = "", quiet = false) {
   let ready: ComponentType<Props> | null = null;
   let loading: Promise<ComponentType<Props>> | null = null;
   const load = () =>
@@ -783,7 +791,10 @@ function deferred<Props extends object>(fetchComponent: () => Promise<ComponentT
       let live = true;
       load().then(
         (component) => {
-          if (live) transitionBooking(() => setLoaded(() => component));
+          if (!live) return;
+          const show = () => setLoaded(() => component);
+          if (quiet) show();
+          else transitionBooking(show);
         },
         () => {
           if (live) setFailed(true);
@@ -795,6 +806,7 @@ function deferred<Props extends object>(fetchComponent: () => Promise<ComponentT
     }, [Loaded, failed]);
     if (Loaded) return <Loaded {...props} />;
     if (failed) {
+      if (quiet) return null;
       return (
         <p className="booking-state-note" role="alert">
           This part of the page couldn&rsquo;t load.{" "}

@@ -45,9 +45,6 @@ env:
   # Public by design: it identifies the app, and the Worker verifies every
   # Google token against it. Absent simply hides the Google button.
   NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
-  LESSON_PRICE_CENTS: ${{ vars.LESSON_PRICE_CENTS || '2500' }}
-  LESSON_CURRENCY: ${{ vars.LESSON_CURRENCY || 'eur' }}
-  NEXT_PUBLIC_LESSON_DURATION_MINUTES: ${{ vars.NEXT_PUBLIC_LESSON_DURATION_MINUTES || '60' }}
   NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS: ${{ vars.NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS || '500' }}
 
 # How a release runs (11 November 2026, Dan: "I like fast relsases"). Until then
@@ -182,9 +179,8 @@ jobs:
         run: npm run build
 
       # The plain directory the journeys check and the Cloudflare deploy needs.
-      # Hidden files are kept because the export carries dotfiles the deploy
-      # would otherwise lose; _headers is not one of them, but it does have to
-      # survive the round trip, since it is the whole cache policy.
+      # Hidden files are kept, so anything in public/ whose name starts with a
+      # dot is deployed as well.
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
