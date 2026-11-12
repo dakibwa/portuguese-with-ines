@@ -33,8 +33,9 @@
     // back to "1" stops all sending and records to email_log instead, which is
     // what to do while testing rather than pointing it at a spare address.
     "EMAIL_DRY_RUN": "0",
-    // Send Inês's booking, change and failed-payment copies to TEACHER_EMAIL.
-    // Setting this to "0" pauses these copies; student mail stays live.
+    // Send Inês's booking, change and cancellation copies to TEACHER_EMAIL. A
+    // declined card is a card in her Needs you, never an email. Setting this
+    // to "0" pauses these copies; student mail stays live.
     "TEACHER_NOTIFICATIONS_ENABLED": "1",
     // Enable only after the additive migration, OAuth app setup and secrets.
     "GOOGLE_CALENDAR_ENABLED": "1",
