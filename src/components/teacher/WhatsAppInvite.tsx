@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Mail, MessageCircle } from "lucide-react";
-import { CHARGED_EACH } from "@/components/CardOnFile";
+import { CHARGED_EACH } from "@/components/FeeFacts";
 import { OwedLessonChoices, sum, whatsAppNumber } from "@/components/teacher/CardApprovalLink";
 import { firstName } from "@/components/teacher/DormantEmail";
 import { priceFor } from "@/components/teacher/StudentPrice";

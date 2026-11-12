@@ -380,15 +380,6 @@ main.book-page .booking-composition {
 
 /* Step 1 — lesson */
 
-.booking-repeat-choice.booking-repeat-choice--setup {
-  margin: 0.1rem 0 0;
-  border: 0;
-  border-left: 3px solid rgba(82, 74, 150, 0.48);
-  border-radius: 0 var(--squiggle-field) var(--squiggle-field) 0;
-  padding: 0.2rem 0 0.2rem 0.8rem;
-  background: transparent;
-}
-
 .booking-selection-stack {
   display: grid;
   gap: 0.7rem;
@@ -5366,12 +5357,6 @@ p.lesson-when > span {
   padding: 1rem var(--pad-dialog) var(--pad-dialog);
   gap: 1rem;
   overflow-y: auto;
-}
-
-.calendar-booking-prompt__content p {
-  margin: 0;
-  font-size: 1rem;
-  line-height: 1.5;
 }
 
 .calendar-booking-prompt__actions {

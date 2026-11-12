@@ -4,6 +4,23 @@ import tutor from "../../tutors/ines/tutor.json" with { type: "json" };
 
 const TUTOR_CITY = tutor.place.city;
 
+// One formatter per zone, built on first use: building one costs far more
+// than reading a time with it, and a calendar converts many.
+const wallClocks = new Map<string, Intl.DateTimeFormat>();
+
+function wallClock(timeZone: string) {
+  let formatter = wallClocks.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone, hour12: false, year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    });
+    if (wallClocks.size >= 16) wallClocks.clear();
+    wallClocks.set(timeZone, formatter);
+  }
+  return formatter;
+}
+
 /** Convert a real wall-clock minute to UTC, rejecting dates/times it cannot name. */
 export function wallTimeToUtc(dateKey: string, time: string, timeZone: string, originalInstant?: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey) || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) {
@@ -16,10 +33,7 @@ export function wallTimeToUtc(dateKey: string, time: string, timeZone: string, o
   if (date.getUTCFullYear() !== year || date.getUTCMonth() + 1 !== month || date.getUTCDate() !== day) {
     throw new Error("Choose a valid date and time.");
   }
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone, hour12: false, year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit"
-  });
+  const formatter = wallClock(timeZone);
   const wallAt = (instant: number) => {
     const parts = formatter.formatToParts(new Date(instant));
     const get = (type: string) => Number(parts.find(part => part.type === type)?.value);

@@ -4,9 +4,10 @@ import { HOME_CLOCK, TUTOR_NAME } from "@/lib/tutor";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Circle, CreditCard, Repeat } from "lucide-react";
 import { AssetMark } from "@/components/BrandMarks";
+import { CHARGED_EACH, CHARGED_IT, FeeFacts } from "@/components/FeeFacts";
 import { openCardPage, previewCardBooking, readSession, type CardBooking } from "@/lib/auth-api";
 import { NO_SHOW_WINDOW_HOURS_AFTER, NOTICE_HOURS, SAME_DAY_RESCHEDULE_FEE_CENTS } from "@/lib/config";
-import { formatMoneyCents, formatShortDay, formatSlotTime } from "@/lib/booking-api";
+import { formatMoneyCents, formatShortDay, formatSlotTime, stripePaymentUrl } from "@/lib/booking-api";
 
 /** Each lesson's tile its own mark, as the booking step's chosen lessons have. */
 const LESSON_MARKS = [
@@ -15,27 +16,6 @@ const LESSON_MARKS = [
   "/visuals/v2-splats/one-to-one-splat-v2.svg",
   "/visuals/v2-splats/real-life-splat-v2.svg",
 ];
-
-/**
- * When a lesson is charged, in words that follow the charge window: an hour
- * after it today, at its end once the window is nothing (2 November 2026,
- * Dan: "charged at the time of when the lessons ends").
- */
-export const CHARGED_EACH = NO_SHOW_WINDOW_HOURS_AFTER ? "after each lesson" : "at the end of each lesson";
-export const CHARGED_IT = NO_SHOW_WINDOW_HOURS_AFTER ? "after it ends" : "when it ends";
-
-/**
- * The change and no-show rule as two dabs, what is free first (2 November
- * 2026, Dan: the same words across the site). `noShow` false leaves out the
- * no-show, where nothing charges a card for one.
- */
-export function FeeFacts({ feeCents, noticeHours, noShow = true }: { feeCents: number; noticeHours: number; noShow?: boolean }) {
-  if (!feeCents) return <li>No fee to change or cancel{noShow ? ", or for a missed lesson" : ""}</li>;
-  return <>
-    <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
-    <li><strong>{formatMoneyCents(feeCents)}</strong> to move or cancel later{noShow ? ", or if you don’t show up" : ""}</li>
-  </>;
-}
 
 /** Lessons still to come that the agreement will pay for: one weekly run, or one lesson, with the starts it covers. */
 export type CardUpcoming = { key: string; when: string; amountCents: number; weekly: boolean; startAts: string[] };
@@ -132,7 +112,7 @@ export function CardTerms({ change = false, setup = false, onCancel, onSkip, boo
     try {
       const result = await openCardPage(session, paying ? kept : [], savedCard);
       if (!current()) return;
-      window.location.assign("authorised" in result ? "/book/?view=lessons&card=authorised" : result.checkoutUrl);
+      window.location.assign("authorised" in result ? "/book/?view=lessons&card=authorised" : stripePaymentUrl(result.checkoutUrl));
     } catch (caught) {
       if (!current()) return;
       setError(caught instanceof Error ? caught.message : "We couldn’t open the card form just now. Please try again.");

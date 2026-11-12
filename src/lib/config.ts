@@ -70,6 +70,10 @@ export const GOOGLE_CLIENT_ID = (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "")
 export const CONTACT_WHATSAPP_NUMBER = TUTOR.contact.whatsapp;
 export const CONTACT_WHATSAPP_URL = `https://wa.me/${TUTOR.contact.whatsapp.replace(/\D/g, "")}`;
 
+// One formatter per currency and number of decimals, built on first use:
+// building one costs far more than formatting with it.
+const moneyFormatters = new Map<string, Intl.NumberFormat>();
+
 /**
  * Whole euros print bare ("€25"); anything else keeps its cents ("€22.50").
  * Rounding to whole euros showed a €22.50 private rate as "€23" on the button
@@ -77,12 +81,20 @@ export const CONTACT_WHATSAPP_URL = `https://wa.me/${TUTOR.contact.whatsapp.repl
  */
 export function formatMoney(cents: number, currency = TUTOR.place.currency) {
   const fraction = cents % 100 === 0 ? 0 : 2;
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-    minimumFractionDigits: fraction,
-    maximumFractionDigits: fraction
-  }).format(cents / 100);
+  const code = currency.toUpperCase();
+  const key = `${code} ${fraction}`;
+  let formatter = moneyFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: code,
+      minimumFractionDigits: fraction,
+      maximumFractionDigits: fraction
+    });
+    if (moneyFormatters.size >= 16) moneyFormatters.clear();
+    moneyFormatters.set(key, formatter);
+  }
+  return formatter.format(cents / 100);
 }
 
 /** The late change fee (inside the 14-hour window), which is also what a no-show costs. */
