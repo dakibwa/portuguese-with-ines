@@ -315,10 +315,8 @@ someone already welcomed still creates a fresh link. The recipient's captured ad
 must match at link creation, email dispatch and the final welcome-state update.
 A student needs no lesson to be welcomed (16 October 2026, Inês); with no
 lesson to come the email invites them to sign in and book their next one,
-with no lesson list, and a student free at every length is asked for no card. Accounts the opt-in live check registers
-(`launch-check-…@example.invalid`, from `scripts/qa-recurring-rates.mjs`) are
-left out of the list; the four made on 5 September 2026 were deleted from
-production on 13 October 2026 at Dan's request.
+with no lesson list, and a student free at every length is asked for no card. Accounts an old launch check
+registered (`launch-check-…@example.invalid`) are left out of the list.
 
 Selecting a student opens their lesson history. The teacher UI reads
 `GET /admin/bookings?from=1970-01-01T00:00:00.000Z` through the existing teacher
@@ -402,20 +400,12 @@ writes to the Worker. `Open full page` opens the same painting and reading at
 `/idioms/`, under the shared site header. It checks the signed-in account before
 loading her collection and links back to the Expressions tab.
 
-The migration includes 52 drafts, preserving the original expression IDs,
-Portuguese meaning, literal English, idiomatic English equivalent (in
-`meaning_en`), notes and references. The bundle supplies no usage examples or
-themes, so those start empty. `scripts/import-expressions.mjs` parses only
-literal arrays from the bundle with the installed TypeScript parser; it never
-executes bundle code. Regenerate the seed as plain SQL with:
-
-```sh
-node scripts/import-expressions.mjs /path/to/ines-idioms-app/current-app/lib/expressions.ts
-```
-
-The output is the seed section of `0026-expressions.sql`. Repeating it preserves
-existing IDs and teacher edits (`ON CONFLICT(id) DO NOTHING`); it does not refresh
-or overwrite an existing collection. Reorder is bounded to 500 entries.
+The migration seeded 52 drafts from her earlier idioms app, preserving the
+original expression IDs, Portuguese meaning, literal English, idiomatic English
+equivalent (in `meaning_en`), notes and references; usage examples and themes
+started empty. Its inserts use `ON CONFLICT(id) DO NOTHING`, so applying
+`0026-expressions.sql` again never overwrites her edits. Reorder is bounded to
+500 entries.
 
 ## Student expression picker
 
