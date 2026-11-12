@@ -548,16 +548,18 @@ free times and removes selected times that cannot be booked in the new place.
   a group, nearer lessons come first. A notice says what happened in one bold
   line; the facts flow beneath
   at full width and break only between facts. Work still to do has its one
-  quiet action at that line's end (`Connect`, `Open in Stripe`, `Open`, `See
-  lessons`), at every width, never on a row of its own; it has no cross and
-  clears when done. A notice that only tells her something says it all, a
+  quiet action at that line's end (`Connect`, `Open in Stripe`, `Open`), at
+  every width, never on a row of its own; it has no cross and
+  clears when done. Nothing their card's checks already say is a notice: a
+  card a student saves is their `Card saved` tick and nothing more (12
+  November 2026). A notice that only tells her something says it all, a
   first lesson's note in full too, so it has no action, only a small round
   cross at that line's end: pressed, the notice goes at once, on every device,
   and focus moves to the next notice or the student's name. The action
   and the cross are one height, centred on that line, and stand as far from
   the notice's top edge as from its right, never against it. Inside a
   student's own card it does not say their name again (`Changed their
-  lesson`, `Cancelled their lesson`, `First lesson`, `Added a card`); outside
+  lesson`, `Cancelled their lesson`, `First lesson`); outside
   a card, on the Timetable and under `Check first`, the name stays. Above the groups, `6 of 21 students are all set`
   over a thin coral meter counts active students whose checks are all done.
   Count students needing her attention once, not each task; her own next
@@ -2395,7 +2397,7 @@ Her notes and empty states speak at the hint size: `Choose a date and a time
 first.` sits small just above the greyed action; `Nothing to check just now.`
 and `Your collection is empty.` match the dabs around them. `November 2026`
 stays on one line beside its arrows; a wrapped Needs-you title breaks evenly
-(`Jessica Riley / added a card`); in Lesson history a date reads `Tue 5 Jan`,
+(`Jessica Riley / changed their lesson`); in Lesson history a date reads `Tue 5 Jan`,
 adding its year only beyond six months, and its time shares the line on a wide
 card or sits beneath it, without the dot, on a narrow one, so `· 18:00` never
 starts a line.

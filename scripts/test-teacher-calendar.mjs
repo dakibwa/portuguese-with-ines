@@ -451,28 +451,28 @@ test("Needs you lists only what waits on her, once each, and empties on its own"
 });
 
 
-test("a declined card and a card just added are Needs you cards on the student's row, not emails to Inês", () => {
+test("a declined card is a Needs you card on the student's row, not an email to Inês; a card just saved is none", () => {
   const now = new Date("2026-09-08T10:00:00Z");
   const base = { email: "x@example.invalid", signedIn: true, hasLessons: true, awaitingWelcome: false };
   const students = [
     { ...base, id: "ana", name: "Ana", hasCard: true,
       cardDeclined: [{ bookingId: "b1", reference: "PT-ONE", startsAt: "2026-09-05T15:00:00Z", amountCents: 1500, part: "lesson" },
         { bookingId: "b1", reference: "PT-ONE", startsAt: "2026-09-05T15:00:00Z", amountCents: 500, part: "fee" }] },
-    { ...base, id: "kai", name: "Kai", hasCard: true, cardAdded: { at: "2026-09-07T09:00:00Z", lessons: [{ bookingId: "b2", startsAt: "2026-09-10T10:00:00Z" }] } },
-    // A card since removed says nothing, and a student who has paid has nothing to chase.
-    { ...base, id: "dot", name: "Dot", hasCard: false, cardAdded: { at: "2026-09-07T09:00:00Z", lessons: [] }, cardDeclined: [] },
+    // A card just saved asks nothing of her (12 November 2026, Dan): their row's Card saved says it.
+    { ...base, id: "kai", name: "Kai", hasCard: true, cardForAllLessons: true },
+    // A student who has paid has nothing to chase.
+    { ...base, id: "dot", name: "Dot", hasCard: false, cardDeclined: [] },
   ];
   const items = needsYou({ now, meet: null, payments: [], students, lessons: [], cancellations: [] });
-  assert.deepEqual(items.map((item) => item.key), ["declined:b1:lesson", "declined:b1:fee", "card:kai"], "money first, as payments are");
+  assert.deepEqual(items.map((item) => item.key), ["declined:b1:lesson", "declined:b1:fee"], "money first, as payments are");
   const workspace = studentWorkspace(students, items, true, []);
   assert.equal(workspace.general.length, 0);
-  assert.deepEqual(workspace.sections.needs.map((row) => [row.student.id, row.items.length]), [["ana", 2], ["kai", 1]]);
+  assert.deepEqual(workspace.sections.needs.map((row) => [row.student.id, row.items.length]), [["ana", 2]]);
 
-  // Only what merely informs can be dismissed: the card added, never the declined card.
-  assert.deepEqual(items.map((item) => item.dismiss), [undefined, undefined, `card:kai:${Date.parse("2026-09-07T09:00:00Z")}`]);
-  const dismissed = needsYou({ now, meet: null, payments: [], students, lessons: [], cancellations: [], dismissed: new Set([items[2].dismiss, "declined:b1:lesson"]) });
+  // A declined card is work still to do, so it is never dismissed.
+  assert.deepEqual(items.map((item) => item.dismiss), [undefined, undefined]);
+  const dismissed = needsYou({ now, meet: null, payments: [], students, lessons: [], cancellations: [], dismissed: new Set(["declined:b1:lesson"]) });
   assert.deepEqual(dismissed.map((item) => item.key), ["declined:b1:lesson", "declined:b1:fee"]);
-  assert.equal(studentWorkspace(students, dismissed, true, []).attentionCount, 1, "a dismissed notice leaves the badge");
 });
 
 test("a dismissed change stays gone until the student changes that lesson again", () => {

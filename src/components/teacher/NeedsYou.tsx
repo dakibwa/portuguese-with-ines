@@ -139,21 +139,6 @@ export function NeedsYou({ items, sending, onMeet, onWelcome, onStudent, onDismi
       action = <button className="teacher-quiet" type="button" onClick={() => onStudent(student, "history")}>
         Open<span className="visually-hidden"> {student.name}</span>
       </button>;
-    } else if (item.kind === "card") {
-      // Never charge twice (12 October 2026): a lesson already paid by hand comes off the card from its details.
-      const { student, added } = item;
-      const count = added.lessons.length;
-      full = `${student.name} added a card`;
-      who = embedded ? "Added a card" : full;
-      detail = count
-        ? `${count} ${count === 1 ? "lesson" : "lessons"} you added ${count === 1 ? "is" : "are"} now charged after each one. Paid by hand? Open it and tick “Already paid”`
-        : "Lessons you add are now charged to it after each one";
-      // Only lessons she may have been paid for by hand give her something to
-      // do, and they are on the student's profile: this opened the empty Add
-      // a lesson form, with nothing in it to tick.
-      action = count ? <button className="teacher-quiet" type="button" onClick={() => onStudent(student, "history")}>
-        See lessons<span className="visually-hidden"> for {student.name}</span>
-      </button> : null;
     } else if (item.kind === "lessons") {
       who = full = `${item.student.name} has no lessons yet`;
       detail = "Add a lesson or their weekly lessons";
