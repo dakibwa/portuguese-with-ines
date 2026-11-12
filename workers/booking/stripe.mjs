@@ -494,10 +494,6 @@ export function stripeConfigured(env) {
   return Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET);
 }
 
-export function isTestMode(env) {
-  return /^(?:sk|rk)_test_/.test(String(env.STRIPE_SECRET_KEY ?? ""));
-}
-
 export function stripeMode(env) {
   const key = String(env.STRIPE_SECRET_KEY ?? "");
   if (/^(?:sk|rk)_test_/.test(key)) return "test";

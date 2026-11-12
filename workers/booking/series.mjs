@@ -15,7 +15,7 @@
  * change instead of drifting to 16:30 for half the year.
  */
 
-import { isSlotBookable } from "./availability.mjs";
+import { computeAvailability, isSlotBookable } from "./availability.mjs";
 import { homeZone, addDaysToKey, dateKey, parseDateKey, zonedParts, zonedToUtc } from "./time.mjs";
 
 /**
@@ -78,9 +78,20 @@ export function occurrenceInstants({ fromKey, minuteOfDay, count }) {
  * than failing the run — a single holiday in week six should not stop someone
  * booking the other eleven. The skipped dates are returned so the student is
  * told before they commit, never after.
+ *
+ * A student's weeks are read from one availability over the run's dates,
+ * which gives each day exactly what that day's own read would; only a week
+ * that is not free is checked again, for the words of why.
  */
-export async function planOccurrences(env, { fromKey, minuteOfDay, count, lessonType, now, ignoreBookingId = null, ignoreHoldsOf = null, teacher = false, location = "online" }) {
+export async function planOccurrences(env, { fromKey, minuteOfDay, count, lessonType, now, ignoreHoldsOf = null, teacher = false, location = "online" }) {
   const wanted = occurrenceInstants({ fromKey, minuteOfDay, count: Math.min(count, MAX_OCCURRENCES_PER_RUN) });
+  // A weekly slot is checked against her real teaching hours, not against the
+  // 30-day counter that governs walk-up bookings. Without this a twelve-week
+  // booking would quietly become a four-week one.
+  const checked = { lessonType, location, now, ignoreHoldsOf, ignoreHorizon: true };
+  const { slotsByDate } = !teacher && wanted.length
+    ? await computeAvailability(env, { ...checked, fromKey: wanted[0].key, toKey: wanted.at(-1).key, dates: new Set(wanted.map((week) => week.key)) })
+    : { slotsByDate: {} };
 
   const bookable = [];
   const skipped = [];
@@ -99,18 +110,12 @@ export async function planOccurrences(env, { fromKey, minuteOfDay, count, lesson
       else bookable.push({ ...occurrence, endAt: new Date(occurrence.startAt.getTime() + lessonType.duration_minutes * 60000) });
       continue;
     }
-    const check = await isSlotBookable(env, {
-      startAt: occurrence.startAt.toISOString(),
-      lessonType,
-      location,
-      now,
-      ignoreBookingId,
-      ignoreHoldsOf,
-      // A weekly slot is checked against her real teaching hours, not against
-      // the 30-day counter that governs walk-up bookings. Without this a
-      // twelve-week booking would quietly become a four-week one.
-      ignoreHorizon: true
-    });
+    const startAt = occurrence.startAt.toISOString();
+    if ((slotsByDate[occurrence.key] ?? []).some((slot) => slot.startAt === startAt)) {
+      bookable.push({ ...occurrence, endAt: new Date(occurrence.startAt.getTime() + lessonType.duration_minutes * 60000) });
+      continue;
+    }
+    const check = await isSlotBookable(env, { ...checked, startAt });
     if (check.ok) bookable.push({ ...occurrence, endAt: check.endAt });
     else skipped.push({ key: occurrence.key, startAt: occurrence.startAt.toISOString(), reason: check.reason });
   }

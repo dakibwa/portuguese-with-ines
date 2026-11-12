@@ -223,13 +223,27 @@ export function fetchSchedule(token: string) {
   });
 }
 
-export function fetchBookings(token: string, from?: string) {
+/** Whoever follows her lessons being read afresh: a student's open card reads theirs again. */
+const bookingsReloaded = new Set<() => void>();
+
+/** Called after each read of her lessons (not one student's); returns the way to stop. */
+export function onBookingsReloaded(listener: () => void) {
+  bookingsReloaded.add(listener);
+  return () => { bookingsReloaded.delete(listener); };
+}
+
+/** Her lessons from `from`, or only `studentId`'s, for their card's history. */
+export function fetchBookings(token: string, from?: string, studentId?: string) {
+  const query = new URLSearchParams();
+  if (from) query.set("from", from);
+  if (studentId) query.set("student", studentId);
+  const search = query.toString();
   return adminRequest<{
     bookings: AdminBooking[];
     manualPaymentReconciliation?: PaymentReview[];
   }>(
     token,
-    `/admin/bookings${from ? `?from=${encodeURIComponent(from)}` : ""}`,
+    `/admin/bookings${search ? `?${search}` : ""}`,
   ).then((data) => {
     if (!Array.isArray(data.bookings) || !data.bookings.every((row) =>
       isApiRecord(row) && typeof row.id === "string" && typeof row.reference === "string" &&
@@ -241,6 +255,7 @@ export function fetchBookings(token: string, from?: string) {
     ) || (data.manualPaymentReconciliation !== undefined && (!Array.isArray(data.manualPaymentReconciliation) || !data.manualPaymentReconciliation.every((row) =>
       isApiRecord(row) && typeof row.id === "string" && typeof row.reference === "string"
     )))) throw new Error(BOOKING_REPLY_ERROR);
+    if (!studentId) for (const listener of bookingsReloaded) listener();
     return data;
   });
 }

@@ -33,7 +33,7 @@ Student on /book                                     (browse without an account)
   → POST /series/:id/reschedule | /stop (Bearer)     → move or end an owned weekly sequence
 Legacy /my-lessons and /booking links resolve into /book without losing state
 Inês on /schedule                     (her own account, role=teacher)
-  → GET/POST /admin/availability, /admin/exceptions
+  → GET/POST /admin/availability
   → POST /admin/online-only                          online-only date ranges and daily hours
   → GET  /admin/lesson-availability                 teacher lesson picker
   → POST /admin/exceptions/day                       one date's day off, blocked hours and extra hours
@@ -66,8 +66,6 @@ Inês on /schedule                     (her own account, role=teacher)
   → POST /admin/students/:id/dormant-email           send one dormant student theirs, at most once a day
   → POST /admin/bookings/:id/reschedule | /cancel
   → POST /admin/bookings/:id/cancel { following }    this lesson and every later week of its run; the run stops
-  → POST /admin/bookings/:id/length                  60 or 90 minutes, for this lesson or (`following`) every
-                                                     later week of its run, at the student's own price
   → POST /admin/bookings/:id/change                  time, length and place together, for this lesson or
                                                      (`following`) every later week of its run; one email
 Stripe → POST /stripe/webhook                        signature-verified
@@ -166,9 +164,9 @@ other past lesson. Homework is set on it as usual.
 
 Moving it to another past time, or cancelling it, is as quiet, since the
 student was never told of it. It cannot be moved into the future (409 `A
-recorded lesson stays in the past. Add a new lesson instead.`, or through her
-one change `A lesson already had stays in the past. Add a new lesson
-instead.`), so a record never becomes an unannounced lesson to come. Its
+lesson already had stays in the past. Add a new lesson instead.`, through
+`/reschedule` or her one change), so a record never becomes an unannounced
+lesson to come. Its
 length and place are corrected as any lesson already had is (see her one
 change, below).
 An unproven account with a password is reclaimed first (below), because
@@ -264,8 +262,6 @@ status:
 - Per lesson: a weekly run can't be added ticked (400); each lesson of it is
   ticked from its own dialog, and new weeks are born unticked.
 - The tick covers the lesson price only, not a late change fee.
-- `POST /admin/bookings/:id/paid-by-hand` (her lesson on a card, ticked)
-  still answers for any open page; the site does not call it.
 - Her student list's count of lessons to come still paid by hand
   (`unpaidUpcoming`) and the student's `Pay by card` prompt leave ticked
   lessons out; emails show their price as `paid`.
@@ -309,8 +305,10 @@ with no lesson list, and a student free at every length is asked for no card. Ac
 registered (`launch-check-…@example.invalid`) are left out of the list.
 
 Selecting a student opens their lesson history. The teacher UI reads
-`GET /admin/bookings?from=1970-01-01T00:00:00.000Z` through the existing teacher
-permission path and matches the account ID (email only for older unlinked rows).
+`GET /admin/bookings?from=1970-01-01T00:00:00.000Z&student=<id>` through the
+existing teacher permission path: only that student's lessons, by account ID
+(email only for older unlinked rows), and no `manualPaymentReconciliation`. It
+reads them again whenever her schedule reads her lessons afresh.
 It shows confirmed and cancelled lessons, including old dates, with upcoming
 lessons first and past/cancelled lessons newest first. Unfinished checkout holds
 are excluded. Payment and cancellation status are read-only; viewing history
@@ -637,7 +635,7 @@ password changes use the reset email. Google callbacks open Profile directly.
 
 Lessons only belong to students: there are no loose lessons.
 `POST /admin/bookings` names the student by `studentId` (their account, which
-works for a student with no email yet) or, for older callers, by `email`; one
+works for a student with no email yet); one
 who isn't on the site is refused ("Add them as a student first.", 404), and
 students come from `POST /admin/students`. Each student's card is their profile
 from their first invite to regular use.
@@ -1256,8 +1254,8 @@ while validation runs. Inês's explicit calendar additions retain their override
   stranger reaching in and taking a slot months out; a student keeping their own
   standing time is the case it is meant to allow. Even at 84 days,
   a run starting a few weeks out would otherwise quietly lose its last weeks.
-- **A recipe is never swept while it is being written.** The housekeeping on
-  an availability read removes a recipe with no lessons (an abandoned card
+- **A recipe is never swept while it is being written.** The minute sweep's
+  housekeeping removes a recipe with no lessons (an abandoned card
   setup's, once its 35-minute holds lapse) only when it is more than ten
   minutes old: a recipe is written a moment before its first lesson is tied
   to it, and taking it then would fail that booking part way.
@@ -1313,9 +1311,10 @@ while validation runs. Inês's explicit calendar additions retain their override
   must still be to come to take the
   weeks after it too; lessons before it are never touched, and a lesson
   already had changes only on its own (see correcting one, below).
-  `POST /admin/bookings/:id/length` takes `lessonType` (`single` or `long`),
-  the displayed `expectedPriceCents` (the student's own price for that length,
-  a 90 derived as 1.5× their 60) and `following`. A lesson a card has paid,
+  A change of length alone, `POST /admin/bookings/:id/change` with only
+  `lessonType` (`single` or `long`), the displayed `expectedPriceCents` (the
+  student's own price for that length, a 90 derived as 1.5× their 60) and
+  `following`, is handled as follows. A lesson a card has paid,
   with a payment due or going through, a free one going to a priced length,
   or one the longer lesson would run into another lesson, keeps its length
   and comes back under `kept` with a short reason; her own lessons keep no
@@ -1333,7 +1332,7 @@ while validation runs. Inês's explicit calendar additions retain their override
   /admin/bookings/:id/change` takes any of `startAt`, `lessonType` with
   `expectedPriceCents`, and `location`, plus `following`. For a lesson still
   to come a new time must be to come too (a lesson already had is corrected
-  within the past, below). A length alone is exactly `/length`. Otherwise the lesson she opened takes
+  within the past, below). A length alone is the length change above. Otherwise the lesson she opened takes
   the new instant, and with `following` every later lesson takes the new day
   and Porto time in its own week: the week of the run it sits nearest,
   counted from the lesson she opened and stepped by date keys, so clock
@@ -1341,11 +1340,11 @@ while validation runs. Inês's explicit calendar additions retain their override
   back to the new day with the rest. What her page says before she saves
   (`3 lessons move to Thursdays at 16:00`) is therefore what happens. A
   lesson whose payment is going through, that cannot take the new length (as
-  `/length` decides), whose new time does not exist on a clock-change day, or
+  the length change decides), whose new time does not exist on a clock-change day, or
   that would run into another lesson takes none of the change and comes back
   under `kept` with a short reason; of two of the run's lessons that would
   meet, the later stays. The rest change in one JSON-backed write guarded
-  like `/length`'s (each row exactly as read, the run's count, no overlap,
+  like the length change's (each row exactly as read, the run's count, no overlap,
   the price snapshot when the length changes, her authority). Each keeps its
   UID with a higher sequence, counts as a move and never takes a fee. With
   `following` the recipe takes the new weekday, time, length and place, and
@@ -1366,7 +1365,7 @@ while validation runs. Inês's explicit calendar additions retain their override
   your lesson` / `Inês has changed your weekly lessons`), naming any week
   that stayed; a time-only move of one lesson keeps the words it always had.
 - **Inês can correct a lesson already had.**
-  `/change` and `/length` take a lesson that has started, a record included,
+  `/change` takes a lesson that has started, a record included,
   while nothing of it is on a card: `not_required` or `recorded`, no charge
   started, ticked `Already paid` or not (a ticked one stays ticked, at the
   price of what it now is). It takes 60 or 90 minutes at the
@@ -1385,7 +1384,12 @@ while validation runs. Inês's explicit calendar additions retain their override
   lesson`), plus `it's on their card` for one scheduled on a card and not
   yet charged: what a card is about to be charged for is never changed
   behind the student's back. Her page uses `/reschedule` only for a past lesson that keeps
-  its length and place for one of those reasons, to move its time.
+  its length and place for one of those reasons, to move its time. That time
+  stays in the past too (409 `A lesson already had stays in the past. Add a
+  new lesson instead.`): moved on, a lesson a card had paid could be
+  cancelled from its link for a refund. Only one still waiting for its card
+  charge, with nothing taken, moves on to a time to come (a no-show to another
+  day, see *The no-show policy*), and the write checks it is still waiting.
   `POST /admin/bookings/:id/cancel` with `following: true` ends the run first,
   so the nightly top-up cannot add a week, then cancels each confirmed lesson
   from this one on exactly as her single cancellation does: a card payment is

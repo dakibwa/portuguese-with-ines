@@ -135,10 +135,3 @@ export function lessonTypeChangeProblem(row, currentLessonType, nextLessonType, 
   }
   return "This lesson's length can't be changed while its payment is being processed.";
 }
-
-/** A future saved-card charge follows the newly chosen lesson price. */
-export function amountAfterLessonTypeChange(row, nextLessonType) {
-  return ["scheduled", "processing"].includes(row.payment_status)
-    ? nextLessonType.price_cents
-    : (row.amount_cents ?? null);
-}

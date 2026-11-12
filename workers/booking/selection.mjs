@@ -2,6 +2,7 @@ import { homeZone, addDaysToKey, dateKey } from "./time.mjs";
 import { lessonPriceSnapshotSql } from "./rates.mjs";
 import { availabilityRevisionSql } from "./availability.mjs";
 import { currentTutor } from "./tutor.mjs";
+import { studentSessionSql } from "./auth.mjs";
 
 export const MAX_SINGLE_SELECTIONS = 8;
 
@@ -54,9 +55,10 @@ const SERIES_COLUMNS = [
  * which keeps that much free time between it and every other lesson. Only the
  * booking columns are inserted, so the guard span never reaches the table.
  */
-export async function claimSelection(env, { rows, series, now, bufferMinutes = 0, sessionIdentity = null, priceSnapshot = null, availabilityRevision = null, minimumNoticeHours = null }) {
-  const sessionGuard = `EXISTS (SELECT 1 FROM students WHERE id = ? AND session_version = ?)
-    AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`;
+export async function claimSelection(env, { rows, series, now, bufferMinutes = 0, sessionIdentity, priceSnapshot, availabilityRevision, minimumNoticeHours }) {
+  // The student's session, the price they were quoted and her hours as read.
+  const guards = `${studentSessionSql()} AND ${lessonPriceSnapshotSql()} AND ${availabilityRevisionSql()}`;
+  const guardValues = [...sessionIdentity, ...priceSnapshot, availabilityRevision];
   const gapMs = bufferMinutes * 60000;
   const candidates = rows.map((row) => ({
     ...row,
@@ -65,11 +67,8 @@ export async function claimSelection(env, { rows, series, now, bufferMinutes = 0
   }));
   const statements = series.map((entry) => env.DB.prepare(
     `INSERT INTO booking_series (${SERIES_COLUMNS.join(", ")}) SELECT ${SERIES_COLUMNS.map(() => "?").join(", ")}
-     WHERE 1 = 1 ${sessionIdentity ? `AND ${sessionGuard}` : ""}
-       ${priceSnapshot ? `AND ${lessonPriceSnapshotSql()}` : ""}
-       ${availabilityRevision !== null ? `AND ${availabilityRevisionSql()}` : ""}`
-  ).bind(...SERIES_COLUMNS.map((column) => entry[column] ?? null), ...(sessionIdentity ?? []), ...(priceSnapshot ?? []),
-    ...(availabilityRevision !== null ? [availabilityRevision] : [])));
+     WHERE ${guards}`
+  ).bind(...SERIES_COLUMNS.map((column) => entry[column] ?? null), ...guardValues));
   const claimIndex = statements.length;
   statements.push(env.DB.prepare(
     `WITH candidates AS MATERIALIZED (SELECT value FROM json_each(?1)),
@@ -79,17 +78,14 @@ export async function claimSelection(env, { rows, series, now, bufferMinutes = 0
            WHERE (occupied.status = 'confirmed' OR (occupied.status = 'pending_payment' AND occupied.hold_expires_at > ?2))
              AND occupied.starts_at < json_extract(proposed.value, '$.guard_end')
              AND occupied.ends_at > json_extract(proposed.value, '$.guard_start')
-         ) ${sessionIdentity ? `AND ${sessionGuard}` : ""}
-           ${priceSnapshot ? `AND ${lessonPriceSnapshotSql()}` : ""}
-           ${availabilityRevision !== null ? `AND ${availabilityRevisionSql()}` : ""}
-           ${minimumNoticeHours !== null ? "AND NOT EXISTS (SELECT 1 FROM candidates WHERE json_extract(value, '$.starts_at') < ?)" : ""} AS available
+         ) AND ${guards}
+           AND NOT EXISTS (SELECT 1 FROM candidates WHERE json_extract(value, '$.starts_at') < ?) AS available
        )
      INSERT INTO bookings (${BOOKING_COLUMNS.join(", ")})
      SELECT ${BOOKING_COLUMNS.map((column) => `json_extract(value, '$.${column}')`).join(", ")}
      FROM candidates WHERE (SELECT available FROM free)`
-  ).bind(JSON.stringify(candidates), now.toISOString(), ...(sessionIdentity ?? []), ...(priceSnapshot ?? []),
-    ...(availabilityRevision !== null ? [availabilityRevision] : []),
-    ...(minimumNoticeHours !== null ? [new Date(Date.now() + minimumNoticeHours * 3600000).toISOString()] : [])));
+  ).bind(JSON.stringify(candidates), now.toISOString(), ...guardValues,
+    new Date(Date.now() + minimumNoticeHours * 3600000).toISOString()));
   // If the whole claim lost a race, remove only this request's empty recipes
   // before committing. A SQL error rolls the entire D1 batch back.
   for (const entry of series) statements.push(env.DB.prepare(

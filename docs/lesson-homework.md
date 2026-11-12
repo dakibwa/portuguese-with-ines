@@ -3,7 +3,8 @@
 **Hidden for now** (11 November 2026, Dan: "Hide homework for now").
 `features.homework` in `tutors/ines/tutor.json` is `false`, so the site shows
 no way into homework or lesson notes, on Inês's pages or students', and a
-student's Your lessons does not ask the Worker for homework at all. Nothing
+student's Your lessons does not ask the Worker for homework at all; nor does
+the Worker read homework waiting for review into her Students list. Nothing
 is deleted: the Worker's routes and tables are as described below, no
 homework had been saved on the live site when it was hidden, and setting the
 flag to `true` brings everything back. With it on, the row's **Add notes**
@@ -87,8 +88,7 @@ considers recent submissions for three days, but never extends that send window.
 The email has no booking id
 so the failed-email sweep can never rebuild it as a lesson confirmation. A new
 attempt has a new submission id and is announced in its turn.
-`TEACHER_NOTIFICATIONS_ENABLED=0` pauses it with her other copies. Until
-migration 0030 is applied, submissions work as before and no notice is sent.
+`TEACHER_NOTIFICATIONS_ENABLED=0` pauses it with her other copies.
 
 Students can practise again after feedback. A new attempt replaces the previous
 submission, not the published questions. Changed answers are labelled as not yet
@@ -145,11 +145,10 @@ Migration `0029_lesson_homework.sql` adds only `lesson_homework`,
 applied in production; homework AI has been live since 15 October 2026.
 Apply future additive migrations manually to staging, then production. Do not
 apply the full schema or replay older migrations on an existing database.
-The schema is for new local databases only. Where these tables are absent, the
-Students list shows no homework to review and a student's past lessons carry
-no homework,
-rather than either failing. Migration `0030-homework-notified.sql` adds the two
-notification columns; apply it after 0029. This feature does not change bookings, fees or meetings.
+The schema is for new local databases only. Migration `0030-homework-notified.sql`
+adds the two notification columns; apply it after 0029. The Worker reads both
+as present: it no longer treats a missing table or column as no homework.
+This feature does not change bookings, fees or meetings.
 
 - `/admin/lessons/:id/homework`: teacher read/save; `/transcribe`, `/generate`,
   `/publish` and `/return` are explicit POST actions. Existing teacher-session and admin

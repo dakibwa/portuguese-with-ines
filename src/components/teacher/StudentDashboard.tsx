@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
 import { StudentLessons, sharedFacts } from "@/components/teacher/StudentLessons";
 import { EditActions, EditPencil } from "@/components/teacher/EditControls";
-import { fetchBookings, fetchStudentNotes, isStudentsBooking, saveStudentPlan, type AdminBooking, type AdminStudent, type StudentNotes } from "@/lib/admin-api";
+import { fetchBookings, fetchStudentNotes, isStudentsBooking, onBookingsReloaded, saveStudentPlan, type AdminBooking, type AdminStudent, type StudentNotes } from "@/lib/admin-api";
 import { readSession } from "@/lib/auth-api";
 
 /**
@@ -62,6 +62,9 @@ export function StudentDashboard({ student, token, facts, homeworkId, homeworkRe
   const [history, setHistory] = useState<History | null>(null);
   const [notes, setNotes] = useState<Notes | null>(null);
   const [attempt, setAttempt] = useState(0);
+  // Bumped each time her lessons are read afresh, after every change she
+  // makes to one and on her return to the page.
+  const [lessonsRead, setLessonsRead] = useState(0);
   const [notesAttempt, setNotesAttempt] = useState(0);
   // The lesson open in place, one at a time. Only its id is kept, so what is
   // shown follows the lessons as they reload.
@@ -90,9 +93,10 @@ export function StudentDashboard({ student, token, facts, homeworkId, homeworkRe
     setSelected(current => current?.id === homeworkId ? null : current);
   }, [homeworkId, homeworkRequestKey]);
 
+  useEffect(() => onBookingsReloaded(() => setLessonsRead(value => value + 1)), []);
   useEffect(() => {
     let active = true;
-    void fetchBookings(token, "1970-01-01T00:00:00.000Z").then(result => {
+    void fetchBookings(token, "1970-01-01T00:00:00.000Z", studentId).then(result => {
       if (!active || readSession() !== token) return;
       // A linked account survives an email change; see isStudentsBooking.
       const bookings = result.bookings.filter(booking =>
@@ -104,11 +108,11 @@ export function StudentDashboard({ student, token, facts, homeworkId, homeworkRe
       setHistory({ token, studentId, email, bookings: null, error: caught instanceof Error ? caught.message : "Lesson history couldn’t be loaded." });
     });
     return () => { active = false; };
-    // Read again whenever her list is: it is after every change she makes to a
-    // lesson and on her return to the page, each giving this card a new
-    // `student`. The card stays open behind the Timetable, and went on
-    // listing a lesson she had just cancelled or moved there.
-  }, [token, studentId, email, attempt, student]);
+    // Read again whenever her lessons are: the card stays open behind the
+    // Timetable, and went on listing a lesson she had just cancelled or moved
+    // there. Not on every new `student`, which a change of their details or a
+    // welcome sent gives it too.
+  }, [token, studentId, email, attempt, lessonsRead]);
 
   useEffect(() => {
     let active = true;

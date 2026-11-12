@@ -2,6 +2,7 @@ import { CALENDAR_SCOPE, calendarConfigured, encryptCalendarToken, decryptCalend
 import { verifyGoogleIdToken } from "./google.mjs";
 import { calendarUid } from "./ics.mjs";
 import { tutorOf } from "./tutor.mjs";
+import { studentEmailableSql } from "./student-like.mjs";
 
 const encoder = new TextEncoder();
 const enabled = env => env.GOOGLE_CALENDAR_ENABLED === "1" && calendarConfigured(env);
@@ -237,9 +238,7 @@ export async function syncPendingMeetings(env, notifyReady, reminder = null) {
           AND (told.booking_id = b.id OR (b.series_id IS NOT NULL AND instr(told.dedupe_key, ':' || b.series_id || ':') > 0))))` : "";
   const { results: ready } = await env.DB.prepare(`SELECT * FROM bookings b WHERE status = 'confirmed' AND location = 'online'
     AND meeting_url IS NOT NULL AND meeting_notified_at IS NULL AND ends_at > ? AND created_at < ?
-    AND student_email NOT LIKE 'no-email:%'
-    AND NOT EXISTS (SELECT 1 FROM students s WHERE s.email = lower(trim(b.student_email)) AND s.role = 'student' AND s.awaiting_welcome = 1
-      AND COALESCE(s.password_hash, '') = '' AND COALESCE(s.google_sub, '') = '' AND s.last_login_at IS NULL)
+    AND ${studentEmailableSql("b")}
     ${waits}
     ORDER BY starts_at LIMIT 6`)
     .bind(now, new Date(Date.now() - 120000).toISOString(),

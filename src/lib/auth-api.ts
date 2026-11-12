@@ -63,9 +63,6 @@ export type LessonSeries = {
   id: string;
   weekday: number;
   minuteOfDay: number;
-  occurrences: number | null;
-  openEnded: boolean;
-  upcoming: number;
 };
 
 const SESSION_KEY = "ines-student-session";
