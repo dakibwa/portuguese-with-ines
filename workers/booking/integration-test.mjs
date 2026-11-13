@@ -3893,6 +3893,36 @@ await test("a saved card can authorise the named lessons and repeats without ent
     assert.equal((await call("/me/card", { token: ownToken, body })).status, 409, "a repeat press cannot consent or charge twice");
   } finally { beforeRun = null; forgetStudent(email); }
 });
+await test("with nothing outstanding, a saved card is agreed to for lessons to come with no card details", async () => {
+  const id = "saved-card-ahead", email = `${id}@example.invalid`;
+  student(id);
+  db.prepare("UPDATE students SET email_verified_at=? WHERE id=?").run(new Date().toISOString(), id);
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  const had = linkedBooking("saved-card-ahead-had", { owner: id, payment: "not_required", start: "2026-08-18T17:00:00.000Z", end: "2026-08-18T18:00:00.000Z" });
+  db.prepare("UPDATE bookings SET added_by_teacher=1 WHERE student_id=?").run(id);
+  const ownToken = await createSession(id, env.BOOKING_TOKEN_SECRET);
+  try {
+    const added = await call("/admin/bookings", { user: "teacher", body: {
+      studentId: idOf(email), name: "Saved Card Ahead", lessonType: "single", startAt: "2026-10-13T01:30:00.000Z", repeat: "open"
+    } });
+    assert.equal(added.status, 201, await added.clone().text());
+    await drain();
+    const { savedCardKey } = await (await call("/me", { method: "GET", token: ownToken })).json();
+    assert.ok(savedCardKey, "their account carries the saved card's key");
+    const setupCount = checkoutRequests.length, chargeCount = charges.length;
+    assert.equal((await call("/me/card", { token: ownToken, body: { consent: true, savedCardKey: "stale-card" } })).status, 409);
+    const consent = await call("/me/card", { token: ownToken, body: { consent: true, savedCardKey } });
+    assert.equal(consent.status, 200, await consent.clone().text());
+    assert.deepEqual(await consent.json(), { authorised: true });
+    assert.equal(checkoutRequests.length, setupCount, "no card form for a saved card");
+    assert.equal(charges.length, chargeCount, "nothing charged on agreeing");
+    assert.ok(db.prepare("SELECT card_consent_at FROM students WHERE id=?").get(id).card_consent_at);
+    const ahead = db.prepare("SELECT payment_status, COUNT(*) AS n FROM bookings WHERE student_id=? AND id != ? GROUP BY payment_status").all(id, had);
+    assert.deepEqual(ahead.map((row) => row.payment_status), ["scheduled"], "every lesson to come is on the card");
+    assert.equal(db.prepare("SELECT automatic_payment FROM booking_series WHERE student_id=?").get(id).automatic_payment, 1);
+    assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(had).payment_status, "not_required", "a lesson already had is never swept in");
+  } finally { forgetStudent(email); }
+});
 await test("a prepared card link needs the student's approval and covers exactly the past lessons she ticked plus future repeats", async () => {
   const previousClock = clock;
   clock = NativeDate.parse("2026-10-27T18:30:00Z");

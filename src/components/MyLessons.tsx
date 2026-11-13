@@ -90,7 +90,7 @@ export function MyLessons({
   section = "upcoming"
 }: {
   /** The account the booking page has just loaded, so arriving doesn't ask for it twice. */
-  initialAccount?: { student: Student; bookings: MyBooking[]; series?: LessonSeries[]; cardsAccepted?: boolean; sameDayFeeCents?: number; minimumNoticeHours?: number; outstandingLessons?: string[] } | null;
+  initialAccount?: { student: Student; bookings: MyBooking[]; series?: LessonSeries[]; cardsAccepted?: boolean; sameDayFeeCents?: number; minimumNoticeHours?: number; outstandingLessons?: string[]; savedCardKey?: string } | null;
   /** The calendar's minute clock keeps history current without another account read. */
   clock: number;
   /** The account's own prices, as last read or changed here, so booking prices with them. */
@@ -117,6 +117,8 @@ export function MyLessons({
   const [cardsAccepted, setCardsAccepted] = useState(Boolean(initialAccount?.cardsAccepted));
   // Lessons they have had that a card can still pay for, asked for on arrival.
   const [outstanding, setOutstanding] = useState<string[]>(initialAccount?.outstandingLessons ?? []);
+  // The card they saved, which agreeing then uses with no card details again.
+  const [savedCardKey, setSavedCardKey] = useState(initialAccount?.savedCardKey ?? "");
   // Those they left out this visit, for the browser tab's session.
   const [leftOut, setLeftOut] = useState(() => {
     const studentId = initialAccount?.student.id ?? "";
@@ -179,6 +181,7 @@ export function MyLessons({
     setSeries(initialAccount.series ?? []);
     setCardsAccepted(Boolean(initialAccount.cardsAccepted));
     setOutstanding(initialAccount.outstandingLessons ?? []);
+    setSavedCardKey(initialAccount.savedCardKey ?? "");
     setCardRules({ feeCents: initialAccount.sameDayFeeCents, noticeHours: initialAccount.minimumNoticeHours });
     setStudent((current) => current && {
       ...current,
@@ -318,6 +321,7 @@ export function MyLessons({
       setSeries(data.series ?? []);
       setCardsAccepted(Boolean(data.cardsAccepted));
       setOutstanding(data.outstandingLessons ?? []);
+      setSavedCardKey(data.savedCardKey ?? "");
       setCardRules({ feeCents: data.sameDayFeeCents, noticeHours: data.minimumNoticeHours });
     } catch (caught) {
       if (request !== accountRequest.current || readSession() !== session) return;
@@ -1021,6 +1025,7 @@ export function MyLessons({
       needsCard={askForCard}
       onLeaveOut={leaveOut}
       onOpenChange={setCardOpen}
+      savedCardKey={savedCardKey}
       upcoming={upcomingAdded}
     />
   ) : null;

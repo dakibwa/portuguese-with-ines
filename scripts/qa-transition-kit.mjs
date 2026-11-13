@@ -219,6 +219,25 @@ try {
     assert.deepEqual(standing.errors, []);
     await standing.page.close();
 
+    // A card saved, but her lessons not on it (13 November 2026, Dan, of
+    // Jess): signing in asks them to agree, on the card they saved.
+    const onCard = await open(width, "/book/?view=lessons", {
+      session: "qa-saved-session",
+      reply: (endpoint, body) => {
+        if (endpoint === "/me" && !body) return { json: { student: { ...student, hasCard: true }, bookings: [added], series: [], sameDayFeeCents: 500,
+          cardsAccepted: true, savedCardKey: "qa-saved-card" } };
+        if (endpoint === "/me/card") return { json: { authorised: true } };
+        return null;
+      }
+    });
+    const onCardStep = onCard.page.locator(".card-prompt");
+    await onCardStep.getByRole("button", { name: "I authorise card payments for my future lessons" }).click({ timeout: 15000 });
+    await onCardStep.getByRole("button", { name: "Authorise payments" }).click();
+    await onCard.page.waitForURL(/card=authorised/);
+    assert.deepEqual(onCard.posts.find(post => post.endpoint === "/me/card")?.body, { consent: true, savedCardKey: "qa-saved-card" });
+    assert.deepEqual(onCard.errors, []);
+    await onCard.page.close();
+
     // A link may finish after another tab has signed in. Its one-time reply
     // must preserve that newer session; leaving a card request behind must
     // also leave the visitor on the page they chose, rather than Stripe.
