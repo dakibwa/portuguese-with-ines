@@ -378,7 +378,7 @@ function emailIncludedMeeting(result, row, allowAlreadySent = false) {
  * Every student-facing and teacher-facing message for one lifecycle event.
  * Kept in one place so a change to wording cannot drift between the two sides.
  */
-async function notify(env, { event, row, lessonType, settings, manageUrl, previousStartsAt, previousLessonType, previousLocation, teacherChange = null, byTeacher = false, welcome = null, again = false }) {
+export async function notify(env, { event, row, lessonType, settings, manageUrl, previousStartsAt, previousLessonType, previousLocation, teacherChange = null, byTeacher = false, welcome = null, again = false, restored = false }) {
   const held = byTeacher && await awaitingWelcomeAt(env, row.student_email);
   const notifyingSequence = row.sequence;
   const notifyingStatus = row.status;
@@ -484,7 +484,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
 
   const student = event === "booked"
     ? studentBooked({ tutor: tutorOf(env),
-        ...facts, ...policyArgs, first, byTeacher, welcome, when: studentWhen, shortWhen: studentShortWhen, price, paid: isPaid,
+        ...facts, ...policyArgs, first, byTeacher, welcome, restored, when: studentWhen, shortWhen: studentShortWhen, price, paid: isPaid,
         // Older already-paid bookings lock inside the window; saved-card ones stay changeable for the fee.
         policy: isFree ? "free" : isPaid && !byTeacher ? "paid" : isOnCard ? "card" : "unpaid"
       })
@@ -507,7 +507,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const teacherFacts = { ...facts, student: who, byTeacher, held, when: hero, heroNote: teacherHeroNote, shortWhen, notice };
   const teacher = event === "booked"
     ? lessonBookedTeacher({ tutor: tutorOf(env),
-        ...teacherFacts, noEmailYet: isNoEmailYet(row.student_email), welcome, calendarAttached, again,
+        ...teacherFacts, noEmailYet: isNoEmailYet(row.student_email), welcome, calendarAttached, again, restored,
         paidAmount: isPaid ? formatEuros(row.amount_cents ?? lessonType.price_cents) : ""
       })
     : event === "rescheduled"
@@ -543,7 +543,14 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
     })
   ];
 
-  if (teacherNotificationsEnabled(env) && teacherEmail) {
+  // Inês is told what students do and what money does, not what she did
+  // herself (13 November 2026, Dan: "do the less emails for Ines"). While
+  // Google Calendar keeps her calendar, her copy of her own add, move, change
+  // or cancellation tells her nothing new: the event is already there. Without
+  // it, the copy's calendar file is how the lesson reaches her calendar, so it
+  // still goes, and so does one that carries money (a refund or a payment).
+  const herOwnChange = byTeacher && !calendarAttached && !wasRefunded && !isPaid;
+  if (teacherNotificationsEnabled(env) && teacherEmail && !herOwnChange) {
     // Her receipt automation reads these emails, so every copy carries the NIF.
     sends.push(
       deliver(env, {
@@ -647,6 +654,7 @@ export async function sendLessonReminders(env, now = new Date()) {
          SELECT 1 FROM email_log t
          WHERE julianday(t.created_at) > julianday(b.starts_at) - ?4
            AND (t.dedupe_key = 'student:rescheduled:' || b.id || ':' || b.sequence
+             OR t.dedupe_key = 'student:booked:' || b.id || ':' || b.sequence
              OR (b.series_id IS NOT NULL
                AND ((t.dedupe_key >= 'student:series-moved:' || b.series_id || ':'
                      AND t.dedupe_key < 'student:series-moved:' || b.series_id || ';')
@@ -887,7 +895,11 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
     );
   }
 
-  if (teacherNotificationsEnabled(env) && teacherEmail) {
+  // Her own run, and a run topped up on its own, are in her Google Calendar
+  // already (see notify), so only without it does her copy go, for its
+  // calendar file. A top-up that had to leave a week out still tells her.
+  const herOwnRun = (byTeacher || (reason === "extended" && !skipped.length)) && await calendarOwnsTeacherInvites(env);
+  if (teacherNotificationsEnabled(env) && teacherEmail && !herOwnRun) {
     const teacherFacts = {
       ...common, byTeacher, held, noEmailYet: isNoEmailYet(first.student_email), welcome,
       student: { name: first.student_name, email: shownEmail(first.student_email), phone: first.student_phone, nif: await studentNif(env, first.student_id), notes: first.notes },
@@ -1058,7 +1070,9 @@ async function notifySeriesCancelled(env, { rows, kept = [], lessonType, setting
     })
   ];
 
-  if (teacherNotificationsEnabled(env) && teacherEmail) {
+  // Her own cancellation of a run is in her Google Calendar already (see notify).
+  const herOwnCancel = byTeacher && !rows.some(row => row.payment_status === "refunded") && await calendarOwnsTeacherInvites(env);
+  if (teacherNotificationsEnabled(env) && teacherEmail && !herOwnCancel) {
     const teacherCopy = lessonCancelledTeacher({ tutor: tutorOf(env),
       byTeacher, held, message: cancellationMessage,
       student: { name: first.student_name, email: shownEmail(first.student_email), nif: await studentNif(env, first.student_id) },
@@ -1517,7 +1531,11 @@ async function sendWelcome(env, { student, settings, welcome, lessons = [], dedu
  * nothing a student sees, books or is charged reads it.
  */
 function dormantSql(alias) {
-  return `(${alias}.dormant_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM bookings dormant_lesson
+  // So does signing in after the mark (13 November 2026, Dan: "mark Raquel as
+  // signed in": she had signed in and still read as dormant).
+  return `(${alias}.dormant_at IS NOT NULL
+    AND (${alias}.last_login_at IS NULL OR ${alias}.last_login_at <= ${alias}.dormant_at)
+    AND NOT EXISTS (SELECT 1 FROM bookings dormant_lesson
     WHERE dormant_lesson.student_id = ${alias}.id
       AND ((dormant_lesson.status = 'confirmed' AND dormant_lesson.ends_at > ${alias}.dormant_at)
         OR (dormant_lesson.status = 'cancelled' AND dormant_lesson.created_at > ${alias}.dormant_at))))`;
@@ -6632,6 +6650,72 @@ async function teacherCancelFollowing(request, env, ctx, row, message, authoriza
 }
 
 /**
+ * Putting back a lesson she cancelled (13 November 2026, Dan: "ok yeah do
+ * that"). She had cancelled a lesson and added it again within a minute four
+ * times, which emailed the student a cancellation and then a new booking and,
+ * from a weekly lesson, left a second weekly run behind. This brings back the
+ * same lesson as it was: its id, reference, manage link, price and payment
+ * terms, and its calendar event, updated by UID at the next SEQUENCE. Only
+ * her own cancellation of a lesson still to come, with no money moved by it,
+ * and only while nothing else has taken the time. The student gets one email
+ * saying it is back on.
+ */
+const RESTORABLE_PAYMENTS = ["not_required", "scheduled", FREE];
+
+export function restoreProblem(row, now = new Date()) {
+  if (row.status !== "cancelled") return "That lesson isn't cancelled.";
+  if (row.cancelled_by !== "teacher") return "Only a lesson you cancelled can be put back. They can book it again from their own link.";
+  if (Date.parse(row.starts_at) <= now.getTime()) return "Its time has passed, so it stays cancelled.";
+  if (row.payment_status === "refunded") return "Its payment was refunded, so add it as a new lesson instead.";
+  if (!RESTORABLE_PAYMENTS.includes(row.payment_status) || row.charge_started_at) return "Its payment has changed since, so add it as a new lesson instead.";
+  return "";
+}
+
+async function teacherRestoreLesson(request, env, ctx, id, authorization) {
+  const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
+  if (!row) return fail("That booking could not be found.", 404, request, env);
+  const now = new Date();
+  const problem = restoreProblem(row, now);
+  if (problem) return fail(problem, 409, request, env);
+
+  const clash = await env.DB.prepare(
+    `SELECT reference FROM bookings
+     WHERE id != ? AND (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > ?)) AND ends_at > ? AND starts_at < ?`
+  )
+    .bind(row.id, now.toISOString(), row.starts_at, row.ends_at)
+    .first();
+  if (clash) return fail(`Another lesson has that time now (${clash.reference}), so it can't go back.`, 409, request, env);
+
+  // The decision and the write are one statement (see prepareSlotClaim): the
+  // time is still free, it is still her cancellation as read, and a trial is
+  // still their first lesson.
+  const restored = await env.DB.prepare(
+    `UPDATE bookings SET status = 'confirmed', cancelled_at = NULL, cancelled_by = NULL, cancellation_message = NULL,
+       sequence = sequence + 1, same_day_change = 0, updated_at = ?
+     WHERE id = ? AND status = 'cancelled' AND cancelled_by = 'teacher' AND sequence = ? AND starts_at > ?
+       AND payment_status IN (${RESTORABLE_PAYMENTS.map(() => "?").join(", ")}) AND charge_started_at IS NULL
+       AND (lesson_type_id != 'trial' OR student_id IS NULL OR NOT EXISTS (
+         SELECT 1 FROM bookings prior WHERE prior.student_id = bookings.student_id AND prior.id != bookings.id AND prior.status != 'cancelled'))
+       AND NOT EXISTS (SELECT 1 FROM bookings other WHERE other.id != bookings.id
+         AND (other.status = 'confirmed' OR (other.status = 'pending_payment' AND other.hold_expires_at > ?))
+         AND other.starts_at < bookings.ends_at AND other.ends_at > bookings.starts_at)
+       AND (${authorization.sql})`
+  )
+    .bind(now.toISOString(), row.id, row.sequence, now.toISOString(), ...RESTORABLE_PAYMENTS, now.toISOString(), ...authorization.values)
+    .run();
+  if (!(restored?.meta?.changes > 0)) return fail("That lesson or its time has just changed. Please reload.", 409, request, env);
+
+  const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first();
+  const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
+  const settings = await loadSettings(env);
+  const token = await createManageToken(row.id, env.BOOKING_TOKEN_SECRET);
+  ctx.waitUntil(
+    notify(env, { event: "booked", row: updated, lessonType, settings, manageUrl: studentManageUrl(env, token), byTeacher: true, restored: true })
+  );
+  return json({ booking: publicBooking(updated, lessonType, settings), emailed: await studentIsEmailed(env, updated.student_email) }, 200, request, env);
+}
+
+/**
  * Paid to her by hand: ticked "Already paid", with nothing on a card. That
  * never holds her own change back (11 November 2026, Dan: "even if it's
  * already marked as paid Ines should be able to change it"): the lesson
@@ -8158,6 +8242,11 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     );
 
     return json({ booking: publicBooking(updated, lessonType, settings), emailed: await studentIsEmailed(env, updated.student_email) }, 200, request, env);
+  }
+
+  const adminRestore = path.match(/^\/admin\/bookings\/([^/]+)\/restore$/);
+  if (adminRestore && request.method === "POST") {
+    return await teacherRestoreLesson(request, env, ctx, adminRestore[1], authorization);
   }
 
   const adminChange = path.match(/^\/admin\/bookings\/([^/]+)\/change$/);

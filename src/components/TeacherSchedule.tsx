@@ -6,6 +6,7 @@ import { AlertCircle, Check, CheckCircle2, ChevronDown } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
 import { WeeklyTimetable } from "@/components/teacher/WeeklyTimetable";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
+import { PutBackButton } from "@/components/teacher/PutBack";
 import { TeacherMeetConnection } from "@/components/teacher/TeacherMeetConnection";
 import { TeacherAccountProfile } from "@/components/teacher/TeacherAccountProfile";
 import { StudentPicker, type StudentPickerStart } from "@/components/teacher/StudentPicker";
@@ -162,6 +163,9 @@ export function TeacherSchedule() {
   const [accountBusy, setAccountBusy] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  // The lesson she has just cancelled, offered back beside the line that says
+  // so, and only while that line is the one shown.
+  const [putBack, setPutBack] = useState<{ id: string; firstName: string; status: string } | null>(null);
   const bookingRequest = useRef(0);
   const studentRequestGeneration = useRef(0);
   const calendarTitleRef = useRef<HTMLHeadingElement>(null);
@@ -857,7 +861,21 @@ export function TeacherSchedule() {
       {status ? (
         <div className="teacher-inline-success" role="status">
           <CheckCircle2 size={20} aria-hidden="true" />
-          {status}
+          <span className="teacher-inline-success__text">{status}</span>
+          {putBack?.status === status ? <PutBackButton
+            token={token}
+            bookingId={putBack.id}
+            firstName={putBack.firstName}
+            onDone={(message) => {
+              if (readSession() !== token) return;
+              setPutBack(null);
+              setError("");
+              setStatus(message);
+              void reloadBookings();
+              void reloadStudents();
+            }}
+            onError={(message) => setError(message)}
+          /> : null}
         </div>
       ) : null}
 
@@ -1119,8 +1137,9 @@ export function TeacherSchedule() {
           now={now}
           afterChangeFocusRef={calendarTitleRef}
           onClose={() => setSelectedBooking(null)}
-          onChanged={(message) => {
+          onChanged={(message, cancelled) => {
             if (readSession() !== token) return;
+            setPutBack(cancelled ? { id: cancelled, firstName: selectedBooking.student_name.split(" ")[0], status: message } : null);
             setSelectedBooking(null);
             setStatus(message);
             void reloadBookings();

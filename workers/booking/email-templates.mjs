@@ -253,11 +253,26 @@ function lessonRows({ lesson, place, meetingUrl, reference, price, cancelled = f
  * fixed (a set number of lessons), twoTimes, slot ("Tuesday", "17:30") when
  * Inês set up a plain weekly slot, repeats, occurrences, skippedNote }.
  */
-export function studentBooked({ tutor = currentTutor(), first, byTeacher, welcome = null, lesson, lessonName, place, meetingUrl, reference, when, shortWhen,
+export function studentBooked({ tutor = currentTutor(), first, byTeacher, welcome = null, restored = false, lesson, lessonName, place, meetingUrl, reference, when, shortWhen,
   price, policy, paid = false, notice, fee, manageUrl, lessonsUrl, run = null }) {
   // A student she brought in is told where their lessons now are, the website by name.
   const website = welcome?.neverIn ? ` You can now see and change your lessons on ${tutor.pronouns.possessive} website, ${tutor.site.domain}.` : "";
   const footer = (rules) => welcome ? [...rules, welcomeLine(tutor)] : rules;
+  // A lesson she cancelled and put back (13 November 2026): the same lesson, as it was.
+  if (!run && restored) {
+    return {
+      subject: `Your ${tutor.language.name} lesson is back on — ${shortWhen}`,
+      content: {
+        heading: "Your lesson is back on",
+        preheader: `${tutor.shortName} has put your lesson back · ${when}`,
+        intro: `${hello(first, tutor)} ${tutor.shortName} has put back the lesson ${tutor.pronouns.subject} cancelled, just as it was. ${CALENDAR_UPDATED}`,
+        hero: when,
+        rows: lessonRows({ lesson, place, meetingUrl, reference, price }),
+        action: manageUrl ? { label: MANAGE_LABEL, url: manageUrl } : null,
+        footer: policyFooter(policy, { notice, fee, tutor })
+      }
+    };
+  }
   if (!run) {
     return {
       subject: byTeacher ? `${tutor.shortName} has booked your ${tutor.language.name} lesson — ${shortWhen}` : `Your ${tutor.language.name} lesson is booked — ${shortWhen}`,
@@ -321,8 +336,23 @@ export function studentBooked({ tutor = currentTutor(), first, byTeacher, welcom
  * an open-ended run carried forward (`extended`).
  */
 export function lessonBookedTeacher({ student, byTeacher, held = false, noEmailYet = false, welcome = null, lesson, lessonName, place, meetingUrl, reference,
-  when, heroNote = "", shortWhen, paidAmount = "", calendarAttached = true, run = null, extended = false, again = false }) {
+  when, heroNote = "", shortWhen, paidAmount = "", calendarAttached = true, run = null, extended = false, again = false, restored = false }) {
   const name = student.name;
+  // Her copy of a lesson she put back goes only for its calendar file, before Google Calendar is connected.
+  if (!run && restored) {
+    return {
+      subject: `You put a lesson back — ${name}, ${shortWhen}`,
+      content: {
+        heading: "You put a lesson back",
+        preheader: `${name} · ${lessonName} · ${when}`,
+        intro: `${emailedLine(name, { held, noEmailYet, welcome: null })} ${CALENDAR_UPDATED}`,
+        hero: when,
+        heroNote,
+        rows: [...lessonRows({ lesson, place, meetingUrl, reference }), ...studentRows(student)],
+        footer: SIGN_OFF
+      }
+    };
+  }
   if (!run) {
     // `again`: a lesson the student cancelled, booked again from its link (10 November 2026).
     return {

@@ -1101,6 +1101,14 @@
 .teacher-inline-success > svg {
   color: var(--blue);
 }
+/* A line she can undo ends on its one action, beside the words. */
+.teacher-inline-success__text {
+  flex: 1;
+  min-width: 0;
+}
+.teacher-inline-success > .teacher-quiet {
+  align-self: center;
+}
 .teacher-inline-notice {
   background: rgba(220, 216, 245, 0.5);
   color: var(--ink);
@@ -3319,17 +3327,19 @@
 .teacher-lesson-row > .teacher-lesson-row__line > .teacher-lesson-row__what { grid-area: what; }
 .teacher-lesson-row > .teacher-lesson-row__line > .teacher-lesson-row__side { grid-area: side; }
 .teacher-lesson-row__facts { grid-area: facts; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.85rem; min-width: 0; margin-top: 0.2rem; }
-.teacher-lesson-row__foot > :is(.paid-tick, .teacher-quiet) { grid-area: money; position: relative; z-index: 1; justify-self: end; margin-top: 0.2rem; }
+.teacher-lesson-row__foot > :is(.paid-tick, .teacher-quiet, .teacher-lesson-row__actions) { grid-area: money; position: relative; z-index: 1; justify-self: end; margin-top: 0.2rem; }
+/* A lesson she cancelled can have two: Put it back, then Record refund. */
+.teacher-lesson-row__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; }
 /* Folded, facts with no money beside them have the whole line, and a weekly
    run's time sits under its day so Show weeks fits beside it. */
 @container lessons (max-width: 39.99rem) {
-  .teacher-lesson-row:not(:has(> .teacher-lesson-row__foot > :is(.paid-tick, .teacher-quiet))) .teacher-lesson-row__facts { grid-column: 1 / -1; }
+  .teacher-lesson-row:not(:has(> .teacher-lesson-row__foot > :is(.paid-tick, .teacher-quiet, .teacher-lesson-row__actions))) .teacher-lesson-row__facts { grid-column: 1 / -1; }
   .teacher-history-run__when .teacher-history-lesson__time { display: block; }
   .teacher-history-run__when .teacher-history-lesson__time > i { display: none; }
 }
 @container lessons (min-width: 40rem) {
   .teacher-lesson-row { grid-template-columns: minmax(14.5rem, auto) minmax(0, 1fr) auto auto; grid-template-areas: "what facts side money"; }
-  .teacher-lesson-row__facts, .teacher-lesson-row__foot > :is(.paid-tick, .teacher-quiet) { margin-top: 0; }
+  .teacher-lesson-row__facts, .teacher-lesson-row__foot > :is(.paid-tick, .teacher-quiet, .teacher-lesson-row__actions) { margin-top: 0; }
 }
 .teacher-lesson-row__what { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; min-width: 0; font-size: 0.8rem; }
 /* The day and time press the whole lesson (9 November 2026, Dan): the button

@@ -2045,7 +2045,7 @@ Buttons:
 - there are three weights and no more: the coral or blue filled button for the
   one thing to do next; the outline for its pair (`Cancel`, `Sign out`, `Not
   now`); and the quiet lilac chip in sentence case for a lesser action beside
-  the thing it acts on (`Show weeks`, `Show all`, `Record refund`, `Remove card`,
+  the thing it acts on (`Show weeks`, `Show all`, `Record refund`, `Put it back`, `Remove card`,
   `Send reset link`, an open lesson's `Homework`, `Change` and `Cancel`). The
   chip is the third weight everywhere: on Inês's tabs it replaces the
   capital-letter filled lilac site button for lesser actions (`Edit weekly
@@ -2303,7 +2303,13 @@ that sends an email, `Add a message to the email (optional)` with an example in 
 its count appearing only near the 1,000-character limit; a cancelled lesson paid
 by hand stays visible in history and Receipts. `Record refund` asks Inês to
 confirm she already returned it directly; it records that fact, sends no money
-or email, and keeps the receipt labelled `Refunded`. `No-show` is live from the
+or email, and keeps the receipt labelled `Refunded`. `Put it back` undoes a
+lesson she cancelled while it is still to come and no money has moved: one
+press, like the cancel it undoes, as the quiet chip at the end of the
+`Lesson cancelled…` line right after, in the cancelled lesson's dialog, and at
+the end of its row in `Past & cancelled` (beside `Record refund` when both
+apply); the line then says the student has been emailed that it's back on.
+`No-show` is live from the
 lesson's start until its end, and before that it shows greyed out with
 `Available 11:00–12:00` beneath, so she always knows where it is. The marked
 state stays reversible within the same window, the lesson is charged once it

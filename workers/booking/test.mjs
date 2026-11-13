@@ -39,7 +39,7 @@ import {
   lessonTypeChangeProblem,
   planSeriesCancellation
 } from "./policy.mjs";
-import { bookingPaymentProblem, lessonChargePlan, noShowProblem, normaliseLocation, notifySeries, welcomeLessonLines } from "./index.mjs";
+import { bookingPaymentProblem, lessonChargePlan, noShowProblem, normaliseLocation, notify, notifySeries, welcomeLessonLines } from "./index.mjs";
 import {
   addDaysToKey,
   dateKey,
@@ -1485,6 +1485,77 @@ await test("automatic open-ended top-ups do not send another client email", asyn
     fixture.emailLog.map(({ kind, recipient }) => ({ kind, recipient })),
     [{ kind: "teacher_series_extended", recipient: "ines@example.com" }]
   );
+});
+
+// 13 November 2026, Dan: "do the less emails for Ines". While Google Calendar
+// keeps her calendar, what she did herself and a run topped up on its own are
+// already there; what a student does, and money, still reach her.
+await test("with Google Calendar connected, Inês is emailed what students do, not what she did", async () => {
+  const connected = () => {
+    const fixture = seriesEmailFixture();
+    Object.assign(fixture.env, { GOOGLE_CALENDAR_ENABLED: "1", GOOGLE_CALENDAR_CLIENT_ID: "fixture", GOOGLE_CALENDAR_CLIENT_SECRET: "fixture", GOOGLE_CALENDAR_TOKEN_KEY: "aa".repeat(32) });
+    for (const row of fixture.rows) Object.assign(row, { status: "confirmed", meeting_event_id: `event-${row.id}`, meeting_sequence: 0, meeting_url: "https://meet.google.com/abc-defg-hij" });
+    const prepare = fixture.env.DB.prepare;
+    fixture.env.DB.prepare = sql => {
+      const statement = prepare(sql);
+      const first = statement.first.bind(statement);
+      let args = [];
+      const bind = statement.bind.bind(statement);
+      statement.bind = (...values) => { args = values; return bind(...values); };
+      statement.first = async () => sql.includes("email_log") ? first() : sql.includes("google_calendar_connections")
+        ? { calendar_id: "fixture@group.calendar.google.com", status: "active" }
+        : fixture.rows.find(row => row.id === args[0]) ?? null;
+      return statement;
+    };
+    return fixture;
+  };
+  const kinds = fixture => fixture.emailLog.map(({ kind }) => kind).sort();
+  const quietly = async run => {
+    const originalLog = console.log;
+    console.log = () => {};
+    try { await run(); } finally { console.log = originalLog; }
+  };
+  const run = (fixture, options) => notifySeries(fixture.env, { rows: fixture.rows, lessonType: fixture.lessonType, settings: fixture.settings,
+    series: { id: `series-${options.reason ?? "booked"}-${options.byTeacher ? "hers" : "theirs"}`, occurrences: null }, manageUrls: fixture.manageUrls, skipped: [], ...options });
+
+  let fixture = connected();
+  await quietly(() => run(fixture, { byTeacher: true }));
+  assert.deepEqual(kinds(fixture), ["student_series_booked"], "her own weekly lessons");
+  fixture = connected();
+  await quietly(() => run(fixture, { reason: "extended" }));
+  assert.deepEqual(kinds(fixture), [], "a run topped up on its own");
+  fixture = connected();
+  await quietly(() => run(fixture, { reason: "extended", skipped: [{ startAt: "2026-09-24T16:30:00.000Z" }] }));
+  assert.deepEqual(kinds(fixture), ["teacher_series_extended"], "a top-up that left a week out still tells her");
+  fixture = connected();
+  await quietly(() => run(fixture, { reason: "moved" }));
+  assert.deepEqual(kinds(fixture), ["student_series_moved", "teacher_series_moved"], "a student's move");
+
+  const single = async (options, mutate = () => {}) => {
+    const fixture = connected();
+    const [row] = fixture.rows;
+    mutate(row);
+    await quietly(() => notify(fixture.env, { row, lessonType: fixture.lessonType, settings: fixture.settings,
+      manageUrl: fixture.manageUrls.one, ...options }));
+    return fixture;
+  };
+  assert.deepEqual(kinds(await single({ event: "cancelled", byTeacher: true }, row => Object.assign(row, { status: "cancelled", sequence: 1, meeting_sequence: 1 }))),
+    ["student_cancelled"], "her own cancellation");
+  assert.deepEqual(kinds(await single({ event: "cancelled" }, row => Object.assign(row, { status: "cancelled", sequence: 1, meeting_sequence: 1 }))),
+    ["student_cancelled", "teacher_cancelled"], "a student's cancellation");
+  assert.deepEqual(kinds(await single({ event: "cancelled", byTeacher: true }, row => Object.assign(row, { status: "cancelled", sequence: 1, meeting_sequence: 1, payment_status: "refunded", amount_cents: 3000 }))),
+    ["student_cancelled", "teacher_cancelled"], "her cancellation that refunded a payment");
+  assert.deepEqual(kinds(await single({ event: "rescheduled", byTeacher: true, previousStartsAt: "2026-09-02T16:30:00.000Z" })),
+    ["student_rescheduled"], "her own move");
+
+  // Put back: one email to the student, at the next SEQUENCE of the same event.
+  fixture = await single({ event: "booked", byTeacher: true, restored: true }, row => Object.assign(row, { sequence: 2, meeting_sequence: 2 }));
+  assert.deepEqual(kinds(fixture), ["student_booked"], "her lesson put back");
+  const back = JSON.parse(fixture.emailLog[0].request_json);
+  assert.equal(back.subject, "Your Portuguese lesson is back on — Thu 3 Sept, 17:30");
+  assert.match(back.text, /Inês has put back the lesson she cancelled, just as it was\. An updated calendar invitation is attached\./);
+  const ics = Buffer.from(back.attachments[0].content, "base64").toString();
+  assert.ok(ics.includes("METHOD:REQUEST") && ics.includes("SEQUENCE:2") && ics.includes(`UID:${calendarUid("one")}`));
 });
 
 await test("a single invitation is unchanged by the series refactor", () => {

@@ -2978,6 +2978,68 @@ await test("teacher cancellation sends an escaped personal message to both inbox
   }
 });
 
+// 13 November 2026, Dan: "ok yeah do that". The same lesson back, one email
+// each way, only for her own cancellation of a lesson still to come with no
+// money moved, and only while nothing else has the time.
+await test("she puts back a lesson she cancelled, as it was, while its time is still free", async () => {
+  captureEmail();
+  env.TEACHER_NOTIFICATIONS_ENABLED = "1";
+  env.TEACHER_EMAIL = "ines@example.invalid";
+  const restore = (id, user = "teacher") => call(`/admin/bookings/${id}/restore`, { user });
+  const state = id => ({ ...db.prepare("SELECT status,cancelled_by,cancelled_at,cancellation_message,sequence,payment_status,amount_cents FROM bookings WHERE id=?").get(id) });
+  try {
+    booking("put-back", { start: "2026-09-12T09:00:00.000Z", end: "2026-09-12T10:00:00.000Z" });
+    assert.equal((await call("/admin/bookings/put-back/cancel", { user: "teacher", body: { message: "Sorry, wrong lesson" } })).status, 200);
+    await drain();
+    sentEmails.length = 0;
+    assert.equal((await restore("put-back", "alice")).status, 401, "only she puts a lesson back");
+    const back = await restore("put-back");
+    assert.equal(back.status, 200, await back.clone().text());
+    assert.equal((await back.json()).emailed, true);
+    await drain();
+    assert.deepEqual(state("put-back"), { status: "confirmed", cancelled_by: null, cancelled_at: null, cancellation_message: null, sequence: 2,
+      payment_status: "scheduled", amount_cents: 1500 }, "its price and card terms as they were");
+    const [studentEmail, ...more] = sentEmails.filter(sent => sent.to[0] === "alice@example.invalid");
+    assert.equal(more.length, 0, "one email to the student");
+    assert.ok(studentEmail.subject.startsWith("Your Portuguese lesson is back on — "), studentEmail.subject);
+    const ics = Buffer.from(studentEmail.attachments[0].content, "base64").toString();
+    assert.ok(ics.includes("METHOD:REQUEST") && ics.includes("SEQUENCE:2"), "the same calendar event, updated");
+    // Without Google Calendar her copy carries the calendar file, so it goes.
+    assert.ok(sentEmails.find(sent => sent.to[0] === "ines@example.invalid")?.subject.startsWith("You put a lesson back — Test Student"));
+    assert.equal((await restore("put-back")).status, 409, "a lesson that is on is not put back again");
+
+    // Something else in its time keeps it cancelled.
+    assert.equal((await call("/admin/bookings/put-back/cancel", { user: "teacher" })).status, 200);
+    booking("put-back-clash", { start: "2026-09-12T09:30:00.000Z", end: "2026-09-12T10:30:00.000Z", owner: "bob" });
+    const clash = await restore("put-back");
+    assert.equal(clash.status, 409);
+    assert.match(await clash.text(), /put-back-clash/);
+    assert.equal(state("put-back").status, "cancelled");
+    db.prepare("DELETE FROM bookings WHERE id='put-back-clash'").run();
+    assert.equal((await restore("put-back")).status, 200, "once the time is free again");
+
+    // Only her own cancellation of a lesson still to come, with no money moved.
+    for (const [id, fields] of [
+      ["put-back-theirs", { cancelled_by: "student" }],
+      ["put-back-past", { starts_at: "2026-09-04T09:00:00.000Z", ends_at: "2026-09-04T10:00:00.000Z" }],
+      ["put-back-refunded", { payment_status: "refunded" }],
+      ["put-back-charging", { charge_started_at: "2026-09-05T09:00:00.000Z" }],
+    ]) {
+      booking(id, { start: "2026-09-19T09:00:00.000Z", end: "2026-09-19T10:00:00.000Z" });
+      db.prepare("UPDATE bookings SET status='cancelled', cancelled_by='teacher', cancelled_at=? WHERE id=?").run(new Date().toISOString(), id);
+      for (const [column, value] of Object.entries(fields)) db.prepare(`UPDATE bookings SET ${column} = ? WHERE id = ?`).run(value, id);
+      assert.equal((await restore(id)).status, 409, id);
+      assert.equal(state(id).status, "cancelled", id);
+      db.prepare("DELETE FROM bookings WHERE id=?").run(id);
+    }
+  } finally {
+    env.TEACHER_NOTIFICATIONS_ENABLED = "0";
+    delete env.TEACHER_EMAIL;
+    db.prepare("DELETE FROM bookings WHERE id LIKE 'put-back%'").run();
+    releaseEmail();
+  }
+});
+
 await test("teacher cancellation accepts no message, blank text and the limit, but rejects invalid input before refunding", async () => {
   captureEmail();
   try {
@@ -6099,13 +6161,19 @@ await test("she marks students dormant and sends them her own come-back email, o
     assert.equal((await send(other.id)).status, 200);
     assert.deepEqual(to("other-old@example.invalid").map((sent) => sent.text), [firstTry.text], "a retry sends the first attempt's exact request, once");
 
-    // The link signs them in, and a day later she may send it again.
+    // Signing in from it brings them back (13 November 2026, Dan); marked
+    // again, a day later she may send it again.
+    clock += 60000;
     assert.equal((await call("/auth/email-link/confirm", { user: null, body: { token: link } })).status, 200);
+    assert.equal((await listed(old.id)).dormant, false, "signing in after the mark makes them active again");
     clock += 25 * 3600000;
+    assert.equal((await send(old.id)).status, 409, "only a dormant student is sent it");
+    assert.equal((await (await mark(old.id, true)).json()).student.dormant, true, "a sign-in before the mark never wakes them");
     assert.equal((await send(old.id)).status, 200);
     assert.equal(to("old-student@example.invalid").length, 2);
 
     // A lesson wakes them; someone with a lesson to come can't be marked dormant.
+    clock += 60000;
     const lesson = await call("/admin/bookings", { user: "teacher", body: { studentId: old.id, lessonType: "single", startAt: "2026-10-27T10:00:00.000Z" } });
     assert.equal(lesson.status, 201, await lesson.clone().text());
     await drain();

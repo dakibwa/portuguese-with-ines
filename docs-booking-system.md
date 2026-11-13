@@ -68,6 +68,7 @@ Inês on /schedule                     (her own account, role=teacher)
   → POST /admin/students/:id/dormant-email           send one dormant student theirs, at most once a day
   → POST /admin/bookings/:id/reschedule | /cancel
   → POST /admin/bookings/:id/cancel { following }    this lesson and every later week of its run; the run stops
+  → POST /admin/bookings/:id/restore                 put back a lesson she cancelled, as it was; one email
   → POST /admin/bookings/:id/change                  time, length and place together, for this lesson or
                                                      (`following`) every later week of its run; one email
 Stripe → POST /stripe/webhook                        signature-verified
@@ -116,7 +117,8 @@ carries the calendar invitation. While they have never been in, or have not yet
 saved a card from their account, its button is a one-click sign-in link (good
 for 14 days, once) instead of the manage link, and it says how adding a card
 works; the invitation still carries the manage link. Her own copy says
-`You added a lesson`.
+`You added a lesson`, and goes only while Google Calendar is not connected
+(see *Which emails Inês gets*).
 
 **Recording a lesson already had.** A `startAt` at or before now is a
 lesson she is recording, not booking. It is checked for clashes only, like any lesson she adds (weekly
@@ -915,7 +917,10 @@ sees, books or is charged reads either.
   confirmed lesson ending after the mark (one they book, one she adds, or one
   she records as had) makes them active again with nobody unmarking them, and
   so does one booked after the mark and then cancelled. A lesson recorded
-  from before the mark, or cancelled before it, does not.
+  from before the mark, or cancelled before it, does not. So does signing in
+  after the mark (`last_login_at` later than `dormant_at`, by any way in): a
+  student who comes back to the site is no longer dormant, though nothing is
+  written, so marking them again later holds until they next sign in.
 - **Her list.** Dormant students leave the main list for a `Dormant · n`
   section beneath it, by name, labelled `Dormant`, with no setup steps and no
   setup count on the Students badge. One with something new for her (a
@@ -1307,7 +1312,8 @@ while validation runs. Inês's explicit calendar additions retain their override
   updated calendar email, for every move: its `email_log` key names the run,
   the lesson the move began from and that lesson's sequence, since a run's
   sequences begin again at 0 with each week the top-up adds. Inês gets her
-  copy when teacher notifications are enabled.
+  copy when teacher notifications are enabled, unless she moved it herself
+  with Google Calendar connected.
 - **Inês can change the length of, or cancel, a weekly lesson and every later
   week of its run in one go.** Both start from the lesson she opened, which
   must still be to come to take the
@@ -1837,6 +1843,28 @@ get wrong:
 - `UID` is stable for the life of the booking.
 - `SEQUENCE` increments on every change. Clients ignore an update that does not.
 - `METHOD` is `REQUEST` for a booking or change, `CANCEL` for a cancellation.
+  A lesson she puts back is a `REQUEST` at the next `SEQUENCE` under the same
+  `UID`, so it lands on the cancelled event and confirms it again.
+
+### Which emails Inês gets
+
+Inês is emailed what students do and what money does, not what she did
+herself (13 November 2026, Dan: "do the less emails for Ines"). Before this,
+two in three of her lesson emails were copies of her own adds and
+cancellations or the nightly top-up's `Weekly slot extended`.
+
+- **While Google Calendar is connected** (`calendarOwnsTeacherInvites`), her
+  copy of a lesson or run she adds, moves, changes the length of, cancels or
+  puts back is not sent: the event is already in her calendar and the copy
+  carries no calendar file. A top-up that added every week it planned is not
+  sent either. The student's own email is unchanged in every case.
+- **Still sent:** everything a student does (book, book again, move,
+  cancel), every payment email (her receipt automation reads them), a
+  cancellation of hers that refunded a card payment, a copy of hers on a
+  lesson already paid, a top-up that had to leave a week out, homework to
+  review, and the no-show and late-change fee notices.
+- **Without Google Calendar** every copy goes as before, since its calendar
+  file is how the lesson reaches her calendar.
 
 ### Time and availability
 
@@ -2249,6 +2277,47 @@ keep their original parameters.
   retained and no new card charge is invented. Emails say the fee applies (to
   Inês, that it is due) rather than that a card is charged.
 
+### Putting back a lesson she cancelled
+
+Inês can undo her own cancellation (13 November 2026, Dan: "ok yeah do
+that"): before this, a lesson cancelled by mistake was added again, which
+sent the student a cancellation and then a new booking a minute apart, and
+re-adding a weekly lesson left a second run behind. `POST
+/admin/bookings/:id/restore` with `{}` takes the same row back to
+`confirmed`. Like every admin route it needs her account or the admin
+token.
+
+- **Only her own cancellation, still to come, with no money moved.** The
+  lesson must be cancelled by her (`cancelled_by = 'teacher'`), start after
+  now, be `not_required`, `scheduled` or free, with no charge started.
+  A student's cancellation is refused with `Only a lesson you cancelled can
+  be put back. They can book it again from their own link.` (see the next
+  section); a past, refunded or paid one, or one whose payment changed, is
+  refused with a sentence saying why. Each refusal is 409.
+- **Its time must still be free.** A confirmed lesson overlapping it answers
+  409 `Another lesson has that time now (REF), so it can't go back.` Time off
+  and hours are not checked: she is the one putting it back. A trial goes back
+  only while it would still be the student's first lesson.
+- **The same lesson, as it was.** Same id, reference, manage link, price and
+  payment terms; `cancelled_at`, `cancelled_by` and the cancellation message
+  are cleared, `same_day_change` is reset, and `sequence` goes up by one in one
+  guarded write (status, sequence, start, payment and overlap checked again at
+  the write; a race answers 409 `That lesson or its time has just changed.
+  Please reload.`). A weekly lesson stays in its run; a run she stopped stays
+  stopped, so only that lesson comes back.
+- **One email to the student**, `Your Portuguese lesson is back on — …`, with
+  the updated invitation (same `UID`, next `SEQUENCE`, `REQUEST`) and their
+  manage link. Google Calendar's event is set back to confirmed. Inês's copy
+  (`You put a lesson back — …`) goes only without Google Calendar. A lesson
+  put back inside the reminder window counts that email as its reminder.
+- **Where she finds it.** `Put it back` sits beside `Lesson cancelled…` on her
+  schedule right after a single cancel, in the lesson's dialog while it is
+  cancelled, and at the end of its row in the student's `Past & cancelled`
+  (beside `Record refund` when that is offered too). `canPutBack` in
+  `src/lib/admin-api.ts` mirrors the Worker's rule; the Worker decides. The
+  reply is `{ booking, emailed }`, and the page says whether the student was
+  emailed.
+
 ### Booking a cancelled lesson again
 
 A student who cancelled a lesson can take the time back from the same link.
@@ -2640,7 +2709,9 @@ Secrets, each via `npx wrangler secret put <NAME> --config workers/booking/wrang
 Non-secret vars in `wrangler.jsonc`: `GOOGLE_CLIENT_ID` enables Google Sign-In
 (it is public by design — the Worker verifies every token against it).
 Production uses `TEACHER_NOTIFICATIONS_ENABLED=1` to send Inês's booking,
-change and cancellation copies, and her "Homework to review" notices. Setting
+change and cancellation copies, and her "Homework to review" notices; with
+Google Calendar connected, copies of her own changes are left out (see
+*Which emails Inês gets*). Setting
 it to `0` pauses these copies; student mail and successful-payment fiscal
 reminders remain enabled, and `TEACHER_EMAIL` remains the student messages'
 reply-to. Staging keeps teacher booking copies paused and all email in dry-run
