@@ -2,11 +2,11 @@
 
 import { IN_PERSON } from "@/lib/tutor";
 import { Globe, UserRound } from "lucide-react";
-import { addedByTeacher, type AdminBooking } from "@/lib/admin-api";
+import { type AdminBooking } from "@/lib/admin-api";
 import { formatSlotTime } from "@/lib/booking-api";
 import { meetingHref } from "@/components/MeetingLink";
 import { GoogleMeetLogo } from "@/components/GoogleMeetLogo";
-import { dateKey, dateLabel, shiftDate } from "@/lib/teacher-calendar";
+import { dateKey, dateLabel, shiftDate, shownAsAdded } from "@/lib/teacher-calendar";
 
 /**
  * Her next lesson, or the one happening now, at the top of her schedule with
@@ -62,7 +62,7 @@ export function NextLesson({
             )}
             {porto ? IN_PERSON : "Online"}
           </span>
-          {addedByTeacher(next) ? <span className="teacher-next__added">Added by you</span> : null}
+          {shownAsAdded(next) ? <span className="teacher-next__added">Added by you</span> : null}
         </button>
       </div>
       {meet ? (

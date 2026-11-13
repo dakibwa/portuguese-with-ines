@@ -23,7 +23,7 @@ import { NO_SHOW_WINDOW_HOURS_AFTER, SAME_DAY_FEE_LABEL } from "@/lib/config";
 // When a card is charged, in the words the student reads (CardOnFile): at the
 // lesson's end while the no-show window is nothing, after it once there is one.
 const CHARGED = NO_SHOW_WINDOW_HOURS_AFTER ? "after the lesson" : "at the end of the lesson";
-import { dateKey, dateLabel } from "@/lib/teacher-calendar";
+import { dateKey, dateLabel, shownAsAdded } from "@/lib/teacher-calendar";
 import { AssetMark } from "@/components/BrandMarks";
 import { studentMark } from "@/lib/student-marks";
 import { MeetingLink } from "@/components/MeetingLink";
@@ -421,9 +421,9 @@ export function LessonDetails({
   }
 
   const status = (
-    <p className={`lesson-calendar__status${booking.status === "cancelled" ? " lesson-calendar__status--cancelled" : addedByTeacher(booking) ? " lesson-calendar__status--added" : ""}`}>
+    <p className={`lesson-calendar__status${booking.status === "cancelled" ? " lesson-calendar__status--cancelled" : shownAsAdded(booking) ? " lesson-calendar__status--added" : ""}`}>
       {booking.status === "cancelled" ? <CircleX size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
-      {booking.status === "cancelled" ? "Cancelled" : addedByTeacher(booking) ? "Added by you" : "Booked"}
+      {booking.status === "cancelled" ? "Cancelled" : shownAsAdded(booking) ? "Added by you" : "Booked"}
     </p>
   );
   const closeButton = (

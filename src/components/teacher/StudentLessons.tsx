@@ -6,7 +6,7 @@ import { TeacherHomework } from "@/components/homework/lazy";
 import { PaidTick } from "@/components/teacher/PaidTick";
 import { addedByTeacher, paidByHand, setLessonPaid, type AdminBooking, type NoteHomework, type StudentNoteLesson } from "@/lib/admin-api";
 import { formatBookedLessonLabel, formatSlotTime } from "@/lib/booking-api";
-import { dateKey, dateLabel } from "@/lib/teacher-calendar";
+import { dateKey, dateLabel, shownAsAdded } from "@/lib/teacher-calendar";
 import { IN_PERSON } from "@/lib/tutor";
 
 function paymentLabel(booking: AdminBooking) {
@@ -103,7 +103,7 @@ function lessonFacts(booking: AdminBooking, now: number) {
     place(booking),
     lessonLength(booking),
     payment,
-    addedByTeacher(booking) ? "Added by you" : "",
+    shownAsAdded(booking) ? "Added by you" : "",
     booking.reschedule_count > 0 ? `Moved ${booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}` : "",
     changeFee,
   ].filter(Boolean);
@@ -318,7 +318,7 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
       place(pattern),
       lessonLength(pattern),
       payments.size === 1 ? [...payments][0] : "",
-      run.lessons.every(addedByTeacher) ? "Added by you" : "",
+      run.lessons.every(shownAsAdded) ? "Added by you" : "",
       moved ? `${moved === 1 ? "One week" : `${moved} weeks`} at another time` : "",
     ].filter(Boolean);
     const weeksId = `teacher-history-run-${run.id}`;

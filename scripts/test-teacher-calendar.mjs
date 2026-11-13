@@ -31,6 +31,7 @@ import {
   studentWorkspace,
   paintHours,
   removeSpan,
+  shownAsAdded,
   setOnlineOnlyHours,
   shiftDate,
   startsLabel,
@@ -757,4 +758,16 @@ test("hours chosen on the Timetable: time off is never online only or extra hour
     [1, "Thu 10 Sept", "Extra 15:00–17:00, 20:00–20:30"],
     [2, "Mon 28 Sept – Tue 29 Sept", "2 days off"],
   ]);
+});
+
+test("a lesson she added reads Added by you until the student takes it on: on their card, or free once they are in", () => {
+  const added = (extra) => shownAsAdded({ added_by_teacher: 1, payment_status: "not_required", payment_consent_version: null, ...extra });
+  assert.equal(added({}), true, "paid to her directly");
+  assert.equal(added({ student_signed_in: 1 }), true, "signed in, but not on their card");
+  assert.equal(added({ payment_consent_version: "paid-by-hand" }), true, "ticked paid by hand");
+  assert.equal(added({ payment_status: "scheduled", payment_consent_version: "2026-10-12-card-on-file-v1" }), false, "on their card");
+  assert.equal(added({ payment_status: "paid", payment_consent_version: "2026-10-12-card-on-file-v1" }), false, "paid by their card");
+  assert.equal(added({ payment_status: "free" }), true, "free, never signed in");
+  assert.equal(added({ payment_status: "free", student_signed_in: 1 }), false, "free, in their own lessons");
+  assert.equal(shownAsAdded({ added_by_teacher: 0, payment_status: "pending", payment_consent_version: null }), false, "booked by the student");
 });
