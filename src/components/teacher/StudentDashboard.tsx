@@ -230,6 +230,7 @@ export function StudentDashboard({ student, token, facts, homeworkId, homeworkRe
         onOpenLesson={booking => { setNotice(""); setOpenNotes(current => current === booking.id ? null : current); setSelected({ id: booking.id, action: "view" }); }}
         onCloseLesson={() => setSelected(null)}
         onRecordRefund={booking => { setNotice(""); setOpenNotes(current => current === booking.id ? null : current); setSelected({ id: booking.id, action: "refund" }); }}
+        onPutBack={message => { if (readSession() !== token) return; setNotice(message); reload(); onPaidChanged?.(); }}
         onPaid={updated => {
           setHistory(state => state && state.bookings ? { ...state, bookings: state.bookings.map(booking => booking.id === updated.id ? { ...booking, ...updated } : booking) } : state);
           onPaidChanged?.();

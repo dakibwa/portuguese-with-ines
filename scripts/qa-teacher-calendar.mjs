@@ -386,7 +386,7 @@ async function fixture(width, options = {}) {
       return route.fulfill({ json: { lessons: [unpaid(opened, "2026-09-08T13:00:00.000Z"), unpaid("earlier-unpaid", "2026-09-01T13:00:00.000Z")] } });
     }
     const match = path.match(
-      /^\/admin\/bookings\/([^/]+)\/(reschedule|change|cancel|no-show|paid|refund-by-hand)$/,
+      /^\/admin\/bookings\/([^/]+)\/(reschedule|change|cancel|restore|no-show|paid|refund-by-hand)$/,
     );
     if (match) {
       const booking = state.bookings.find((entry) => entry.id === match[1]);
@@ -433,7 +433,10 @@ async function fixture(width, options = {}) {
         return route.fulfill({ json: { changed, kept, emailed: Date.parse(opened.starts_at) > Date.parse("2026-09-07T10:15:00Z") } });
       } else if (match[2] === "cancel") {
         if (state.failCancel-- > 0) return fail("The booking system is busy. Please try again.");
-        booking.status = "cancelled";
+        Object.assign(booking, { status: "cancelled", cancelled_by: "teacher" });
+      } else if (match[2] === "restore") {
+        Object.assign(booking, { status: "confirmed", cancelled_by: null });
+        return route.fulfill({ json: { booking, emailed: true } });
       } else if (match[2] === "refund-by-hand") {
         booking.payment_status = "refunded";
       }
@@ -1037,6 +1040,13 @@ try {
     "cancelled",
   );
   assert.equal(state.writes.filter(entry => entry.path.endsWith("/cancel")).at(-1).data.message, cancellationMessage);
+  // Cancelled by mistake, it goes back as it was from the line that says so.
+  const cancelledLine = page.locator(".teacher-workspace > .teacher-inline-success");
+  await expect(cancelledLine).toContainText("Lesson cancelled.");
+  await cancelledLine.getByRole("button", { name: "Put it back", exact: true }).click();
+  await expect(cancelledLine).toHaveText("Lesson put back. Sam has been emailed that it’s back on.");
+  assert.equal(state.bookings.find((entry) => entry.id.startsWith("manual")).status, "confirmed");
+  assert.ok(state.writes.some(entry => /^\/admin\/bookings\/manual[^/]*\/restore$/.test(entry.path)));
 
   // Her next lesson leads the page with its call: Alex's is happening now.
   const nextLesson = page.locator(".teacher-next");

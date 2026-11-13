@@ -5,12 +5,14 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, ty
 import { X, ArrowLeft, Check, CheckCircle2, CircleX, UserX } from "lucide-react";
 import {
   addedByTeacher,
+  canPutBack,
   cancelBookingAs,
   cancelFollowingAs,
   changeLesson,
   rescheduleBookingAs,
   paidByHand,
   recordRefundByHand,
+  restoreBookingAs,
   setLessonPaid,
   setNoShow,
   type AdminBooking,
@@ -34,6 +36,7 @@ import { TeacherHomework } from "@/components/homework/lazy";
 import { PaidTick } from "@/components/teacher/PaidTick";
 import { CardApprovalLink } from "@/components/teacher/CardApprovalLink";
 import { priceFor } from "@/components/teacher/StudentPrice";
+import { putBackMessage } from "@/components/teacher/PutBack";
 import { lessonProducts } from "@/lib/lesson-products";
 
 const trialPrice = lessonProducts.find((product) => product.id === "trial")?.priceCents ?? 0;
@@ -48,7 +51,8 @@ type Props = {
   now: Date;
   afterChangeFocusRef: RefObject<HTMLElement | null>;
   onClose: () => void;
-  onChanged: (message: string) => void;
+  /** `putBack`: the lesson she has just cancelled, which can still go back as it was. */
+  onChanged: (message: string, putBack?: string) => void;
   /** What it opens on: the lesson, its refund, or (from the row's pencil) its change form. */
   initialAction?: "view" | "refund" | "change";
   /**
@@ -266,6 +270,7 @@ export function LessonDetails({
     : booking.lesson_type_id === "trial" ? trialPrice : priceFor(student, minutes >= 90 ? 90 : 60));
   const ticked = paidByHand(booking);
   const canRecordRefund = booking.status === "cancelled" && ticked && booking.payment_status !== "refunded";
+  const puttable = canPutBack(booking, now.getTime());
   const paid = ticked && booking.payment_status !== "refunded" ? "paid to you by hand" : {
     paid: "paid by card",
     refunded: "refunded",
@@ -364,6 +369,21 @@ export function LessonDetails({
     </button>
   );
 
+  async function putBack() {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await restoreBookingAs(token, booking.id);
+      changed.current = true;
+      onChanged(putBackMessage(result.emailed, firstName));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "That lesson couldn’t be put back.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function perform() {
     if (busy) return;
     setBusy(true);
@@ -395,7 +415,9 @@ export function LessonDetails({
       } else if (action === "cancel") {
         const cancelled = await cancelBookingAs(token, booking.id, awaiting ? "" : cancelMessage);
         changed.current = true;
-        onChanged(cancelled.emailed === false ? "Lesson cancelled." : "Lesson cancelled. The student has been emailed.");
+        // A lesson with no money moved by its cancellation can go back as it was.
+        const backable = canPutBack({ ...booking, status: "cancelled", cancelled_by: "teacher" }, now.getTime());
+        onChanged(cancelled.emailed === false ? "Lesson cancelled." : "Lesson cancelled. The student has been emailed.", backable ? booking.id : undefined);
       } else if (action === "no-show") {
         await setNoShow(token, booking.id, !noShow);
         changed.current = true;
@@ -638,9 +660,11 @@ export function LessonDetails({
           A payment is being processed. Try making changes once it finishes.
         </p>
       ) : null}
-      {/* A cancelled lesson's one action, if any; its close is the cross. */}
-      {booking.status === "cancelled" && action === "view" ? canRecordRefund ? <div className="teacher-dialog-actions">
-        <button className="teacher-quiet" type="button" onClick={() => setAction("refund")}>Record refund</button>
+      {/* A cancelled lesson's actions, if any: put back while it can go back
+          as it was, and a refund made by hand; its close is the cross. */}
+      {booking.status === "cancelled" && action === "view" ? canRecordRefund || puttable ? <div className="teacher-dialog-actions">
+        {puttable ? <button className="teacher-quiet" type="button" disabled={busy} onClick={() => void putBack()}>Put it back</button> : null}
+        {canRecordRefund ? <button className="teacher-quiet" type="button" disabled={busy} onClick={() => setAction("refund")}>Record refund</button> : null}
       </div> : null : action === "view" ? (
         inline ? null : <div className="teacher-dialog-actions">
           {homeworkTrigger}

@@ -4,7 +4,8 @@ import { Fragment, useState, type ReactNode } from "react";
 import { ChevronDown, Pencil, Repeat, X } from "lucide-react";
 import { TeacherHomework } from "@/components/homework/lazy";
 import { PaidTick } from "@/components/teacher/PaidTick";
-import { addedByTeacher, paidByHand, setLessonPaid, type AdminBooking, type NoteHomework, type StudentNoteLesson } from "@/lib/admin-api";
+import { PutBackButton } from "@/components/teacher/PutBack";
+import { addedByTeacher, canPutBack, paidByHand, setLessonPaid, type AdminBooking, type NoteHomework, type StudentNoteLesson } from "@/lib/admin-api";
 import { formatBookedLessonLabel, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel, shownAsAdded } from "@/lib/teacher-calendar";
 import { IN_PERSON } from "@/lib/tutor";
@@ -139,7 +140,7 @@ const PAST_SHOWN = 8;
  * past and cancelled, newest first, with her notes beneath (Dan: "a homework
  * page for each student … it can build up over time").
  */
-export function StudentLessons({ bookings, notes, level, error, now, token, busy, selectedId, details, openNotes, onChangeLesson, onCloseNotes, onBusy, onRetry, onOpenLesson, onCloseLesson, onRecordRefund, onPaid }: {
+export function StudentLessons({ bookings, notes, level, error, now, token, busy, selectedId, details, openNotes, onChangeLesson, onCloseNotes, onBusy, onRetry, onOpenLesson, onCloseLesson, onRecordRefund, onPaid, onPutBack }: {
   token: string;
   /** The lesson whose details are open in place, and those details. */
   selectedId: string | null;
@@ -165,6 +166,8 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
   onRecordRefund: (booking: AdminBooking) => void;
   /** A past lesson ticked or unticked Already paid. */
   onPaid?: (booking: AdminBooking) => void;
+  /** A lesson she cancelled, put back, and what to say of it. */
+  onPutBack?: (message: string) => void;
 }) {
   const [paying, setPaying] = useState("");
   const [paidError, setPaidError] = useState<{ id: string; message: string } | null>(null);
@@ -224,6 +227,8 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
     const detailsId = `teacher-lesson-details-${booking.id}`;
     const state = note ? homeworkState[note.homework] : "";
     const refund = cancelled && paidByHand(booking) && booking.payment_status !== "refunded" && selectedId !== booking.id;
+    // Her own cancellation of a lesson still to come goes back from the row's end too, as a refund is recorded there.
+    const putBack = cancelled && canPutBack(booking, now) && selectedId !== booking.id;
     const label = day(booking);
     const facts = factList(lessonFacts(booking, now), inherited);
     // The row's pencil changes the lesson, in place, as every pencil on her
@@ -272,7 +277,13 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
       booking.notes ? <p className="teacher-history-lesson__note" key="them"><span>{booking.student_name.split(" ")[0]}:</span> “{booking.notes}”</p> : null,
     ].filter(Boolean);
     const money = settle ? <PaidTick plain checked={paidByHand(booking)} disabled={Boolean(paying) || busy} onChange={paid => void markPaid(booking, paid)} />
-      : refund ? <button className="teacher-quiet" data-homework-exit disabled={busy} onClick={() => onRecordRefund(booking)} type="button">Record refund</button> : null;
+      : null;
+    const refundButton = refund ? <button className="teacher-quiet" data-homework-exit disabled={busy} onClick={() => onRecordRefund(booking)} type="button">Record refund</button> : null;
+    const putBackButton = putBack ? <PutBackButton token={token} bookingId={booking.id} firstName={booking.student_name.split(" ")[0]} disabled={busy}
+      onDone={message => { setPaidError(null); onPutBack?.(message); }} onError={message => setPaidError({ id: booking.id, message })} /> : null;
+    const actions = money ?? (putBackButton && refundButton
+      ? <span className="teacher-lesson-row__actions">{putBackButton}{refundButton}</span>
+      : putBackButton ?? refundButton);
     return (
       <li className={`teacher-history-lesson teacher-lesson-row${cancelled || noShow ? " is-cancelled" : ""}${opened ? " is-open" : ""}${selected ? " is-selected" : ""}`} key={booking.id}>
         <div className="teacher-lesson-row__line">
@@ -286,12 +297,12 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
         </div>
         {openDetails ? <div className="teacher-lesson-row__details" id={detailsId}>{openDetails}</div> : null}
         {/* Open details say these facts themselves. */}
-        {!openDetails && (facts || money || said.length) ? <div className="teacher-lesson-row__foot">
+        {!openDetails && (facts || actions || said.length) ? <div className="teacher-lesson-row__foot">
           {/* What was said about it follows its facts on the row's own line
               where there is room (10 November 2026, Dan), and wraps beneath
               them where there is not. */}
           {facts || said.length ? <div className="teacher-lesson-row__facts">{facts}{said}</div> : null}
-          {money}
+          {actions}
         </div> : null}
         {paidError?.id === booking.id ? <p className="teacher-inline-error" role="alert">{paidError.message}</p> : null}
         {note?.notes.trim() && !opened ? <p className="teacher-notes__text">{note.notes.trim()}</p> : null}

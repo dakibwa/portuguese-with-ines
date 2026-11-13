@@ -661,6 +661,26 @@ export function cancelBookingAs(token: string, bookingId: string, message?: stri
   ).then(validateBookingAcknowledgment);
 }
 
+/**
+ * Put back a lesson she cancelled (13 November 2026, Dan): the same lesson, as
+ * it was, with one email to the student. Only her own cancellation of a lesson
+ * still to come, with no money moved, while its time is free; the Worker says
+ * why when it can't.
+ */
+export function restoreBookingAs(token: string, bookingId: string) {
+  return adminRequest<{ booking: { reference: string }; emailed?: boolean }>(
+    token,
+    `/admin/bookings/${encodeURIComponent(bookingId)}/restore`,
+    { method: "POST", body: JSON.stringify({}) },
+  ).then(validateBookingAcknowledgment);
+}
+
+/** Whether a cancelled lesson can be put back, as the Worker decides it (`restoreProblem`). */
+export function canPutBack(booking: AdminBooking, now: number) {
+  return booking.status === "cancelled" && booking.cancelled_by === "teacher" && Date.parse(booking.starts_at) > now &&
+    ["not_required", "scheduled", "free"].includes(booking.payment_status) && !booking.charge_started_at;
+}
+
 /** A lesson that stayed as it was when she changed several, and why, in a few words. */
 export type KeptLesson = { startsAt: string; reason: string };
 
