@@ -2232,8 +2232,10 @@ await test("a paid late change fee reminds Inês to issue its fiscal document on
   assert.match(receipt.text, /less than 14 hours before it/);
 });
 
-await test("Inês's lesson list carries each student's NIF, and students cannot read it", async () => {
-  db.prepare("UPDATE students SET nif='123456789' WHERE id='alice'").run();
+await test("Inês's lesson list carries each student's NIF and whether they have signed in, and students cannot read it", async () => {
+  const logins = db.prepare("SELECT id, last_login_at FROM students WHERE id IN ('alice','bob')").all();
+  db.prepare("UPDATE students SET nif='123456789', last_login_at=? WHERE id='alice'").run(new Date().toISOString());
+  db.prepare("UPDATE students SET last_login_at=NULL WHERE id='bob'").run();
   booking("admin-nif", { start: "2026-10-12T09:00:00.000Z", end: "2026-10-12T10:00:00.000Z" });
   booking("admin-none", { owner: "bob", start: "2026-10-12T11:00:00.000Z", end: "2026-10-12T12:00:00.000Z" });
   try {
@@ -2242,9 +2244,13 @@ await test("Inês's lesson list carries each student's NIF, and students cannot 
     const { bookings } = await listed.json();
     assert.equal(bookings.find((row) => row.id === "admin-nif").student_nif, "123456789");
     assert.equal(bookings.find((row) => row.id === "admin-none").student_nif, "");
+    // A free lesson she added reads as booked only once its student is in.
+    assert.equal(bookings.find((row) => row.id === "admin-nif").student_signed_in, 1);
+    assert.equal(bookings.find((row) => row.id === "admin-none").student_signed_in, 0);
     assert.equal((await call("/admin/bookings", { method: "GET", user: "alice" })).status, 401);
   } finally {
     db.prepare("UPDATE students SET nif='' WHERE id='alice'").run();
+    for (const row of logins) db.prepare("UPDATE students SET last_login_at=? WHERE id=?").run(row.last_login_at, row.id);
     db.prepare("DELETE FROM bookings WHERE id IN ('admin-nif','admin-none')").run();
   }
 });

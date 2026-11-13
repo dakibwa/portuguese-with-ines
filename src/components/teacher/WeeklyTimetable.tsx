@@ -17,7 +17,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { CalendarCheck, CalendarMinus, CalendarPlus, ChevronDown, Plus, Trash2, Video, Globe, UserRound } from "lucide-react";
-import { addedByTeacher, type AdminBooking, type AvailabilityException, type OnlineOnlyPeriod } from "@/lib/admin-api";
+import { type AdminBooking, type AvailabilityException, type OnlineOnlyPeriod } from "@/lib/admin-api";
 import { meetingHref } from "@/components/MeetingLink";
 import { formatSlotTime } from "@/lib/booking-api";
 import { timetableBounds } from "@/lib/timetable-bounds";
@@ -40,6 +40,7 @@ import {
   paintHours,
   parseMinute,
   shiftDate,
+  shownAsAdded,
   spanAround,
   spanLabel,
   startsLabel,
@@ -956,12 +957,12 @@ export function WeeklyTimetable({
                           <Fragment key={`${booking.id}-${position}`}>
                           <button
                             type="button"
-                            className={`teacher-calendar-lesson ${booking.location === "porto" ? "teacher-calendar-lesson--porto" : ""}${short ? " teacher-calendar-lesson--short" : ""}${booking.attendance_status === "no_show" ? " teacher-calendar-lesson--no-show" : ""}${addedByTeacher(booking) ? " teacher-calendar-lesson--added" : ""}`}
+                            className={`teacher-calendar-lesson ${booking.location === "porto" ? "teacher-calendar-lesson--porto" : ""}${short ? " teacher-calendar-lesson--short" : ""}${booking.attendance_status === "no_show" ? " teacher-calendar-lesson--no-show" : ""}${shownAsAdded(booking) ? " teacher-calendar-lesson--added" : ""}`}
                             style={{
                               top,
                               height,
                             }}
-                            aria-label={`${booking.student_name}, ${dateLabel(date)}, ${formatSlotTime(booking.starts_at)} to ${formatSlotTime(booking.ends_at)}, ${booking.location === "porto" ? "in Porto" : "online"}${booking.attendance_status === "no_show" ? ", marked as a no-show" : ""}${addedByTeacher(booking) ? ", added by you" : ""}. View lesson`}
+                            aria-label={`${booking.student_name}, ${dateLabel(date)}, ${formatSlotTime(booking.starts_at)} to ${formatSlotTime(booking.ends_at)}, ${booking.location === "porto" ? "in Porto" : "online"}${booking.attendance_status === "no_show" ? ", marked as a no-show" : ""}${shownAsAdded(booking) ? ", added by you" : ""}. View lesson`}
                             onClick={() => onSelectBooking(booking)}
                           >
                             <span className="teacher-lesson-time">
@@ -973,8 +974,9 @@ export function WeeklyTimetable({
                               {/* A lesson she added herself reads apart from
                                   the students' own bookings while lessons
                                   move onto the site (12 October 2026, at
-                                  Dan's request); the key says "Added by you". */}
-                              {addedByTeacher(booking) ? (
+                                  Dan's request), until the student takes it
+                                  on; the key says "Added by you". */}
+                              {shownAsAdded(booking) ? (
                                 <em className="teacher-lesson-added" aria-hidden="true">Added</em>
                               ) : null}
                             </span>

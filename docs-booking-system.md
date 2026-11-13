@@ -41,9 +41,11 @@ Inês on /schedule                     (her own account, role=teacher)
                                                      each is onto the site
   → POST /admin/bookings                             add a lesson, or a weekly slot, for someone
                                                      (marked `added_by_teacher`, shown as
-                                                     `Added by you`; charged to a card only
-                                                     once the student saved one from their
-                                                     account); one already started is
+                                                     `Added by you` until it is on the
+                                                     student's card, or free and they have
+                                                     signed in, then as booked; charged to a
+                                                     card only once the student saved one
+                                                     from their account); one already started is
                                                      recorded (`payment_status = 'recorded'`):
                                                      nobody is told, and it is open at the
                                                      student's price until it is paid

@@ -2242,8 +2242,10 @@ lesson without losing her draft; more than four under weekly hours fold beneath
 `more lessons`. A lesson she added herself, for a booking arranged elsewhere,
 reads apart from the students' own while lessons move onto the site: lilac with
 a dashed edge and `Added` within its card on the week, `Added by you` in the
-key, the strip and its dialog, which says it isn't charged through the site. The
-booking system records which lessons she added, so they stay hers once a
+key, the strip and its dialog, which says it isn't charged through the site. It
+reads as booked, like the students' own, once the student takes it on: it is on
+their card, or it is free and they have signed in. The booking system records
+which lessons she added, so they stay hers for how they are paid once a
 student's card pays for them. Her lesson form has sliders for a lesson's length
 and place, with the timetable's globe and person beside Online and In Porto, and
 asks `How often`: `Once` or `Weekly`, and a weekly slot then runs for `4 weeks`,

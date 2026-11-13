@@ -7253,6 +7253,9 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     const { results } = await env.DB.prepare(
       `SELECT b.*, l.name AS lesson_name, COALESCE(s.nif, '') AS student_nif, COALESCE(s.mark, '') AS student_mark,
          (COALESCE(s.awaiting_welcome, 0) = 1 AND COALESCE(s.password_hash, '') = '' AND s.google_sub IS NULL AND s.last_login_at IS NULL) AS student_awaiting_welcome,
+         -- Whether the student has ever come in, so a free lesson she added
+         -- reads as booked once it is in their own lessons (13 November 2026).
+         (COALESCE(s.password_hash, '') != '' OR s.google_sub IS NOT NULL OR s.last_login_at IS NOT NULL) AS student_signed_in,
          -- A student's first lesson, for Needs you: the page only reads from
          -- yesterday on, so it cannot tell for itself. Cancelled lessons never
          -- count as earlier; rows from before accounts match by email. The

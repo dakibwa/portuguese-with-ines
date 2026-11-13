@@ -90,6 +90,8 @@ export type AdminBooking = {
   student_mark?: string;
   /** Their student is set up but not welcomed yet, so no email reaches them. */
   student_awaiting_welcome?: number;
+  /** 1 once their student has ever signed in. */
+  student_signed_in?: number;
   starts_at: string;
   ends_at: string;
   status: "confirmed" | "cancelled";
@@ -156,7 +158,8 @@ export type PaymentReview = {
 /**
  * A lesson Inês added herself, for a booking arranged elsewhere, rather than
  * one a student booked on the site. The booking system records it outright
- * (migration 0023), so it stays hers once the student's card pays for it.
+ * (migration 0023), so it stays hers for how it is paid once the student's
+ * card pays for it; whether it still reads `Added by you` is `shownAsAdded`.
  */
 export function addedByTeacher(booking: Pick<AdminBooking, "added_by_teacher">) {
   return Boolean(booking.added_by_teacher);

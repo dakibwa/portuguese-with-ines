@@ -744,6 +744,24 @@ export type StudentStage = "todo" | "waiting" | "set";
 export type StudentNext = "invite" | "card" | "pay";
 
 /**
+ * A lesson she added reads `Added by you` only until the student has taken it
+ * on (13 November 2026, Dan: "some people have added cards and added the
+ * schedule now shouldn't they update in the calendar"). It reads as booked,
+ * like one they booked themselves, once it is on their card, or, at no
+ * charge, once they have signed in and it is in their own lessons. A lesson
+ * ticked paid by hand, or paid to her directly, stays hers.
+ */
+export function shownAsAdded(
+  booking: Pick<AdminBooking, "added_by_teacher" | "payment_status" | "payment_consent_version" | "student_signed_in">,
+) {
+  if (!booking.added_by_teacher) return false;
+  const consent = booking.payment_consent_version ?? "";
+  const onTheirCard = consent !== "" && consent !== "paid-by-hand";
+  const freeAndTheirs = booking.payment_status === "free" && Boolean(booking.student_signed_in);
+  return !onTheirCard && !freeAndTheirs;
+}
+
+/**
  * How far a student has got with the website (2 November 2026, Dan: "get
  * everyone logged in, pay for previous lessons and able to book their own
  * lessons"). Three checks, not six steps: signed in, a card with her lessons
