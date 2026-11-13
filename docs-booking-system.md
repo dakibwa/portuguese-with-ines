@@ -2907,7 +2907,12 @@ saved card is authorised in place: the student does not add it again or
 visit Stripe. Its opaque review key binds the approval to that saved card;
 the transaction rechecks the card, session, revocation and every lesson
 snapshot before recording consent. A card removed or replaced, a revoked
-session, or a paid/edited lesson refuses the approval.
+session, or a paid/edited lesson refuses the approval. With no past lesson to
+pay (none outstanding, or every one left out), a saved card is still agreed to
+in place for the lessons to come (13 November 2026): `GET /me` carries the
+card's `savedCardKey`, and `POST /me/card` with that key and no `bookings`
+records standing consent and puts every lesson to come that Inês added, and
+her weekly runs, on the card; no lesson already had is included.
 
 Without a saved card, Stripe setup collects one and only its verified
 completion schedules the selected lessons, including ones that have started

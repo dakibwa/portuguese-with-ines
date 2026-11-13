@@ -305,7 +305,7 @@ export function previewCardBooking(token: string, bookingIds: string[]) {
  */
 export function openCardPage(token: string, bookings: CardBooking[] = [], savedCardKey?: string) {
   return post<{ checkoutUrl?: string; authorised?: boolean }>("/me/card", {
-    consent: true, ...(bookings.length ? { bookings, bookingConsent: true, ...(savedCardKey ? { savedCardKey } : {}) } : {})
+    consent: true, ...(bookings.length ? { bookings, bookingConsent: true } : {}), ...(savedCardKey ? { savedCardKey } : {})
   }, token).then((data) => {
     if (data.authorised === true) return { authorised: true as const };
     if (typeof data.checkoutUrl !== "string") throw new AuthApiError(BOOKING_REPLY_ERROR, 502);
@@ -372,6 +372,8 @@ type Account = {
   cardsAccepted?: boolean;
   /** Lessons Inês added that they have had and a card can still pay for, oldest first; absent means none. */
   outstandingLessons?: string[];
+  /** The card they saved, to agree with and not enter again; empty or absent with none. */
+  savedCardKey?: string;
 };
 
 function isAccount(data: unknown): data is Account {
@@ -379,7 +381,8 @@ function isAccount(data: unknown): data is Account {
     (data.series === undefined || (Array.isArray(data.series) && data.series.every((series) =>
       isApiRecord(series) && typeof series.id === "string" && Boolean(series.id)
     ))) &&
-    (data.outstandingLessons === undefined || (Array.isArray(data.outstandingLessons) && data.outstandingLessons.every((id) => typeof id === "string" && Boolean(id))));
+    (data.outstandingLessons === undefined || (Array.isArray(data.outstandingLessons) && data.outstandingLessons.every((id) => typeof id === "string" && Boolean(id)))) &&
+    (data.savedCardKey === undefined || typeof data.savedCardKey === "string");
 }
 
 /** The account this session last read here, if it is recent enough to show while asking again. */

@@ -1786,7 +1786,11 @@ async function authoriseSavedCard(request, env, student, bookings) {
   const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   const marker = `card-authorisation:${crypto.randomUUID()}`;
   // Every reviewed lesson must still match its snapshot, or none is approved.
-  const reviewed = bookings.map(() => `(b.id = ? AND b.starts_at = ? AND b.ends_at = ? AND ${lessonCentsSql("b")} = ?)`).join(" OR ");
+  // With none named it covers only lessons to come (13 November 2026, Dan:
+  // a saved card is agreed to on sign-in, never typed in again).
+  const reviewed = bookings.length
+    ? bookings.map(() => `(b.id = ? AND b.starts_at = ? AND b.ends_at = ? AND ${lessonCentsSql("b")} = ?)`).join(" OR ") : "0";
+  const named = bookings.length ? bookings.map(() => "?").join(", ") : "NULL";
   const [saved] = await env.DB.batch([
     env.DB.prepare(`UPDATE students SET card_consent_at = ?
       WHERE id = ? AND session_version = ? AND card_setup_version = ?
@@ -1807,8 +1811,8 @@ async function authoriseSavedCard(request, env, student, bookings) {
         amount_cents = ${lessonCentsSql("bookings")},
         payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
       WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed'
-        AND ((payment_status = 'not_required' AND (starts_at > ? OR id IN (${bookings.map(() => "?").join(", ")})))
-          OR (payment_status = '${RECORDED}' AND id IN (${bookings.map(() => "?").join(", ")})))
+        AND ((payment_status = 'not_required' AND (starts_at > ? OR id IN (${named})))
+          OR (payment_status = '${RECORDED}' AND id IN (${named})))
         AND COALESCE(payment_consent_version, '') != '${PAID_BY_HAND_MARK}'
         AND EXISTS (SELECT 1 FROM request_limits WHERE key = ?)`)
       .bind(now, STUDENT_CARD_CONSENT_VERSION, now, student.id, now, ...bookings.map((booking) => booking.id), ...bookings.map((booking) => booking.id), marker),
@@ -1819,7 +1823,8 @@ async function authoriseSavedCard(request, env, student, bookings) {
     env.DB.prepare("DELETE FROM request_limits WHERE key = ?").bind(marker)
   ]);
   if (!(saved?.meta?.changes > 0)) {
-    return fail(`Your card or ${bookings.length > 1 ? "lessons" : "lesson"} changed. Review ${bookings.length > 1 ? "them" : "it"} again before agreeing.`, 409, request, env);
+    return fail(bookings.length ? `Your card or ${bookings.length > 1 ? "lessons" : "lesson"} changed. Review ${bookings.length > 1 ? "them" : "it"} again before agreeing.`
+      : "Your saved card changed. Please refresh and agree again.", 409, request, env);
   }
   return json({ authorised: true }, 200, request, env);
 }
@@ -1883,7 +1888,7 @@ async function handleStudentCard(request, env) {
     return fail("Too many attempts. Please try again in an hour.", 429, request, env);
   }
   if (body.savedCardKey) {
-    if (!approved.length || body.savedCardKey !== await savedCardKey(student)) {
+    if (body.savedCardKey !== await savedCardKey(student)) {
       return fail("Your saved card has changed. Review it again before agreeing.", 409, request, env);
     }
     return authoriseSavedCard(request, env, student, approved);
@@ -6087,7 +6092,10 @@ async function handleMe(request, env) {
   if (!current || current.id !== student.id || current.session_version !== student.session_version) return fail("Please sign in again.", 401, request, env);
   return json(
     { student: publicStudent(student), bookings, series, sameDayFeeCents: settings.sameDayChangeFeeCents, minimumNoticeHours: settings.minimumNoticeHours, cardsAccepted: cardsTaken(env, settings),
-      outstandingLessons: cardsTaken(env, settings) ? (outstandingRows ?? []).map((row) => row.id) : [] },
+      outstandingLessons: cardsTaken(env, settings) ? (outstandingRows ?? []).map((row) => row.id) : [],
+      // The card they saved, so agreeing to put lessons to come on it needs
+      // no card details again; empty with none.
+      savedCardKey: cardsTaken(env, settings) ? await savedCardKey(student) : "" },
     200,
     request,
     env

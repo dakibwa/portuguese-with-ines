@@ -26,7 +26,7 @@ export type CardUpcoming = { key: string; when: string; amountCents: number; wee
  * short list a booking shows, and pressing the button is the agreement; the
  * card itself is entered on Stripe's page.
  */
-export function CardTerms({ change = false, setup = false, onCancel, onSkip, bookingId = "", choosable = false, needsCard = false, onLeaveOut, upcoming = [], feeCents = SAME_DAY_RESCHEDULE_FEE_CENTS, noticeHours = NOTICE_HOURS }: {
+export function CardTerms({ change = false, setup = false, onCancel, onSkip, bookingId = "", choosable = false, needsCard = false, savedCardKey = "", onLeaveOut, upcoming = [], feeCents = SAME_DAY_RESCHEDULE_FEE_CENTS, noticeHours = NOTICE_HOURS }: {
   change?: boolean; onCancel?: () => void;
   /** Offered only once something has gone wrong, so a card that can't go ahead never keeps them from their lessons. */
   onSkip?: () => void;
@@ -41,6 +41,8 @@ export function CardTerms({ change = false, setup = false, onCancel, onSkip, boo
   choosable?: boolean;
   /** With every lesson left out, whether a card is still needed for lessons to come. */
   needsCard?: boolean;
+  /** Their account's saved card: lessons to come alone go on it with no card details either. */
+  savedCardKey?: string;
   /** The lessons left out, as the step's button or `See your lessons` is pressed; `done` closes the step. */
   onLeaveOut?: (ids: string[], done: boolean) => void;
   /** Their lessons still to come that Inês added, which the agreement then pays for. */
@@ -94,7 +96,10 @@ export function CardTerms({ change = false, setup = false, onCancel, onSkip, boo
   // lessons to come, or about nothing.
   const noneIn = choosable && ready && !kept.length;
   const paying = Boolean(bookingId) && !noneIn;
-  const savedCard = paying ? review?.savedCardKey : undefined;
+  // A saved card is agreed to, never typed in again (13 November 2026, Dan:
+  // "make it a prompt for her as soon as she logs in to agree to that"),
+  // also when only lessons to come are on it.
+  const savedCard = paying ? review?.savedCardKey : needsCard ? review?.savedCardKey || savedCardKey || undefined : undefined;
   const fee = review?.sameDayFeeCents ?? feeCents;
   const notice = review?.minimumNoticeHours ?? noticeHours;
   const cardRequest = useRef(0);
@@ -304,8 +309,8 @@ export function CardTerms({ change = false, setup = false, onCancel, onSkip, boo
  * now; only a card that can't go ahead (the lessons already settled, cards
  * switched off) offers their lessons instead, for that visit.
  */
-export function CardPrompt({ bookingId = "", choosable = false, needsCard = false, onLeaveOut, upcoming = [], onOpenChange }: {
-  bookingId?: string; upcoming?: CardUpcoming[];
+export function CardPrompt({ bookingId = "", choosable = false, needsCard = false, savedCardKey = "", onLeaveOut, upcoming = [], onOpenChange }: {
+  bookingId?: string; upcoming?: CardUpcoming[]; savedCardKey?: string;
   /** As CardTerms: the account's outstanding lessons, each of which can be left out. */
   choosable?: boolean; needsCard?: boolean; onLeaveOut?: (ids: string[], done: boolean) => void;
   /** Whether the card is showing: true on arrival, false once skipped after a failure or when it goes, so their lessons can wait for it. */
@@ -324,7 +329,7 @@ export function CardPrompt({ bookingId = "", choosable = false, needsCard = fals
       </span>
       <div className="card-prompt__body">
         <h3 id="card-prompt-heading">Confirm your card payments</h3>
-        <CardTerms key={bookingId} bookingId={bookingId} choosable={choosable} needsCard={needsCard} onLeaveOut={onLeaveOut} setup={!bookingId} upcoming={upcoming} onSkip={() => setOpen(false)} />
+        <CardTerms key={bookingId} bookingId={bookingId} choosable={choosable} needsCard={needsCard} savedCardKey={savedCardKey} onLeaveOut={onLeaveOut} setup={!bookingId} upcoming={upcoming} onSkip={() => setOpen(false)} />
       </div>
     </section>
   );
