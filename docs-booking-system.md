@@ -2254,8 +2254,11 @@ keep their original parameters.
   inside the window — the unified calendar says so instead of offering the
   buttons, and the endpoints refuse with the same words for anyone who kept an
   old tab open. `same_day_change` is never set on a paid row.
-- **Scheduled saved-card booking**: students may move or cancel right up to the
-  lesson start. A change inside the window atomically schedules one €5 charge
+- **Scheduled saved-card booking**: students may move or cancel until the
+  lesson's scheduled end, including while it is running (16 November 2026).
+  The manage-link read and calendar use the end to decide when it is past;
+  both writes recheck that end before changing anything. A change inside the
+  window atomically schedules one €5 charge
   to the saved card. A move keeps the later full lesson charge, due at the
   new end; a cancellation removes the full lesson charge. Once the fee is paid,
   the student and Inês are each emailed once; hers is the fiscal reminder.

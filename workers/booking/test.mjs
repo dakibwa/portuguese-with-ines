@@ -1632,6 +1632,8 @@ await test("a booking made under the lesson-day wording is never charged more th
   // On the day but more than 14 hours ahead: the new rule is kinder.
   const evening = { ...legacy, starts_at: "2026-09-10T21:30:00.000Z" };
   assert.equal(changePolicy(evening, new Date("2026-09-10T06:00:00.000Z")).feeApplies, false);
+  const overnight = { ...legacy, starts_at: "2026-09-10T22:30:00.000Z" };
+  assert.equal(changePolicy(overnight, new Date("2026-09-10T23:15:00.000Z")).feeApplies, true, "the late fee still applies after Porto's midnight during the lesson");
 });
 
 await test("an unpaid booking is never locked and never refunded", () => {

@@ -1682,7 +1682,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
    * inside the notice) still reaches its run's choices, with This lesson closed.
    */
   const weeklyRun = Boolean(activeManagedSeries && managed?.booking.status === "confirmed");
-  const lessonChangeable = Boolean(managed && managed.booking.status === "confirmed" && !managed.isPast && !managed.changeLocked);
+  const lessonChangeable = Boolean(managed && managed.booking.status === "confirmed" && Date.parse(managed.booking.endAt) > clock && !managed.changeLocked);
   const runLessons = weeklyRun
     ? myBookings
         .filter((booking) => booking.seriesId === resolvedManagedSeriesId && booking.status === "confirmed" && !booking.isPast && Date.parse(booking.startAt) > clock)
@@ -1821,7 +1821,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     const until = addDaysToKey(todayKey, 140);
     const wanted: { typeId: string; manageToken?: string }[] = [];
     if (managed) {
-      if (!isManagedReschedule && managed.booking.status === "confirmed" && !managed.isPast && !managed.changeLocked && managedToken) {
+      if (!isManagedReschedule && lessonChangeable && managedToken) {
         wanted.push({ typeId: managed.booking.lessonType.id, manageToken: managedToken });
       }
     } else if (intent === "book") {
@@ -1848,14 +1848,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     };
   // defaultLessonChoice reads the lesson types and preferences listed here.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todayKey, checkingSession, loadingSlots, managed, isManagedReschedule, managedToken, intent, lessonTypes, lessonTypeId, offerTrial, hasPriorBooking, student, preferredLessonTypeId, availabilityLocation]);
+  }, [todayKey, checkingSession, loadingSlots, managed, lessonChangeable, isManagedReschedule, managedToken, intent, lessonTypes, lessonTypeId, offerTrial, hasPriorBooking, student, preferredLessonTypeId, availabilityLocation]);
 
   const calendarBookings = myBookings
     .filter((booking) => booking.status === "confirmed" && Date.parse(booking.endAt) > clock)
     .sort((a, b) => a.startAt.localeCompare(b.startAt));
   if (
     managed &&
-    !managed.isPast &&
+    Date.parse(managed.booking.endAt) > clock &&
     managed.booking.status === "confirmed" &&
     !calendarBookings.some((booking) => booking.reference === managed.booking.reference)
   ) {
@@ -3175,7 +3175,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   }
 
   function renderLessonPreview(preview: MyBooking) {
-    const changeable = preview.status === "confirmed" && Date.parse(preview.startAt) > clock && !preview.changeLocked;
+    const changeable = preview.status === "confirmed" && Date.parse(preview.endAt) > clock && !preview.changeLocked;
     const feeCents = loadedAccount?.sameDayFeeCents ?? lateFeeCents;
     return (
       <>
@@ -3205,7 +3205,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           </p>
         ) : preview.sameDayFeeApplies && preview.status === "confirmed" ? (
           <p className="lesson-calendar__notice">
-            Changing or cancelling now costs {formatMoneyCents(feeCents)}, as it&rsquo;s less than {noticeHours} hours away.
+            Changing or cancelling now costs {formatMoneyCents(feeCents)}{Date.parse(preview.startAt) <= clock ? ", as the lesson has already started." : `, as it’s less than ${noticeHours} hours away.`}
             {preview.sameDayFeeAutomatic ? " Your saved card is charged when you confirm." : ""}
           </p>
         ) : null}
@@ -3925,7 +3925,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         </p>
                       ) : managed.sameDayFeeApplies && managed.booking.status === "confirmed" ? (
                         <p className="lesson-calendar__notice">
-                          Changing or cancelling now costs {formatMoneyCents(managed.booking.sameDayFeeCents)}, as it&rsquo;s less than {noticeHours} hours away.
+                          Changing or cancelling now costs {formatMoneyCents(managed.booking.sameDayFeeCents)}{Date.parse(managed.booking.startAt) <= clock ? ", as the lesson has already started." : `, as it’s less than ${noticeHours} hours away.`}
                           {managed.sameDayFeeAutomatic ? " Your saved card is charged when you confirm." : ""}
                         </p>
                       ) : null}
@@ -4098,7 +4098,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     </div>
                   ) : null}
 
-                  {(manageOutcome || ((managed.booking.status === "cancelled" || managed.isPast || managed.changeLocked) && !weeklyRun)) && !(rebookOffered && manageMode === "view") ? (
+                  {(manageOutcome || ((managed.booking.status === "cancelled" || Date.parse(managed.booking.endAt) <= clock || managed.changeLocked) && !weeklyRun)) && !(rebookOffered && manageMode === "view") ? (
                     <button className="button button--quiet lesson-manage-dialog__done" onClick={dismissManagedDialog} type="button">
                       Done
                     </button>

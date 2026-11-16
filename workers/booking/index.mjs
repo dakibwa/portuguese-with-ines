@@ -4386,7 +4386,7 @@ async function handleGetBooking(request, env, token) {
       booking: managedBooking(row, lessonType, settings),
       ...offer,
       ...(card ? { cardOffer: { priceCents: card.priceCents, everyWeek: card.everyWeek, replacesCard: card.replacesCard } } : {}),
-      isPast: new Date(row.starts_at) <= new Date(),
+      isPast: new Date(row.ends_at) <= new Date(),
       // The field keeps its original name for the site; it now means "inside
       // the 14-hour window". A saved-card booking charges the fee automatically.
       sameDayFeeApplies: policy.feeApplies && settings.sameDayChangeFeeCents > 0,
@@ -4412,7 +4412,7 @@ async function handleReschedule(request, env, ctx, token) {
   if (row.status === "cancelled") return fail("That lesson has already been cancelled.", 409, request, env);
 
   let now = new Date();
-  if (new Date(row.starts_at) <= now) return fail(`That lesson has already started. Please email ${tutorOf(env).shortName}.`, 409, request, env);
+  if (new Date(row.ends_at) <= now) return fail(`That lesson has already ended. Please email ${tutorOf(env).shortName}.`, 409, request, env);
 
   // Only an older already-paid lesson is locked. A current saved-card lesson
   // stays changeable and the EUR 5 fee is charged below.
@@ -4473,7 +4473,7 @@ async function handleReschedule(request, env, ctx, token) {
   // or while this request checked the new time. Charge only the quote their
   // current page accepted; older clients may omit it as before.
   now = new Date();
-  if (new Date(row.starts_at) <= now) return fail(`That lesson has already started. Please email ${tutorOf(env).shortName}.`, 409, request, env);
+  if (new Date(row.ends_at) <= now) return fail(`That lesson has already ended. Please email ${tutorOf(env).shortName}.`, 409, request, env);
   policy = changePolicy(row, now, settings.minimumNoticeHours);
   if (policy.locked) return fail("That lesson is now inside the change window and cannot be moved. Please reload.", 409, request, env);
   if (!sameTime && Date.parse(startsAt) < now.getTime() + settings.minimumNoticeHours * 3600000) {
@@ -4719,8 +4719,8 @@ async function handleCancel(request, env, ctx, token) {
   if (row.status === "cancelled") return fail("That lesson is already cancelled.", 409, request, env);
 
   let now = new Date();
-  if (new Date(row.starts_at) <= now) {
-    return fail(`That lesson has already started. Please email ${tutorOf(env).shortName}.`, 409, request, env);
+  if (new Date(row.ends_at) <= now) {
+    return fail(`That lesson has already ended. Please email ${tutorOf(env).shortName}.`, 409, request, env);
   }
   const settings = await loadSettings(env);
   const body = await readJson(request);
@@ -4751,7 +4751,7 @@ async function handleCancel(request, env, ctx, token) {
 
   const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
   now = new Date();
-  if (new Date(row.starts_at) <= now) return fail(`That lesson has already started. Please email ${tutorOf(env).shortName}.`, 409, request, env);
+  if (new Date(row.ends_at) <= now) return fail(`That lesson has already ended. Please email ${tutorOf(env).shortName}.`, 409, request, env);
   policy = changePolicy(row, now, settings.minimumNoticeHours);
   const sameDay = policy.feeApplies && settings.sameDayChangeFeeCents > 0 ? 1 : 0;
   if (body.expectedLateFeeCents !== undefined && body.expectedLateFeeCents !== (sameDay ? settings.sameDayChangeFeeCents : 0)) {
