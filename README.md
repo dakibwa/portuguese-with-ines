@@ -155,6 +155,9 @@ request only competes with the fonts for no gain.
 - One 14-hour rule covers booking, moving and cancelling. Moving or
   cancelling is free while the lesson is at least 14 elapsed hours away;
   inside that window it costs €5, charged automatically to the saved card.
+  Students can change or cancel throughout the lesson, until its scheduled end;
+  the same €5 fee applies. A moved lesson charges its price at its new end,
+  and a cancelled lesson has no full lesson charge.
   Bookings made under the earlier "free until the lesson day" wording pay only
   when both rules would charge. From the lesson's start until it ends Inês
   can mark a no-show; that replaces the full lesson charge with €5, charged

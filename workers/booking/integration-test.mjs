@@ -570,9 +570,9 @@ await test("the student's own price snapshots onto every occurrence and a one-of
   assert.equal(one.status, 201);
   assert.equal((await one.json()).booking.amountCents, 1500);
 });
-await test("a cancellation inside 14 hours records and charges just one separate fee under concurrent retries", async () => {
+await test("a cancellation during a lesson charges just one separate fee under concurrent retries, never the lesson price", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
-  const id = linkedBooking("same-day-cancel", { start: "2026-09-05T12:00:00.000Z", end: "2026-09-05T13:00:00.000Z" });
+  const id = linkedBooking("same-day-cancel", { start: "2026-09-05T09:30:00.000Z", end: "2026-09-05T10:30:00.000Z" });
   const path = `/bookings/${await token(id)}/cancel`;
   const unreviewed = await call(path, { body: { expectedLateFeeCents: 0 } });
   assert.equal(unreviewed.status, 409, await unreviewed.clone().text());
@@ -656,12 +656,12 @@ await test("opening, unchanged submission and failed move never charge a fee", a
   assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE reference='no-action'").get().same_day_fee_status, "not_required");
   db.prepare("UPDATE bookings SET status='cancelled' WHERE reference='no-action'").run();
 });
-await test("a move inside 14 hours preserves agreed price, charges once, then lesson only after its new end", async () => {
-  const id = linkedBooking("same-day-move", { start: "2026-09-05T16:00:00.000Z", end: "2026-09-05T17:00:00.000Z" });
+await test("a move during a lesson preserves agreed price, charges once, then lesson only after its new end", async () => {
+  const id = linkedBooking("same-day-move", { start: "2026-09-05T09:30:00.000Z", end: "2026-09-05T10:30:00.000Z" });
   const path = `/bookings/${await token(id)}/reschedule`;
   const unreviewed = await call(path, { body: { startAt: "2026-09-08T14:00:00.000Z", expectedLateFeeCents: 0 } });
   assert.equal(unreviewed.status, 409, await unreviewed.clone().text());
-  assert.equal(db.prepare("SELECT starts_at FROM bookings WHERE id=?").get(id).starts_at, "2026-09-05T16:00:00.000Z");
+  assert.equal(db.prepare("SELECT starts_at FROM bookings WHERE id=?").get(id).starts_at, "2026-09-05T09:30:00.000Z");
   assert.ok(!charges.some(charge => charge.key.includes(id)));
   db.prepare("UPDATE bookings SET attendance_status='no_show',no_show_marked_at='2026-09-05T09:00:00.000Z' WHERE id=?").run(id);
   const result = await call(path, { body: { startAt: "2026-09-08T14:00:00.000Z", expectedLateFeeCents: 500 } });
@@ -675,6 +675,51 @@ await test("a move inside 14 hours preserves agreed price, charges once, then le
   assert.equal(charges.filter((charge) => charge.key.includes(id)).length, 1);
   await chargeDueLessons(env, new Date("2026-09-08T21:00:00Z"));
   assert.deepEqual(charges.filter((charge) => charge.key.includes(id)).map((charge) => charge.amount), [500, 1500]);
+});
+await test("students can change from the lesson's start until its end, and a request that crosses the end is refused", async () => {
+  const previousClock = clock;
+  const originalPrepare = DB.prepare;
+  const end = Date.parse("2026-09-05T10:00:00.000Z");
+  try {
+    for (const operation of ["reschedule", "cancel"]) {
+      for (const [when, allowed] of [[end - 60 * 60_000, true], [end - 1, true], [end, false], [end + 1, false]]) {
+        clock = when;
+        const id = linkedBooking(`lesson-end-${operation}-${when}`, { start: "2026-09-05T09:00:00.000Z", end: "2026-09-05T10:00:00.000Z" });
+        try {
+          const path = `/bookings/${await token(id)}`;
+          const managed = await (await call(path, { method: "GET" })).json();
+          assert.equal(managed.isPast, !allowed);
+          const response = await call(`${path}/${operation}`, { body: {
+            ...(operation === "reschedule" ? { startAt: "2026-09-30T16:00:00.000Z" } : {}), expectedLateFeeCents: 500
+          } });
+          assert.equal(response.status, allowed ? 200 : 409, await response.clone().text());
+          await drain();
+          assert.deepEqual(charges.filter(charge => charge.key.includes(id)).map(charge => charge.amount), allowed ? [500] : []);
+          if (!allowed) assert.match(await response.text(), /already ended/);
+        } finally { db.prepare("DELETE FROM bookings WHERE id=?").run(id); }
+      }
+      clock = end - 1;
+      const id = linkedBooking(`crossed-end-${operation}`, { start: "2026-09-05T09:00:00.000Z", end: "2026-09-05T10:00:00.000Z" });
+      DB.prepare = sql => {
+        const statement = originalPrepare(sql);
+        if (sql === "SELECT * FROM lesson_types WHERE id = ?") {
+          const first = statement.first;
+          statement.first = () => { clock = end; return first(); };
+        }
+        return statement;
+      };
+      try {
+        const response = await call(`/bookings/${await token(id)}/${operation}`, { body: {
+          ...(operation === "reschedule" ? { startAt: "2026-09-30T16:00:00.000Z" } : {}), expectedLateFeeCents: 500
+        } });
+        assert.equal(response.status, 409, await response.clone().text());
+        assert.match(await response.text(), /already ended/);
+        await drain();
+        assert.ok(!charges.some(charge => charge.key.includes(id)));
+        assert.equal(db.prepare("SELECT status FROM bookings WHERE id=?").get(id).status, "confirmed");
+      } finally { DB.prepare = originalPrepare; db.prepare("DELETE FROM bookings WHERE id=?").run(id); }
+    }
+  } finally { clock = previousClock; DB.prepare = originalPrepare; }
 });
 await test("a single move or cancellation cannot overwrite a concurrent hand payment or price reduction", async () => {
   for (const operation of ["reschedule", "cancel"]) for (const transition of ["paid", "lower-price"]) {
@@ -2766,21 +2811,21 @@ await test("availability ignores the lesson being changed only for its manage li
   assert.ok(!(await starts("single&series=avail-series", "alice")).includes("12:30"), "an ended sequence cannot be moved");
 });
 
-await test("switching only between online and Porto inside 14 hours is a late change, not a new time", async () => {
+await test("switching only between online and Porto during a lesson is a late change, not a new time", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
-  const id = linkedBooking("switch-late", { start: "2026-09-05T18:00:00.000Z", end: "2026-09-05T19:00:00.000Z" });
+  const id = linkedBooking("switch-late", { start: "2026-09-05T09:30:00.000Z", end: "2026-09-05T10:30:00.000Z" });
   const path = `/bookings/${await token(id)}/reschedule`;
   const fees = () => charges.filter((charge) => charge.key.includes(id)).map((charge) => charge.amount);
-  const switched = await call(path, { body: { startAt: "2026-09-05T18:00:00.000Z", location: "porto" } });
+  const switched = await call(path, { body: { startAt: "2026-09-05T09:30:00.000Z", location: "porto" } });
   assert.equal(switched.status, 200, await switched.clone().text());
   const result = await switched.json();
   assert.equal(result.booking.location, "porto");
   assert.equal(result.sameDayFeeApplied, true);
   await drain();
   assert.deepEqual({ ...db.prepare("SELECT starts_at, ends_at, location, same_day_change FROM bookings WHERE reference='switch-late'").get() },
-    { starts_at: "2026-09-05T18:00:00.000Z", ends_at: "2026-09-05T19:00:00.000Z", location: "porto", same_day_change: 1 });
+    { starts_at: "2026-09-05T09:30:00.000Z", ends_at: "2026-09-05T10:30:00.000Z", location: "porto", same_day_change: 1 });
   assert.deepEqual(fees(), [500], "one late change fee, as for any change inside the window");
-  assert.equal((await call(path, { body: { startAt: "2026-09-05T18:00:00.000Z", location: "online" } })).status, 200);
+  assert.equal((await call(path, { body: { startAt: "2026-09-05T09:30:00.000Z", location: "online" } })).status, 200);
   await drain();
   assert.deepEqual(fees(), [500], "the fee applies once per lesson");
   for (const body of [{ startAt: "2026-09-05T18:30:00.000Z" }, { startAt: "2026-09-05T18:00:00.000Z", lessonType: "long" }]) {
@@ -2792,6 +2837,7 @@ await test("switching only between online and Porto inside 14 hours is a late ch
   const outsideId = linkedBooking("switch-outside-hours", { start: "2026-09-16T20:00:00.000Z", end: "2026-09-16T21:00:00.000Z" });
   const outside = await call(`/bookings/${await token(outsideId)}/reschedule`, { body: { startAt: "2026-09-16T20:00:00.000Z", location: "porto" } });
   assert.equal(outside.status, 200, await outside.clone().text());
+  db.prepare("DELETE FROM bookings WHERE id=?").run(id);
 });
 
 await test("a pay-in-person lesson cancelled late says the fee applies, never that a card is charged", async () => {

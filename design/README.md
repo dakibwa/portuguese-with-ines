@@ -1548,6 +1548,12 @@ menu keeps it a row like the rest, with its own coral `Book a lesson` below.
 There is no second `My lessons` navigation destination. Old `/my-lessons` and
 emailed `/booking` links retain their destination and tokens in `/book/`.
 
+Students can change or cancel a lesson until its scheduled end, including while
+it is running. Its `Change` and `Cancel` actions stay available for that whole
+time. During a lesson the notice says it has already started and names the
+usual €5 late change fee before confirmation. A cancellation charges no lesson
+price; a moved lesson charges its price after its new end.
+
 Preserve these states:
 
 - primary coral and secondary outline actions share a 52 px height, Montserrat

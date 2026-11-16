@@ -4,7 +4,8 @@
  * Since 21 September 2026 one 14-hour rule covers booking, moving and
  * cancelling: a student may book, move or cancel for free while the lesson is
  * at least `minimumNoticeHours` (14) elapsed hours away. Inside that window a
- * move or cancellation costs EUR 5, charged to the saved card. Elapsed hours
+ * move or cancellation costs EUR 5, charged to the saved card. Students can
+ * change throughout a lesson, until its scheduled end. Elapsed hours
  * need no time zone, so the rule reads the same wherever the student is.
  *
  * Earlier bookings agreed to "free until the lesson's Porto calendar day". Dan
@@ -64,7 +65,8 @@ export function isLateChange(row, now = new Date(), noticeHours = currentTutor()
   const start = new Date(row.starts_at);
   const late = start.getTime() - now.getTime() < noticeHours * 3600000;
   if (!LESSON_DAY_CONSENT_VERSIONS.has(row.payment_consent_version)) return late;
-  return late && dateKey(now, homeZone()) === dateKey(start, homeZone());
+  // A lesson still running after Porto's midnight keeps the same late terms.
+  return late && dateKey(now, homeZone()) >= dateKey(start, homeZone());
 }
 
 export function changePolicy(row, now = new Date(), noticeHours = currentTutor().defaults.noticeHours) {

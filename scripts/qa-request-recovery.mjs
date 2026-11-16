@@ -117,27 +117,34 @@ async function currentSession(page) {
 try {
   // History and the useful upcoming count advance with the lesson's end,
   // even when the account snapshot was read before it finished. Its live
-  // Meet action remains reachable throughout the running lesson.
+  // Meet action and changes remain reachable throughout the running lesson.
   for (const width of [1280, 390]) {
-    const running = { ...nextLesson, startAt: "2026-09-14T09:30:00Z", endAt: "2026-09-14T10:30:00Z", isPast: true, meetingUrl: "https://meet.google.com/abc-defg-hij" };
+    const running = { ...nextLesson, startAt: "2026-09-14T09:30:00Z", endAt: "2026-09-14T10:30:00Z", isPast: true, meetingUrl: "https://meet.google.com/abc-defg-hij", sameDayFeeApplies: true, sameDayFeeAutomatic: true, paymentStatus: "scheduled" };
     const state = await fixture(width, async path => path === "/me"
       ? { json: { student, bookings: [running], series: [], sameDayFeeCents: 500 } }
-      : path === "/bookings/next" ? { json: { booking: running, isPast: true, sameDayFeeApplies: false } } : null);
+      : path === "/bookings/next" ? { json: { booking: running, isPast: false, sameDayFeeApplies: true, sameDayFeeAutomatic: true } } : null);
     const { page } = state;
     try {
       await page.clock.install({ time: new Date("2026-09-14T10:00:00Z") });
       await page.goto(`${base}/book/?view=lessons`);
       await expect(page.locator("#lesson-calendar .calendar-week button.is-next")).toHaveCount(1);
       if (width === 390) await expect(page.locator(".lesson-overview__next .meeting-link")).toBeVisible();
-      else {
-        await page.locator("#lesson-calendar .calendar-week button.is-next").click();
-        await expect(page.locator(".lesson-manage-dialog .meeting-link")).toBeVisible();
-        await page.getByRole("button", { name: "Close lesson management", exact: true }).click();
-      }
+      await nextLessonOpener(page).click();
+      const dialog = page.locator(".lesson-manage-dialog");
+      await expect(dialog.locator(".meeting-link")).toBeVisible();
+      await expect(dialog.getByRole("button", { name: "Change", exact: true })).toBeVisible();
+      await expect(dialog.getByRole("button", { name: "Cancel", exact: true })).toBeVisible();
+      await expect(dialog).toContainText("Changing or cancelling now costs €5, as the lesson has already started.");
+      await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+      await expect(dialog).toContainText("Your saved card is charged the €5 late change fee, and nothing for the lesson");
+      await dialog.getByRole("button", { name: "Keep lesson", exact: true }).click();
       // Beneath the calendar, a lesson joins Past lessons once it has ended.
       await expect(page.locator("#account-past-lessons .past-lesson")).toHaveCount(0);
       await expect(page.locator(".account-menu__places button").first()).toHaveText(/Your lessons\s*1/);
       await page.clock.fastForward(31 * 60_000);
+      await expect(dialog.getByRole("button", { name: "Change", exact: true })).toHaveCount(0);
+      await expect(dialog.getByRole("button", { name: "Cancel", exact: true })).toHaveCount(0);
+      await page.getByRole("button", { name: "Close lesson management", exact: true }).click();
       await expect(page.locator("#account-past-lessons .past-lesson")).toHaveCount(1);
       await expect(page.locator(".account-menu__places button").first()).toHaveText("Your lessons");
       assert.deepEqual(state.errors, []);
