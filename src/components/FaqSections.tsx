@@ -36,7 +36,7 @@ export function FaqSections({ sections, indexMark }: { sections: FaqSection[]; i
         });
       }
     };
-    fromAddress(true);
+    fromAddress(Boolean(window.location.hash));
     setReady(true);
     const onHashChange = () => fromAddress(false);
     window.addEventListener("hashchange", onHashChange);
