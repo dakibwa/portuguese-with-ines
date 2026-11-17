@@ -726,6 +726,19 @@ first. The stand-in never leaves the database (`workers/booking/no-email.mjs`):
   the no-show and paid-by-hand replies and `GET /admin/receipts` (so the CSV)
   show `""` for it.
 
+When a student with no address completes card setup, the email collected by
+Stripe becomes their contact email on Students and replaces the stand-in on
+all their lessons (17 November 2026, Dan). This happens in the same guarded
+transaction as accepting the card, both from an account and from a lesson's
+link. An existing address is never overwritten, an address already belonging
+to another account is not adopted, and authentication/verification and payment
+consent fields are unchanged. Checkout does not verify ownership of a mailbox.
+The minute sweep also recovers addresses discarded by older card setups from
+completed Checkout sessions belonging to that student and their current Stripe
+Customer and account/card versions. It checks at most ten students per tick,
+retries a missing/conflicting address or provider failure at most hourly, and
+sends no welcome or retrospective message.
+
 `POST /admin/students/:id/welcome` is refused (400) until she gives an email.
 Her way to them instead is the WhatsApp invite:
 `POST /admin/students/:id/invite-link` makes the same one-click sign-in link a

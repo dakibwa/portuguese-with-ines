@@ -111,6 +111,12 @@ export function retrieveSetupIntent(env, setupIntentId) {
   return stripeGet(env, `/setup_intents/${encodeURIComponent(setupIntentId)}`);
 }
 
+/** Completed Checkout records retain the email collected while adding a card. */
+export function listCompletedCheckoutSessions(env, customer) {
+  const query = new URLSearchParams({ customer, status: "complete", limit: "20" });
+  return stripeGet(env, `/checkout/sessions?${query}`);
+}
+
 export function retrieveCheckoutSession(env, sessionId) {
   return stripeGet(env, `/checkout/sessions/${encodeURIComponent(sessionId)}`);
 }

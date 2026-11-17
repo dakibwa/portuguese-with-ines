@@ -25,6 +25,7 @@ import {
   createLessonCardSession,
   createStudentCardSession,
   expireCheckoutSession,
+  listCompletedCheckoutSessions,
   refundPayment,
   retrieveCheckoutSession,
   retrieveRefund,
@@ -1988,6 +1989,65 @@ async function savedSetupCard(env, session, label, ...context) {
 }
 
 /**
+ * The first address collected in Checkout is also the student's contact
+ * address (17 November 2026, Dan). Fill only the no-email stand-in, never
+ * replace an address or merge accounts. These statements join the card's
+ * guarded transaction, so a rejected or superseded setup cannot write it.
+ * Checkout is not mailbox verification: authentication and consent fields
+ * stay exactly as they were, including a prior sign-in from her invite.
+ */
+function checkoutContactStatements(env, studentId, customer, address, guard = { sql: "1", values: [] }) {
+  const email = normaliseEmail(address);
+  if (!customer || !isEmail(email) || email.length > 254) return [];
+  return [
+    env.DB.prepare(`UPDATE students SET email = ?
+      WHERE id = ? AND role = 'student' AND email LIKE '${NO_EMAIL_YET}%' AND stripe_customer_id = ?
+        AND NOT EXISTS (SELECT 1 FROM students other WHERE other.id != ? AND lower(trim(other.email)) = ?)
+        AND (${guard.sql})`)
+      .bind(email, studentId, customer, studentId, email, ...guard.values),
+    // A stand-in is not a historical address: remove it from past lessons too.
+    env.DB.prepare(`UPDATE bookings SET student_email = ?, updated_at = ?
+      WHERE student_id = ? AND student_email LIKE '${NO_EMAIL_YET}%'
+        AND EXISTS (SELECT 1 FROM students WHERE id = ? AND role = 'student' AND email = ? AND stripe_customer_id = ?)
+        AND (${guard.sql})`)
+      .bind(email, new Date().toISOString(), studentId, studentId, email, customer, ...guard.values)
+  ];
+}
+
+/** Repair older card setups which saved the card but discarded its email. */
+export async function syncMissingCheckoutContacts(env) {
+  if (!stripeReady(env)) return;
+  const window = Math.floor(Date.now() / 3600000) * 3600;
+  const { results } = await env.DB.prepare(`SELECT id, stripe_customer_id, card_setup_version, session_version FROM students s
+    WHERE s.role = 'student' AND s.email LIKE '${NO_EMAIL_YET}%'
+      AND s.stripe_customer_id IS NOT NULL AND s.stripe_payment_method IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM request_limits r WHERE r.key = 'stripe-contact:' || s.id AND r.window = ?)
+    ORDER BY s.id LIMIT 10`).bind(window).all();
+  for (const student of results ?? []) {
+    if (!await takeRateLimit(env, `stripe-contact:${student.id}`, 1, 3600)) continue;
+    try {
+      const sessions = await listCompletedCheckoutSessions(env, student.stripe_customer_id);
+      const session = (sessions.data ?? []).find((item) =>
+        item.status === "complete" && item.mode === "setup" && item.customer === student.stripe_customer_id &&
+        item.metadata?.student_id === student.id && ["student_card", "lesson_card"].includes(item.metadata?.purpose) &&
+        String(item.metadata?.card_setup_version ?? "0") === String(student.card_setup_version ?? 0) &&
+        (item.metadata.purpose !== "student_card" || String(item.metadata?.session_version ?? "0") === String(student.session_version ?? 0)) &&
+        isEmail(item.customer_details?.email)
+      );
+      if (!session) continue;
+      const statements = checkoutContactStatements(env, student.id, student.stripe_customer_id, session.customer_details.email, {
+        sql: "EXISTS (SELECT 1 FROM students WHERE id = ? AND card_setup_version = ? AND session_version = ?)",
+        values: [student.id, student.card_setup_version ?? 0, student.session_version ?? 0]
+      });
+      if (statements.length) await env.DB.batch(statements);
+    } catch {
+      // No provider payload or contact details in logs; retry next hour.
+      console.warn("stripe-contact-sync-unavailable", student.id);
+    }
+  }
+}
+
+/**
  * Stripe has saved the card. From now on the lessons Inês added that are
  * still to come pay for themselves after they end, on the same terms as a
  * lesson the student books. Past lessons stay unchanged unless the student
@@ -2057,7 +2117,10 @@ async function confirmStudentCard(env, session) {
     env.DB.prepare(
       `UPDATE booking_series SET automatic_payment = 1, payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
        WHERE student_id = ? AND added_by_teacher = 1 AND status = 'active' AND automatic_payment = 0 AND ${current}`
-    ).bind(consentedAt, STUDENT_CARD_CONSENT_VERSION, now, student.id, student.id, consentedAt, setupVersion, accountVersion)
+    ).bind(consentedAt, STUDENT_CARD_CONSENT_VERSION, now, student.id, student.id, consentedAt, setupVersion, accountVersion),
+    ...checkoutContactStatements(env, student.id, customer, session.customer_details?.email, {
+      sql: current, values: [student.id, consentedAt, setupVersion, accountVersion]
+    })
   ]);
   if (!(saved?.meta?.changes > 0)) {
     console.warn("stripe-student-card-superseded", student.id);
@@ -2359,6 +2422,7 @@ const worker = {
 
 /** One tutor's share of the minute and nightly work. */
 function sweep(event, env, ctx) {
+  ctx.waitUntil(syncMissingCheckoutContacts(env));
   ctx.waitUntil(chargeDueLessons(env));
   ctx.waitUntil(chargeDueSameDayFees(env));
   ctx.waitUntil(retryPaymentRecovery(env));
@@ -5163,6 +5227,7 @@ async function confirmLessonCard(env, session) {
        WHERE id = ? AND student_id = ? AND added_by_teacher = 1 AND status = 'active' AND automatic_payment = 0 AND COALESCE(prepaid, 0) = 0
          AND ${marked}`
     ).bind(consentedAt, PAYMENT_CONSENT_VERSION, now, agreed.seriesId, agreed.studentId, marker)] : []),
+    ...checkoutContactStatements(env, agreed.studentId, customer, session.customer_details?.email, { sql: marked, values: [marker] }),
     env.DB.prepare("DELETE FROM request_limits WHERE key = ?").bind(marker)
   ]);
   if (!(saved?.meta?.changes > 0)) {

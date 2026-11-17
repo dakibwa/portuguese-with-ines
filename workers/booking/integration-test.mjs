@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { emailLifecycle } from "./email.mjs";
-import worker, { chargeDueLessons, chargeDueSameDayFees, notifyMeetingReady, notifySeries, releaseExpiredHolds, resendFailedEmails, retryPaymentRecovery, retryRefunds, sendLessonReminders } from "./index.mjs";
+import worker, { chargeDueLessons, chargeDueSameDayFees, notifyMeetingReady, notifySeries, releaseExpiredHolds, resendFailedEmails, retryPaymentRecovery, retryRefunds, sendLessonReminders, syncMissingCheckoutContacts } from "./index.mjs";
 import { createSession, createResetToken, createSignInToken, hashPassword, sessionHash, sessionVersion } from "./auth.mjs";
 import { createManageToken, readManageToken } from "./tokens.mjs";
 import { findRecurringCode, studentLessonType, priceForMove, takeRateLimit } from "./rates.mjs";
@@ -38,6 +38,10 @@ let googleJwk = null;
 let checkoutUnavailable = false;
 let decline = false;
 const setupIntents = new Map();
+const checkoutContactSessions = new Map();
+const checkoutContactReads = [];
+let duringCheckoutContactRead = null;
+let checkoutContactUnavailable = false;
 let duringSetupRead = null;
 const expiredSessions = [];
 const completedSessions = new Set();
@@ -46,6 +50,15 @@ let expiryUnavailable = false;
 const sentEmails = [];
 let emailUnavailable = false;
 globalThis.fetch = async (url, options) => {
+  if (String(url).startsWith("https://api.stripe.com/v1/checkout/sessions?")) {
+    const query = new URL(url).searchParams;
+    assert.equal(query.get("status"), "complete");
+    assert.equal(query.get("limit"), "20");
+    checkoutContactReads.push(query.get("customer"));
+    await duringCheckoutContactRead?.();
+    if (checkoutContactUnavailable) return Response.json({ error: { message: "Isolated contact lookup outage" } }, { status: 503 });
+    return Response.json({ data: checkoutContactSessions.get(query.get("customer")) ?? [] });
+  }
   if (String(url) === "https://api.resend.com/emails") {
     if (emailUnavailable) return Response.json({ message: "Isolated email outage" }, { status: 503 });
     sentEmails.push(JSON.parse(options.body));
@@ -4177,7 +4190,8 @@ await test("a card saved from the account pays for the lessons Inês added from 
 
     setupIntents.set("seti_card_later", { status: "succeeded", customer: "cus_card_later", payment_method: "pm_card_later" });
     const session = { id: "cs_card_later", mode: "setup", status: "complete", client_reference_id: `student:${id}`,
-      customer: "cus_card_later", setup_intent: "seti_card_later", metadata: { purpose: "student_card", student_id: id } };
+      customer: "cus_card_later", setup_intent: "seti_card_later", metadata: { purpose: "student_card", student_id: id },
+      customer_details: { email: "different-billing-address@example.invalid" } };
     const event = { id: "evt_card_later", type: "checkout.session.completed", livemode: false, data: { object: session } };
     assert.equal((await webhook({ ...event, id: "evt_card_other", data: { object: { ...session, client_reference_id: "student:alice" } } })).status, 400);
     assert.equal((await webhook({ ...event, id: "evt_card_open", data: { object: { ...session, status: "open" } } })).status, 400);
@@ -4191,6 +4205,7 @@ await test("a card saved from the account pays for the lessons Inês added from 
     assert.equal(listed.find((row) => row.id === id).cardForAllLessons, true);
 
     const saved = db.prepare("SELECT * FROM students WHERE id=?").get(id);
+    assert.equal(saved.email, email, "an existing contact address is never replaced by a billing address");
     assert.deepEqual([saved.stripe_customer_id, saved.stripe_payment_method, Boolean(saved.card_consent_at)], ["cus_card_later", "pm_card_later", true]);
     assert.equal(statusOf("2026-09-01T09:00:00.000Z"), "recorded", "a lesson already had goes on a card only when a link names it");
     assert.equal(statusOf("2026-10-05T02:00:00.000Z"), "not_required", "only lessons Inês added change");
@@ -6830,6 +6845,148 @@ const lessonCardState = (id) => ({
   bookings: db.prepare("SELECT * FROM bookings WHERE student_id=? ORDER BY starts_at").all(id).map((row) => ({ ...row })),
   series: db.prepare("SELECT * FROM booking_series WHERE student_id=?").all(id).map((row) => ({ ...row })),
   student: { ...db.prepare("SELECT * FROM students WHERE id=?").get(id) }
+});
+
+await test("the first Checkout email becomes the contact and sign-in address from either card setup route", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  for (const route of ["account", "lesson"]) {
+    const id = `checkout-contact-${route}`;
+    const email = `${id}@example.invalid`;
+    try {
+      const [lesson] = await handSetUpStudent(id, "2026-10-14T10:00:00.000Z", null);
+      const signedIn = route === "account" ? new Date().toISOString() : null;
+      db.prepare("UPDATE students SET email=?, email_verified_at=?, last_login_at=?, awaiting_welcome=1 WHERE id=?")
+        .run(`no-email:${id}`, signedIn, signedIn, id);
+      db.prepare("UPDATE bookings SET student_email=? WHERE student_id=?").run(`no-email:${id}`, id);
+      const auth = () => ({ ...db.prepare("SELECT email_verified_at,last_login_at,session_version,password_hash,google_sub FROM students WHERE id=?").get(id) });
+      const beforeAuth = auth();
+      const sessionToken = await createSession(id, env.BOOKING_TOKEN_SECRET);
+      const opened = route === "account"
+        ? await call("/me/card", { token: sessionToken, body: { consent: true } })
+        : await lessonCardStart(await token(lesson.id), "lesson", 2500);
+      assert.equal(opened.status, 200, await opened.clone().text());
+      const event = lessonCardCompleted(id, { customer: `cus_${id}` });
+      event.data.object.customer_details = { email: ` ${email.toUpperCase()} ` };
+      assert.equal((await webhook(event)).status, 200);
+      assert.equal((await webhook(event)).status, 200, "a replay is harmless");
+      assert.equal(db.prepare("SELECT email FROM students WHERE id=?").get(id).email, email);
+      assert.equal(db.prepare("SELECT student_email FROM bookings WHERE id=?").get(lesson.id).student_email, email);
+      assert.deepEqual(auth(), beforeAuth, "Stripe supplies contact details, not proof of mailbox ownership");
+      const listed = (await (await call("/admin/students", { user: "teacher", method: "GET" })).json()).students.find(s => s.id === id);
+      assert.equal(listed.email, email, "Inês can contact them at the collected address");
+      const me = await (await call("/me", { token: sessionToken, method: "GET" })).json();
+      assert.equal(me.student.email, email, "their signed-in account uses the same address");
+      const invitationCount = db.prepare("SELECT COUNT(*) AS n FROM sign_in_links WHERE student_id=?").get(id).n;
+      assert.equal((await call("/auth/email-link", { user: null, body: { email } })).status, 200);
+      await drain();
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM sign_in_links WHERE student_id=?").get(id).n, invitationCount + 1,
+        "the same address can request a sign-in link");
+      const added = await call("/admin/bookings", { user: "teacher", body: { studentId: id, lessonType: "single", startAt: "2026-10-21T10:00:00.000Z" } });
+      assert.equal(added.status, 201, await added.clone().text());
+      assert.deepEqual([...new Set(db.prepare("SELECT student_email FROM bookings WHERE student_id=?").all(id).map(row => row.student_email))], [email]);
+    } finally {
+      await drain();
+      forgetLessonCardLimits();
+      forgetStudent(db.prepare("SELECT email FROM students WHERE id=?").get(id)?.email);
+    }
+  }
+});
+
+await test("a Checkout address already used by another account or an invalid address cannot replace the stand-in", async () => {
+  const id = "checkout-contact-conflict";
+  try {
+    const [lesson] = await handSetUpStudent(id, "2026-10-14T10:00:00.000Z", null);
+    db.prepare("UPDATE students SET email=? WHERE id=?").run(`no-email:${id}`, id);
+    db.prepare("UPDATE bookings SET student_email=? WHERE student_id=?").run(`no-email:${id}`, id);
+    for (const [index, address] of ["alice@example.invalid", "invalid-address"].entries()) {
+      db.prepare("UPDATE bookings SET payment_status='not_required', payment_consent_at=NULL, payment_consent_version=NULL WHERE id=?").run(lesson.id);
+      assert.equal((await lessonCardStart(await token(lesson.id), "lesson", 2500)).status, 200);
+      const event = lessonCardCompleted(`${id}-${index}`, { customer: `cus_${id}` });
+      event.data.object.customer_details = { email: address };
+      assert.equal((await webhook(event)).status, 200, "saving the card still succeeds");
+      assert.equal(db.prepare("SELECT email FROM students WHERE id=?").get(id).email, `no-email:${id}`);
+      assert.equal(db.prepare("SELECT student_email FROM bookings WHERE id=?").get(lesson.id).student_email, `no-email:${id}`);
+      assert.equal(db.prepare("SELECT email FROM students WHERE id='alice'").get().email, "alice@example.invalid");
+    }
+  } finally {
+    forgetLessonCardLimits();
+    forgetStudent(`no-email:${id}`);
+  }
+});
+
+await test("older card setups recover missing contact details without payments, messages, account merges or stale writes", async () => {
+  const id = "checkout-contact-recovery";
+  const address = `${id}@example.invalid`;
+  const customer = `cus_${id}`;
+  const originalClock = clock;
+  student(id);
+  const missing = () => db.prepare("UPDATE students SET email=? WHERE id=?").run(`no-email:${id}`, id);
+  const allowRetry = () => db.prepare("DELETE FROM request_limits WHERE key=?").run(`stripe-contact:${id}`);
+  missing();
+  booking(`${id}-past`, { owner: id, payment: "paid", start: "2026-08-20T10:00:00.000Z", end: "2026-08-20T11:00:00.000Z" });
+  booking(`${id}-future`, { owner: id, start: "2026-10-14T10:00:00.000Z", end: "2026-10-14T11:00:00.000Z" });
+  db.prepare("UPDATE bookings SET student_email=? WHERE student_id=?").run(`no-email:${id}`, id);
+  const contact = { status: "complete", mode: "setup", customer, metadata: { purpose: "student_card", student_id: id }, customer_details: { email: address } };
+  checkoutContactSessions.set(customer, [
+    { ...contact, customer: "cus_someone_else" },
+    { ...contact, metadata: { ...contact.metadata, student_id: "alice" } },
+    { ...contact, metadata: { ...contact.metadata, card_setup_version: "99" } },
+    contact
+  ]);
+  const accountBefore = { ...db.prepare("SELECT * FROM students WHERE id=?").get(id) };
+  const money = () => db.prepare("SELECT id,payment_status,amount_cents,charged_cents,stripe_payment_intent,payment_consent_at,payment_consent_version FROM bookings WHERE student_id=? ORDER BY id").all(id);
+  const moneyBefore = money();
+  const chargeCount = charges.length;
+  const emailsBefore = db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n;
+  try {
+    await syncMissingCheckoutContacts(env);
+    assert.deepEqual({ ...db.prepare("SELECT * FROM students WHERE id=?").get(id) }, { ...accountBefore, email: address });
+    assert.deepEqual(db.prepare("SELECT student_email FROM bookings WHERE student_id=?").all(id).map(row => row.student_email), [address, address]);
+    assert.deepEqual(money(), moneyBefore);
+    assert.equal(charges.length, chargeCount);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n, emailsBefore, "recovery sends nothing");
+    const reads = () => checkoutContactReads.filter(value => value === customer).length;
+    const completedReads = reads();
+    await syncMissingCheckoutContacts(env);
+    assert.equal(reads(), completedReads, "a known contact needs no Stripe lookup");
+
+    missing(); allowRetry();
+    contact.customer_details.email = "alice@example.invalid";
+    await syncMissingCheckoutContacts(env);
+    assert.equal(db.prepare("SELECT email FROM students WHERE id=?").get(id).email, `no-email:${id}`);
+    const conflictReads = reads();
+    await syncMissingCheckoutContacts(env);
+    assert.equal(reads(), conflictReads, "a conflict is not queried every minute");
+
+    contact.customer_details.email = address;
+    allowRetry();
+    duringCheckoutContactRead = () => db.prepare("UPDATE students SET email='chosen-contact@example.invalid' WHERE id=?").run(id);
+    await syncMissingCheckoutContacts(env);
+    assert.equal(db.prepare("SELECT email FROM students WHERE id=?").get(id).email, "chosen-contact@example.invalid", "an address saved during the lookup wins");
+    duringCheckoutContactRead = null;
+
+    missing(); allowRetry();
+    duringCheckoutContactRead = () => db.prepare("UPDATE students SET stripe_customer_id='cus_replaced' WHERE id=?").run(id);
+    await syncMissingCheckoutContacts(env);
+    assert.equal(db.prepare("SELECT email FROM students WHERE id=?").get(id).email, `no-email:${id}`, "an old Stripe customer cannot write a contact");
+    duringCheckoutContactRead = null;
+    db.prepare("UPDATE students SET stripe_customer_id=? WHERE id=?").run(customer, id);
+    allowRetry();
+    checkoutContactUnavailable = true;
+    await syncMissingCheckoutContacts(env);
+    assert.equal(db.prepare("SELECT email FROM students WHERE id=?").get(id).email, `no-email:${id}`);
+    checkoutContactUnavailable = false;
+    clock += 3600000;
+    await syncMissingCheckoutContacts(env);
+    assert.equal(db.prepare("SELECT email FROM students WHERE id=?").get(id).email, address, "a provider outage is retried next hour");
+  } finally {
+    clock = originalClock;
+    checkoutContactUnavailable = false;
+    duringCheckoutContactRead = null;
+    checkoutContactSessions.delete(customer);
+    allowRetry();
+    forgetStudent(db.prepare("SELECT email FROM students WHERE id=?").get(id)?.email);
+  }
 });
 
 await test("a hand-set-up student pays for every week by card from a lesson's link: Stripe's page, then the run goes on the card, charged nothing now", async () => {
