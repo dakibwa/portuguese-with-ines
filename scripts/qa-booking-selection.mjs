@@ -99,8 +99,8 @@ try {
       await page.getByRole("button", { name: time, exact: true }).click();
       await page.locator("#booking-confirmation-stage").waitFor();
     }
-    // The terms are read over the first confirmation only; qa-flow reads them
-    // again at each width, before and after agreeing.
+    // The phone also opens the terms with several lessons selected. qa-flow
+    // covers the dialog on desktop and phone, before and after agreeing.
     async function confirm(count, { readTerms = false } = {}) {
       const button = page.getByRole("button", { name: `Book ${count} lessons & agree to pay`, exact: true });
       await button.waitFor();
@@ -182,7 +182,7 @@ try {
     await checkOverflow();
     await page.locator('.booking-chosen-lessons').scrollIntoViewIfNeeded();
     rejectNext = true;
-    await confirm(3, { readTerms: true });
+    await confirm(3, { readTerms: width === 390 });
     await page.getByRole("alert").filter({ hasText: "Nothing has been booked" }).waitFor({ timeout: 5000 }).catch(async error => {
       console.error(JSON.stringify({ requests, text: await page.locator("body").innerText(), errors }, null, 2));
       await page.screenshot({ path: `${out}/failure-${width}.png` });

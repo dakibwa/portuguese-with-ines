@@ -34,6 +34,13 @@ concurrency:
 # live Worker reads the same values, so the two can never be compared against
 # different ones.
 env:
+  # The site and fixture journeys must build and run using exactly these files.
+  # A new import of excluded server code will fail the next fresh build.
+  SITE_CHECKOUT: |
+    /*
+    !/workers/
+    !/docs/
+    !*.md
   # Booking is served by the ines-booking Worker. The `booking` job below fails
   # the release if it is missing or unhealthy, so a release can never quietly
   # ship a dead calendar.
@@ -53,7 +60,7 @@ env:
 # Now only what truly depends on something else waits for it:
 #
 #   worker ──┬── booking ───────────┐
-#            └── journeys (four) ───┼── publish
+#            └── journeys ──────────┼── publish
 #   build ───────┘                  │
 #   checks ─────────────────────────┘
 #
@@ -155,16 +162,37 @@ jobs:
   # Worker (the pages call it from the browser), so it does not wait for it.
   build:
     runs-on: ubuntu-latest
+    outputs:
+      site_key: ${{ steps.key.outputs.name }}
+      proved: ${{ steps.proved.outputs.cache-hit }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: ${{ env.SITE_CHECKOUT }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
+      - name: Identify the site, fixtures, public settings and runner
+        id: key
+        run: |
+          key=$(node scripts/journey-cache-key.mjs)
+          echo "name=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the exact export that passed every journey
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: proved
+        uses: actions/cache/restore@v4
+        with:
+          path: out
+          key: ${{ steps.key.outputs.name }}
+
       - name: Restore installed dependencies
+        if: steps.proved.outputs.cache-hit != 'true'
         id: modules
         uses: actions/cache@v4
         with:
@@ -172,10 +200,11 @@ jobs:
           key: modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json', 'scripts/harden-braces.mjs') }}
 
       - name: Install dependencies
-        if: steps.modules.outputs.cache-hit != 'true'
+        if: steps.proved.outputs.cache-hit != 'true' && steps.modules.outputs.cache-hit != 'true'
         run: npm ci --no-audit --no-fund
 
       - name: Build the site
+        if: steps.proved.outputs.cache-hit != 'true'
         run: npm run build
 
       # The plain directory the journeys check and the Cloudflare deploy needs.
@@ -230,16 +259,21 @@ jobs:
       # Every share runs to its end, so one release shows everything broken.
       fail-fast: false
       matrix:
-        checks:
-          - qa-teacher-calendar qa-meet-links
-          - qa-flow qa-request-recovery qa-payment-recovery
-          - qa-selection-calendar-recovery qa-transition-kit qa-student-nif
-          # qa-homework waits off these lines while homework is hidden (11
-          # November 2026): see the note at the top of scripts/qa-homework.mjs.
-          - qa-auth-recovery qa-workspace-navigation qa-expression-translations qa-booking-selection qa-profile-rates check-portfolio-banner
+        # qa-flow also talks to the deployed Worker. It runs on every release.
+        # The others use fixed replies and the identical previously tested export.
+        # qa-homework waits here until homework is visible again.
+        checks: >-
+          ${{ fromJSON(needs.build.outputs.proved == 'true' && '["qa-flow"]' ||
+          '["qa-teacher-calendar qa-meet-links",
+            "qa-flow qa-request-recovery qa-payment-recovery",
+            "qa-selection-calendar-recovery qa-transition-kit qa-student-nif",
+            "qa-auth-recovery qa-workspace-navigation qa-expression-translations qa-booking-selection qa-profile-rates check-portfolio-banner"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: ${{ env.SITE_CHECKOUT }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -347,3 +381,10 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy out --project-name=portuguese-with-ines --branch=main
+
+      - name: Keep the released export for identical fixture journeys
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.outputs.proved != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: out
+          key: ${{ needs.build.outputs.site_key }}
