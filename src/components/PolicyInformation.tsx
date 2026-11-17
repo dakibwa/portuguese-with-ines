@@ -1,9 +1,9 @@
-import { CONTACT_WHATSAPP_NUMBER, CONTACT_WHATSAPP_URL, NOTICE_HOURS, SAME_DAY_FEE_LABEL } from "@/lib/config";
+import { CONTACT_WHATSAPP_NUMBER, CONTACT_WHATSAPP_URL, LESSON_CHANGE_DEADLINE, NOTICE_HOURS, SAME_DAY_FEE_LABEL } from "@/lib/config";
 
 export function TermsPrivacyInformation() {
   return (
     <div className="policy-information">
-      <h2 id="booking">Booking</h2>
+      <h2 id="booking" tabIndex={-1}>Booking</h2>
       <p>Book at least {NOTICE_HOURS} hours ahead. Choose your lessons and check the price before confirming.</p>
 
       <h2>Payments</h2>
@@ -13,8 +13,8 @@ export function TermsPrivacyInformation() {
         <li>Each weekly lesson is paid separately. Prepaid bookings follow the rules shown in your calendar.</li>
       </ul>
 
-      <h2 id="change-booking">Changes</h2>
-      <p>Change or cancel in your calendar until the lesson’s scheduled end, even after it has started.</p>
+      <h2 id="change-booking" tabIndex={-1}>Changes</h2>
+      <p>{LESSON_CHANGE_DEADLINE}</p>
       <ul>
         <li><strong>{NOTICE_HOURS} hours or more before:</strong> free.</li>
         <li><strong>Less than {NOTICE_HOURS} hours before, or during the lesson:</strong> {SAME_DAY_FEE_LABEL} once per lesson, charged to your saved card when you confirm the change or cancellation.</li>
@@ -48,7 +48,7 @@ export function TermsPrivacyInformation() {
         bookings, payments, refunds, complaints or privacy requests.
       </p>
 
-      <h2 id="privacy">Privacy</h2>
+      <h2 id="privacy" tabIndex={-1}>Privacy</h2>
       <p>
         Inês is responsible for your personal information. Agreeing to this notice does not give permission
         for marketing or optional data use.

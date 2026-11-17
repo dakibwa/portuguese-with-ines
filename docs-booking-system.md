@@ -2022,10 +2022,10 @@ is always checked for the chosen length.
 ### Payment
 
 The combined notice opens at `/book/#terms-privacy` without requiring sign-in.
-It is a native modal dialog over the current screen, beginning with `How booking
-works`; consumer rights, sole-trader contact details and privacy follow. Sign-up does not
-repeat it. The footer links to `Terms & privacy`; old policy URLs and the
-`#booking`, `#privacy` and `#change-booking` fragments open the same dialog.
+It is a native modal dialog over the current screen, beginning with `Booking`.
+Consumer rights, sole-trader contact details and privacy follow. Sign-up does not
+repeat it. The footer links to `Terms & privacy`. Old policy URLs and the
+`#booking`, `#privacy` and `#change-booking` fragments open it at the named section.
 The visible payment and €5 summary precedes a required `Agree to terms & privacy`
 toggle in postpay mode. It explicitly authorises the existing card charges and
 acknowledges the privacy notice. The final button states both the lesson count
@@ -2035,9 +2035,10 @@ The underlined terms text inside the agreement opens the dialog independently
 of the toggle. The page shows one payment summary, without a separate reading
 link or repeated authorisation sentence. Escape, the close button or clicking
 outside dismisses the dialog and returns focus to its opener. With JavaScript
-disabled, the same terms and privacy text is ordinary document content; the
-footer and old legal links still reach it. Public navigation and all FAQ
-categories also remain usable without JavaScript.
+disabled, the same terms and privacy text is ordinary document content. The
+footer and old legal links still reach it. The booking page explains that the
+calendar needs JavaScript and offers a WhatsApp link to Inês. Public navigation
+and all FAQ categories also remain usable without JavaScript.
 
 Unreadable booking API replies and invalid lesson-type or availability data
 show a booking error and the contact link while keeping the document usable.

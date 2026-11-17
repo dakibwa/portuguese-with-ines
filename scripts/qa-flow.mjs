@@ -373,11 +373,15 @@ if (mobileNavigation.pageTurns === null ? !pageDissolved : !pageTurned) {
   throw new Error(`Route navigation should turn the destination in without delaying the click: ${JSON.stringify(mobileNavigation)}.`);
 }
 
-const reducedMotionPage = await browser.newPage({ viewport: { width: 390, height: 844 }, timezoneId: "Europe/Lisbon" });
+const reducedMotionPage = await browser.newPage({ viewport: { width: 375, height: 667 }, timezoneId: "Europe/Lisbon" });
 await reducedMotionPage.addInitScript(watchPageTurns);
 await reducedMotionPage.emulateMedia({ reducedMotion: "reduce" });
 await reducedMotionPage.goto(`${base}/faq/`, { waitUntil: "domcontentloaded" });
-await reducedMotionPage.locator("h1").waitFor({ timeout: 10_000 });
+await reducedMotionPage.locator('.faq-index[data-ready="true"]').waitFor();
+if (!await reducedMotionPage.locator("h1").evaluate(async heading => {
+  await new Promise(requestAnimationFrame);
+  return heading.getBoundingClientRect().top >= 0;
+})) throw new Error("Opening the FAQ without a section should leave its title and index in view.");
 const reducedRouteMotion = await reducedMotionPage.evaluate(() => {
   const style = getComputedStyle(document.querySelector(".route-fade"));
   return { animationDuration: style.animationDuration, animationName: style.animationName };
@@ -468,7 +472,11 @@ await page.setViewportSize(beforeMenuViewport);
 
 // Public navigation and FAQ answers remain usable before any enhancement.
 const plainPage = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
-await plainPage.goto(`${base}/faq/`, { waitUntil: "domcontentloaded" });
+await plainPage.goto(`${base}/book/`, { waitUntil: "domcontentloaded" });
+if (!await plainPage.locator('main a[href^="https://wa.me/"]').isVisible()) {
+  throw new Error("When the calendar cannot run, a visitor should still be able to contact Inês.");
+}
+await plainPage.getByRole("link", { name: "FAQ", exact: true }).click();
 if (!await plainPage.getByRole("navigation", { name: "Main navigation", exact: true }).isVisible() ||
     !await plainPage.locator(".faq-group").count() ||
     await plainPage.locator(".faq-group[hidden]").count()) {

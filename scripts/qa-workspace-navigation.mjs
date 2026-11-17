@@ -306,6 +306,12 @@ try {
     await page.goto(`${base}/${oldPath}`);
     await page.waitForURL(`**/book/#${section}`);
     await page.locator("#terms-privacy[open]").waitFor();
+    const heading = page.locator(`.policy-dialog__content #${section === "terms-privacy" ? "booking" : section}`);
+    assert.ok(await heading.evaluate(element => {
+      const bounds = element.getBoundingClientRect();
+      const pane = element.closest(".policy-dialog__content").getBoundingClientRect();
+      return bounds.top >= pane.top - 1 && bounds.bottom <= pane.bottom + 1;
+    }), `Opening ${oldPath} should show its section within the notice`);
     if (oldPath.startsWith("book/#")) {
       await page.getByRole("button", { name: "Close terms & privacy", exact: true }).click();
       await page.waitForFunction(() => !window.location.hash);

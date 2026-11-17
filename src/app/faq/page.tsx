@@ -5,7 +5,8 @@ import { AssetMark } from "@/components/BrandMarks";
 import { FaqSections } from "@/components/FaqSections";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
-import { CONTACT_WHATSAPP_URL, NOTICE_HOURS, SAME_DAY_RESCHEDULE_FEE_CENTS, formatMoney } from "@/lib/config";
+import { CONTACT_WHATSAPP_URL, LESSON_CHANGE_DEADLINE, NOTICE_HOURS, SAME_DAY_RESCHEDULE_FEE_CENTS, formatMoney } from "@/lib/config";
+import { HOMEWORK } from "@/lib/tutor";
 
 export const metadata: Metadata = pageMetadata({
   title: "FAQ | Português com a Inês",
@@ -69,8 +70,9 @@ const faqSections = [
       },
       {
         question: "Is there homework?",
-        answer:
-          "Only if you’d like it. Open a sheet from its lesson under Past lessons in Your lessons. Do it online for feedback from me, or print it. It’s fine if you don’t have time."
+        answer: HOMEWORK
+          ? "Only if you’d like it. Open a sheet from its lesson under Past lessons in Your lessons. Do it online for feedback from me, or print it. It’s fine if you don’t have time."
+          : "Only if you’d like it. We can choose something to practise between lessons."
       }
     ]
   },
@@ -182,7 +184,7 @@ const faqSections = [
     questions: [
       {
         question: `What is the ${NOTICE_HOURS}-hour rule?`,
-        answer: `Give at least ${notice}’ notice to book, change or cancel a lesson. For a lesson at 10:00 on Tuesday, that means by 20:00 on Monday. After that, changing or cancelling costs ${lateFee}. If you don’t turn up, you’ll also be charged ${lateFee} instead of the lesson price.`
+        answer: `Book at least ${notice} ahead. Changing or cancelling is free with that much notice. For a lesson at 10:00 on Tuesday, that means by 20:00 on Monday. After that, changing or cancelling costs ${lateFee}.`
       },
       {
         question: "How do I change or cancel a lesson?",
@@ -191,14 +193,14 @@ const faqSections = [
       {
         question: `What if my lesson is less than ${notice} away?`,
         answer: [
-          `If you cancel with less than ${notice}’ notice or don’t show up to your lesson, you’re charged ${lateFee} instead of the lesson price.`,
+          `If you cancel with less than ${notice}’ notice, you’re charged ${lateFee} instead of the lesson price.`,
           `If you change your lesson with less than ${notice}’ notice, you’re charged ${lateFee} when you confirm the change. You pay for the lesson after it takes place.`,
-          `You must change or cancel before the lesson starts. The late change fee applies once per lesson.`
+          `${LESSON_CHANGE_DEADLINE} The late change fee applies once per lesson.`
         ]
       },
       {
         question: "What if I don’t turn up?",
-        answer: `If you miss your lesson without cancelling, you’ll be charged ${lateFee} instead of the lesson price. That’s the same amount as a late change or cancellation. Any earlier late change fee still applies.`
+        answer: `If I record your lesson as a no-show, you’ll be charged ${lateFee} instead of the lesson price. Any earlier late change fee still applies.`
       },
       {
         question: "What if I need to stop for a while?",

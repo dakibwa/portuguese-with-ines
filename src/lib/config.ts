@@ -8,6 +8,7 @@ export const SAME_DAY_RESCHEDULE_FEE_CENTS = Number(
  * `minimum_notice_hours` setting enforces both, so keep the two in step.
  */
 export const NOTICE_HOURS = TUTOR.defaults.noticeHours;
+export const LESSON_CHANGE_DEADLINE = "Change or cancel in your calendar until the lesson’s scheduled end, even after it has started.";
 /** Inês can mark a no-show from the start until this long after the end; the
  * lesson is charged once the window closes. Zero since 2 November 2026 (Dan:
  * "charged at the time of when the lessons ends"). Mirrors the Worker's constant. */
