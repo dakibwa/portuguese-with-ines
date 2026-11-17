@@ -198,7 +198,7 @@ Porto times across the clock changes and how hours and time off are stored.
 it cannot read (a bad lesson, date, weekly run or saved hours) rather than
 showing it or reporting a change as done.
 
-The release then runs thirteen customer journeys against the built export it
+On a fresh build the release runs thirteen customer journeys against the export it
 publishes, at desktop and phone widths, shared between four machines so they
 take about two minutes: `qa-flow`
 (public pages, the booking page against the live Worker, and a student's
@@ -214,6 +214,12 @@ price posted and the card form after booking) and `qa-expression-translations`
 development server at `QA_BASE_URL` (default `http://localhost:3000`); all but
 `qa-flow`'s booking page use isolated API replies. A new check earns its place
 only by protecting a student, Inês or money in a way these don't already.
+
+When the same site and fixture inputs have already passed on main that UTC day,
+the release reuses the exact exported files and reruns the live `qa-flow` journey.
+The booking tests and live Worker health check still run. A change to the site,
+fixtures, dependencies, public settings or runner starts a fresh proof. A manual
+release always builds afresh and runs every journey.
 
 A fourteenth, `qa-homework`, waits off the release while homework is hidden
 (11 November 2026, Dan: "Hide homework for now"; `features.homework` in
@@ -427,9 +433,9 @@ domains serve. There is no GitHub Pages preview any more: it needed the root of
 A release takes about three minutes (11 November 2026, Dan: "I like fast
 relsases"; it had grown to ten). Three things start together: the booking
 Worker's tests and its deploy, the build, and the types, lint and unit tests.
-Once the Worker is live, its health is checked and the customer journeys run
-against the build, shared between four machines. The site publishes only when
-all of it has passed. Each run's summary page lists how long every journey
+Once the Worker is live, its health and the live booking journey are checked.
+Fresh exports also run all the fixture journeys across four machines. The site
+publishes once these checks pass. Each run's summary page lists how long each journey
 took, which is where to look when a release slows down. Installed
 dependencies and the test browser are kept between releases while the
 lockfile is unchanged, because installing afresh took anything from nine
