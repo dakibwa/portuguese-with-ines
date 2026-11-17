@@ -74,7 +74,13 @@ export function BookingFlow({ initialView = "book" }: { initialView?: BookingVie
 
           <section className="booking-provider" aria-label="Your lesson calendar">
             {BOOKING_CONFIGURED ? (
-              <BookingCalendar initialManageToken={manageToken} initialLessonsView={initialView === "lessons"} />
+              <>
+                <noscript>
+                  <p>Turn on JavaScript to use your lesson calendar.</p>
+                  <a className="button button--outline button--compact" href={CONTACT_WHATSAPP_URL}>Message {TUTOR_NAME} on WhatsApp</a>
+                </noscript>
+                <BookingCalendar initialManageToken={manageToken} initialLessonsView={initialView === "lessons"} />
+              </>
             ) : (
               <div className="booking-placeholder" aria-label="Booking setup placeholder">
                 <p className="eyebrow">Not yet available</p>

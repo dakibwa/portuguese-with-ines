@@ -2035,9 +2035,10 @@ The underlined terms text inside the agreement opens the dialog independently
 of the toggle. The page shows one payment summary, without a separate reading
 link or repeated authorisation sentence. Escape, the close button or clicking
 outside dismisses the dialog and returns focus to its opener. With JavaScript
-disabled, the same terms and privacy text is ordinary document content; the
-footer and old legal links still reach it. Public navigation and all FAQ
-categories also remain usable without JavaScript.
+disabled, the same terms and privacy text is ordinary document content. The
+footer and old legal links still reach it. The booking page explains that the
+calendar needs JavaScript and offers a WhatsApp link to Inês. Public navigation
+and all FAQ categories also remain usable without JavaScript.
 
 Unreadable booking API replies and invalid lesson-type or availability data
 show a booking error and the contact link while keeping the document usable.

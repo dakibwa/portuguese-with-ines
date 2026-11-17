@@ -92,10 +92,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <noscript>
           <style>{`
             html:has(.book-page) .policy-information-fallback { display: block; }
-            html .site-footer__contact, html .nav-toggle { display: none; }
+            html .site-footer__contact, html .site-header :is(.nav-toggle, .site-header__sign-in) { display: none; }
             @media (max-width: 820px) {
               html .site-header__inner { flex-wrap: wrap; padding-block: 1rem; }
               html .site-nav { display: flex; flex-basis: 100%; flex-wrap: wrap; justify-content: center; gap: .5rem 1rem; }
+              html .site-footer__nav { display: flex; }
             }
           `}</style>
         </noscript>
