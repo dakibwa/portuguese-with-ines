@@ -39,22 +39,36 @@ export function BookingInformation() {
     const dialog = dialogRef.current;
     if (!dialog) return;
 
-    function openInformation(trigger?: HTMLElement) {
-      if (!dialog || dialog.open) return;
-      returnFocus.current = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
-      releaseScroll.current = lockPageScroll();
-      dialog.showModal();
-      if (contentRef.current) contentRef.current.scrollTop = 0;
+    function openInformation(section: string, trigger?: HTMLElement) {
+      const content = contentRef.current;
+      if (!dialog || !content) return;
+      if (!dialog.open) {
+        returnFocus.current = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+        releaseScroll.current = lockPageScroll();
+        dialog.showModal();
+      }
+
+      const heading = content.querySelector<HTMLElement>(`#${section}`);
+      if (heading) {
+        // Move only the notice's reading pane, leaving the page behind it in place.
+        const inset = parseFloat(getComputedStyle(content).paddingTop);
+        content.scrollTop += heading.getBoundingClientRect().top - content.getBoundingClientRect().top - inset;
+        heading.focus({ preventScroll: true });
+      } else {
+        content.scrollTop = 0;
+        dialog.querySelector("button")?.focus({ preventScroll: true });
+      }
     }
 
     function revealLinkedInformation(event?: HashChangeEvent) {
       const url = new URL(event?.newURL ?? window.location.href);
-      if (policySections.includes(url.hash.slice(1))) {
+      const section = url.hash.slice(1);
+      if (policySections.includes(section)) {
         // Keep the client router in sync with native fragment navigation. A
         // pending history update from closing the previous notice must not
         // overwrite the new shared link before its hashchange is handled.
         if (event) window.history.replaceState(null, "", url);
-        openInformation();
+        openInformation(section);
       } else if (dialog?.open) dialog.close();
     }
 
@@ -65,7 +79,7 @@ export function BookingInformation() {
       event.preventDefault();
       // Reading the terms never navigates away, changes consent, or discards a
       // booking selection (or a private invitation fragment on another page).
-      openInformation(link);
+      openInformation("terms-privacy", link);
     }
 
     revealLinkedInformation();

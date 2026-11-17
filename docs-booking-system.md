@@ -2022,10 +2022,10 @@ is always checked for the chosen length.
 ### Payment
 
 The combined notice opens at `/book/#terms-privacy` without requiring sign-in.
-It is a native modal dialog over the current screen, beginning with `How booking
-works`; consumer rights, sole-trader contact details and privacy follow. Sign-up does not
-repeat it. The footer links to `Terms & privacy`; old policy URLs and the
-`#booking`, `#privacy` and `#change-booking` fragments open the same dialog.
+It is a native modal dialog over the current screen, beginning with `Booking`.
+Consumer rights, sole-trader contact details and privacy follow. Sign-up does not
+repeat it. The footer links to `Terms & privacy`. Old policy URLs and the
+`#booking`, `#privacy` and `#change-booking` fragments open it at the named section.
 The visible payment and €5 summary precedes a required `Agree to terms & privacy`
 toggle in postpay mode. It explicitly authorises the existing card charges and
 acknowledges the privacy notice. The final button states both the lesson count
