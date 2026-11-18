@@ -780,7 +780,8 @@ export type DayCell = { key: string; day: number; month: number; isToday: boolea
 export type BookingWeek = { key: string; cells: DayCell[] };
 
 /**
- * The bookable window as whole Monday-first weeks.
+ * The bookable window as whole Monday-first weeks. An earlier lesson can
+ * extend the first week shown without moving today or the end of the window.
  *
  * Deliberately not a calendar month. Late in a month a month grid is mostly
  * dates already gone — on the 28th, four fifths of the grid — and it hides the
@@ -788,21 +789,19 @@ export type BookingWeek = { key: string; cells: DayCell[] };
  * week is labelled with the month it starts in, and a month that begins
  * part-way through a week marks its 1st.
  */
-export function buildBookingWeeks(fromKey: string, horizonDays: number): BookingWeek[] {
-  const [year, month, day] = fromKey.split("-").map(Number);
-  const from = Date.UTC(year, month - 1, day);
-  const leading = (new Date(from).getUTCDay() + 6) % 7; // Monday = 0
-  const gridStart = from - leading * 86400000;
-  const weekCount = Math.ceil((leading + Math.max(horizonDays, 7) + 1) / 7);
+export function buildBookingWeeks(fromKey: string, horizonDays: number, earliestKey = fromKey): BookingWeek[] {
+  const firstWeek = weekKeyOf(earliestKey < fromKey ? earliestKey : fromKey);
+  const gridStart = Date.parse(`${firstWeek}T00:00:00Z`);
+  const end = Date.parse(`${fromKey}T00:00:00Z`) + Math.max(horizonDays, 7) * 86400000;
 
   // These are calendar date keys, not instants in the visitor's time zone. A
   // behind-UTC browser would otherwise render midnight UTC as the previous
   // month (for example 1 October as 30 September).
   const weeks: BookingWeek[] = [];
 
-  for (let week = 0; week < weekCount; week += 1) {
+  for (let start = gridStart; start <= end; start += 7 * 86400000) {
     const cells: DayCell[] = Array.from({ length: 7 }, (_, index) => {
-      const date = new Date(gridStart + (week * 7 + index) * 86400000);
+      const date = new Date(start + index * 86400000);
       const key = date.toISOString().slice(0, 10);
       return { key, day: date.getUTCDate(), month: date.getUTCMonth() + 1, isToday: key === fromKey };
     });

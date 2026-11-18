@@ -1915,10 +1915,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // Your lessons pages the same way, from this week through the horizon or to
   // the last booked lesson if that is later (an ongoing run is kept twelve
   // weeks ahead), so every lesson can be reached from the calendar.
-  const lastLessonKey = calendarBookings.map(lessonDateKey).sort().at(-1) ?? "";
+  // A lesson can still be ahead in Porto after the student's week has turned,
+  // or be happening now across midnight. Keep its own date reachable.
+  const bookedDates = Object.keys(allBookingsByDate).sort();
+  const lastLessonKey = bookedDates.at(-1) ?? "";
+  const lastHorizonWeek = allCalendarWeeks[horizonWeekCount - 1]?.key ?? "";
   const lessonsRangeWeeks = viewTodayKey
-    ? buildBookingWeeks(viewTodayKey, Math.max(horizonDays, lastLessonKey ? daysBetween(viewTodayKey, lastLessonKey) : 0))
-        .filter((week, index) => index < horizonWeekCount || week.cells[0].key <= lastLessonKey)
+    ? buildBookingWeeks(viewTodayKey, Math.max(horizonDays, lastLessonKey ? daysBetween(viewTodayKey, lastLessonKey) : 0), bookedDates[0])
+        .filter(week => week.key <= lastHorizonWeek || week.key <= lastLessonKey)
     : [];
   const rangeWeeks = isLessonsCalendarOverview ? lessonsRangeWeeks : bookingRangeWeeks;
   const calendarPages: BookingWeek[][] = [];

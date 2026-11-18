@@ -530,15 +530,15 @@ export function shortDateLabel(date: string) {
 export type TimeAheadRow = { dates: string[]; label: string; detail: string };
 
 /**
- * What she has set from `from` on (2 November 2026): days off, hours off,
+ * What she has set from `from` through `until` (or onwards): days off, hours off,
  * extra hours and online-only stretches. Consecutive whole days off read as
  * one stretch, as does each online-only period; a day off lists no extra
  * hours, since it has none to give. Rows are in date order.
  */
-export function timeAhead(exceptions: AvailabilityException[], onlineOnly: OnlineOnlyPeriod[], from: string, interval: number): TimeAheadRow[] {
+export function timeAhead(exceptions: AvailabilityException[], onlineOnly: OnlineOnlyPeriod[], from: string, interval: number, until?: string): TimeAheadRow[] {
   const off = daysOff(exceptions);
   const ahead = (kind: AvailabilityException["kind"]) => [...new Set(exceptions
-    .filter((exception) => exception.kind === kind && exception.weekday == null && exception.date && exception.date >= from)
+    .filter((exception) => exception.kind === kind && exception.weekday == null && exception.date && exception.date >= from && (!until || exception.date <= until))
     .map((exception) => exception.date as string))].sort();
   const blocked = ahead("blocked");
   const rows: { dates: string[]; hours: boolean; note: string }[] = [];
@@ -562,11 +562,14 @@ export function timeAhead(exceptions: AvailabilityException[], onlineOnly: Onlin
       label: shortDateLabel(date),
       detail: `Extra ${dateExtras(exceptions, date, interval).map(spanLabel).join(", ")}`,
     })),
-    ...onlineOnly.filter((period) => period.toDate >= from).map((period) => {
+    ...onlineOnly.flatMap((period) => {
+      const first = period.fromDate < from ? from : period.fromDate;
+      const last = until && until < period.toDate ? until : period.toDate;
+      if (first > last) return [];
       const dates: string[] = [];
-      for (let date = period.fromDate < from ? from : period.fromDate; date <= period.toDate; date = shiftDate(date, 1)) dates.push(date);
+      for (let date = first; date <= last; date = shiftDate(date, 1)) dates.push(date);
       const hours = onlineOnlyLabel([{ start: period.startMinute, end: period.endMinute }]);
-      return { dates, label: stretch(dates), detail: `${dates.length > 1 ? `${dates.length} days online only` : "Online only"}${hours === "All day" ? "" : `, ${hours}`}` };
+      return [{ dates, label: stretch(dates), detail: `${dates.length > 1 ? `${dates.length} days online only` : "Online only"}${hours === "All day" ? "" : `, ${hours}`}` }];
     }),
   ].sort((a, b) => a.dates[0].localeCompare(b.dates[0]));
 }
@@ -637,20 +640,19 @@ export type BookingSegment = {
   end: number;
 };
 
+/** Split a lesson at Porto midnight, optionally clipping it to the displayed week. */
 export function bookingSegments(
   bookings: AdminBooking[],
-  weekStart: string,
+  weekStart?: string,
 ): BookingSegment[] {
-  const endOfWeek = shiftDate(weekStart, 6);
+  const endOfWeek = weekStart && shiftDate(weekStart, 6);
   return bookings.flatMap((booking) => {
     const startDay = dateKey(new Date(booking.starts_at));
     const endDay = dateKey(new Date(booking.ends_at));
     const result: BookingSegment[] = [];
-    for (
-      let day = startDay < weekStart ? weekStart : startDay;
-      day <= endDay && day <= endOfWeek;
-      day = shiftDate(day, 1)
-    ) {
+    const first = weekStart && weekStart > startDay ? weekStart : startDay;
+    const last = endOfWeek && endOfWeek < endDay ? endOfWeek : endDay;
+    for (let day = first; day <= last; day = shiftDate(day, 1)) {
       const start = day === startDay ? localMinute(booking.starts_at) : 0;
       const end = day === endDay ? localMinute(booking.ends_at) : 1440;
       // A lesson crossing the repeated autumn hour must remain visible.
@@ -693,7 +695,7 @@ export function timeOffClashes(
   const clashes: TimeOffClash[] = [];
   for (const booking of bookings) {
     if (booking.status !== "confirmed" || Date.parse(booking.starts_at) <= now.getTime()) continue;
-    const segments = bookingSegments([booking], mondayOf(dateKey(new Date(booking.starts_at))));
+    const segments = bookingSegments([booking]);
     const reason = segments.some(({ date }) => off.has(date)) ? "day off"
       : segments.some(({ date, start, end }) => overlapsSpan(dateBlocks(exceptions, date), start, end)) ? "hours off"
       : booking.location !== "online" && segments.some(({ date, start, end }) => overlapsSpan(onlineOnlyHours(onlineOnly, date), start, end)) ? "online only"

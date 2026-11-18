@@ -184,11 +184,15 @@ export function WeeklyTimetable({
   const { start, end } = timetableBounds({
     windows: allWindows,
     lessons: segments,
-    blocks: editing ? [] : shown.flatMap(index => [
-      ...dateBlocks(exceptions, shiftDate(weekStart, index)),
-      ...weeklyBlocks(exceptions, WEEKDAYS[index].value),
-      ...dateExtras(exceptions, shiftDate(weekStart, index), interval),
-    ]),
+    blocks: editing ? [] : shown.flatMap(index => {
+      const date = shiftDate(weekStart, index);
+      return [
+        ...dateBlocks(exceptions, date),
+        ...weeklyBlocks(exceptions, WEEKDAYS[index].value),
+        ...dateExtras(exceptions, date, interval),
+        ...onlineOnlyHours(onlineOnly, date),
+      ];
+    }),
     step,
     editing,
   });
