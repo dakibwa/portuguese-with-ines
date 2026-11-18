@@ -385,6 +385,12 @@ try {
   assert.equal(await shownClock(), "Los Angeles time");
   await abroadPage.setViewportSize({ width: 390, height: 844 });
   await abroadPage.locator(".lesson-overview__next").waitFor({ state: "visible" });
+  // After local midnight a Sunday lesson is still on the calendar until it ends.
+  abroadLessons.push(abroadLesson("OVERNIGHT", "online", "2026-09-07T06:45:00Z"));
+  await abroadPage.clock.setFixedTime(new Date("2026-09-07T07:10:00Z"));
+  await abroadPage.reload();
+  await day("2026-09-06").and(abroadPage.locator(".is-next")).waitFor();
+  assert.match(await day("2026-09-07").getAttribute("class"), /\bis-today\b/);
   await abroad.close();
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ ok: true, layouts }, null, 2));

@@ -655,6 +655,7 @@ test("clashes: a lesson to come on a day off, in hours off, or in person in onli
     { ...blocked, id: 2, date: "2026-09-22", start_minute: 600, end_minute: 690 },
     // Weekly lunch is her hours, not time off.
     { ...blocked, id: 3, date: null, weekday: 3, start_minute: 780, end_minute: 840 },
+    { ...blocked, id: 4, date: "2026-09-28", start_minute: 0, end_minute: 45 },
   ];
   const onlineOnly = [{ id: "away", fromDate: "2026-09-23", toDate: "2026-09-24", startMinute: 720, endMinute: 960 }];
   const bookings = [
@@ -665,12 +666,14 @@ test("clashes: a lesson to come on a day off, in hours off, or in person in onli
     at("online-in-online-hours", 23, 13),
     at("in-porto-outside-hours", 24, 9, "porto"),
     at("weekly-lunch", 23, 12),
+    { ...at("into-monday", 27, 22), starts_at: "2026-09-27T22:30:00Z", ends_at: "2026-09-27T23:30:00Z" },
+    at("ends-at-midnight", 27, 22),
     { ...at("cancelled", 21, 9), status: "cancelled" },
     at("already-had", 21, 8),
   ];
   assert.deepEqual(
     timeOffClashes(bookings, exceptions, onlineOnly, new Date("2026-09-21T09:30:00Z")).map(({ booking, reason }) => [booking.id, reason]),
-    [["on-day-off", "day off"], ["in-hours-off", "hours off"], ["in-porto-online-hours", "online only"]],
+    [["on-day-off", "day off"], ["in-hours-off", "hours off"], ["in-porto-online-hours", "online only"], ["into-monday", "hours off"]],
   );
 });
 
@@ -757,6 +760,16 @@ test("hours chosen on the Timetable: time off is never online only or extra hour
     [1, "Tue 8 Sept", "Off 14:00–15:00"],
     [1, "Thu 10 Sept", "Extra 15:00–17:00, 20:00–20:30"],
     [2, "Mon 28 Sept – Tue 29 Sept", "2 days off"],
+  ]);
+  // While viewing a later week, the stretches before it end on Sunday.
+  const trip = { id: "trip", fromDate: "2026-09-11", toDate: "2026-09-23", startMinute: 0, endMinute: 1440 };
+  const leave = ["2026-09-12", "2026-09-13", "2026-09-14"].map((date, id) => ({ ...blocked, id, date }));
+  const beforeWeek = (exceptions, periods) => timeAhead(exceptions, periods, "2026-09-07", 30, "2026-09-13").map(row => [row.label, row.detail]);
+  assert.deepEqual(beforeWeek([], [trip]), [
+    ["Fri 11 Sept – Sun 13 Sept", "3 days online only"],
+  ]);
+  assert.deepEqual(beforeWeek(leave, []), [
+    ["Sat 12 Sept – Sun 13 Sept", "2 days off"],
   ]);
 });
 

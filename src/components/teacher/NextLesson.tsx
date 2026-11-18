@@ -37,7 +37,7 @@ export function NextLesson({
       : day === shiftDate(today, 1)
         ? "Tomorrow"
         : dateLabel(day, { weekday: "long", day: "numeric", month: "long" });
-  const laterToday = day === today ? ahead.slice(1).filter((booking) => dateKey(new Date(booking.starts_at)) === today).length : 0;
+  const laterToday = day <= today ? ahead.slice(1).filter((booking) => dateKey(new Date(booking.starts_at)) === today).length : 0;
   const meet = meetingHref({ meetingUrl: next.meeting_url, location: next.location, status: next.status });
   const porto = next.location === "porto";
 

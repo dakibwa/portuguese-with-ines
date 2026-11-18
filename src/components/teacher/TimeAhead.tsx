@@ -28,9 +28,13 @@ export function TimeAhead({ bookings, exceptions, onlineOnly, interval, now, tod
   onGoTo: (date: string) => void;
 }) {
   const clashes = useMemo(() => timeOffClashes(bookings, exceptions, onlineOnly, now), [bookings, exceptions, onlineOnly, now]);
-  const weekEnd = shiftDate(weekStart, 6);
-  const ahead = useMemo(() => timeAhead(exceptions, onlineOnly, today, interval)
-    .filter(row => row.dates[0] > weekEnd || row.dates.at(-1)! < weekStart), [exceptions, onlineOnly, today, interval, weekStart, weekEnd]);
+  const ahead = useMemo(() => {
+    const nextWeek = shiftDate(weekStart, 7);
+    const before = today < weekStart
+      ? timeAhead(exceptions, onlineOnly, today, interval, shiftDate(weekStart, -1))
+      : [];
+    return [...before, ...timeAhead(exceptions, onlineOnly, nextWeek > today ? nextWeek : today, interval)];
+  }, [exceptions, onlineOnly, today, interval, weekStart]);
   if (!clashes.length && !ahead.length) return null;
   return (
     <div className="teacher-ahead">

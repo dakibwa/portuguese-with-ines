@@ -573,27 +573,27 @@ try {
     await online.click();
     await expect(note).toHaveText("Wed 9 Sept can be booked in Porto again.");
     await expect.poll(() => state.onlineOnlyPeriods).toEqual([]);
-    // Some hours, set exactly at the time she pressed.
+    // A label saved outside her usual timetable stays visible and can be reopened.
     await slot(page, 3, 630).click();
     const choice = choiceAt(page);
     await expect(choice.getByRole("button")).toHaveText(["Add a lesson here", "Time off", "Online only"]);
-    await choice.getByLabel("From", { exact: true }).fill("10:15");
-    await choice.getByLabel("Until", { exact: true }).fill("11:40");
+    await choice.getByLabel("From", { exact: true }).fill("20:15");
+    await choice.getByLabel("Until", { exact: true }).fill("21:40");
     assert.deepEqual(state.onlineOnlyPeriods, [], "Setting the times alone saves nothing");
     await choice.getByRole("button", { name: "Online only", exact: true }).click();
-    await expect(note).toHaveText("10:15–11:40 on Wed 9 Sept is online only.");
+    await expect(note).toHaveText("20:15–21:40 on Wed 9 Sept is online only.");
     await expect(slot(page, 3, 630)).toBeFocused();
-    await expect.poll(() => state.onlineOnlyPeriods.map(({ startMinute, endMinute }) => [startMinute, endMinute])).toEqual([[615, 700]]);
-    await expect(page.locator(".teacher-block-label", { hasText: "Online only 10:15–11:40" })).toBeVisible();
+    await expect.poll(() => state.onlineOnlyPeriods.map(({ startMinute, endMinute }) => [startMinute, endMinute])).toEqual([[1215, 1300]]);
+    await expect(page.locator(".teacher-block-label", { hasText: "Online only 20:15–21:40" })).toBeVisible();
     // Pressed again it opens as the block it is, and can become time off instead.
-    await slot(page, 3, 660).click();
+    await slot(page, 3, 1230).click();
     await expect(choice.getByRole("button", { name: "Online only", exact: true })).toHaveAttribute("aria-pressed", "true");
-    await expect(choice.getByLabel("Until", { exact: true })).toHaveValue("11:40");
+    await expect(choice.getByLabel("Until", { exact: true })).toHaveValue("21:40");
     await choice.getByRole("button", { name: "Time off", exact: true }).click();
-    await expect(note).toHaveText("10:15–11:40 on Wed 9 Sept is off.");
+    await expect(note).toHaveText("20:15–21:40 on Wed 9 Sept is off.");
     await expect.poll(() => state.onlineOnlyPeriods).toEqual([]);
-    await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-09", blocks: [{ startMinute: 615, endMinute: 700 }] });
-    await slot(page, 3, 660).click();
+    await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-09", blocks: [{ startMinute: 1215, endMinute: 1300 }] });
+    await slot(page, 3, 1230).click();
     await choice.getByRole("button", { name: "Open again", exact: true }).click();
     await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-09", blocks: [] });
     // Extra hours on a date outside her weekly hours (Tuesdays have none):
