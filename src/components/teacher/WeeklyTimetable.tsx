@@ -737,6 +737,7 @@ export function WeeklyTimetable({
         <div
           className="teacher-timetable-scroll"
           ref={scrollRef}
+          role="region"
           aria-label={
             editing
               ? "Weekly hours"

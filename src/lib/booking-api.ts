@@ -1,4 +1,4 @@
-import { HOME_CLOCK } from "@/lib/tutor";
+import { HOME_CLOCK, TUTOR } from "@/lib/tutor";
 import { forgetSession, readSession } from "@/lib/auth-api";
 import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, formatMoney } from "@/lib/config";
 import { BOOKING_REPLY_ERROR, isApiAmount, isApiInstant, isApiLesson, isApiRecord as isRecord } from "@/lib/api-response";
@@ -358,6 +358,16 @@ export function createBooking(
     if ([data.checkoutClientSecret, data.checkoutUrl, data.manageUrl, data.manageToken].some((value) => value !== undefined && (typeof value !== "string" || !value)) ||
       (data.series !== undefined && (!validSelectionDates(data.series) || typeof data.series.id !== "string" || typeof data.series.openEnded !== "boolean")) ||
       (data.selection !== undefined && (!validSelectionDates(data.selection) || typeof data.selection.recurring !== "boolean" || !Number.isInteger(data.selection.weeklyTimes) || data.selection.weeklyTimes < 0))) unreadableReply();
+    // Older Workers supplied only a management link. Use its token in this
+    // workspace, so a booking reply never supplies a navigation destination.
+    if (!data.manageToken && data.manageUrl) {
+      try {
+        const link = new URL(data.manageUrl, TUTOR.site.url);
+        if (link.origin === new URL(TUTOR.site.url).origin || (typeof window !== "undefined" && link.origin === window.location.origin)) {
+          data.manageToken = link.searchParams.get("manage") || link.searchParams.get("token") || undefined;
+        }
+      } catch { /* The lesson is booked and can still be opened under Your lessons. */ }
+    }
     return data;
   });
 }

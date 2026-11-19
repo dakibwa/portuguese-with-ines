@@ -1,10 +1,8 @@
-import { createServer } from "node:http";
-import { existsSync, readFileSync } from "node:fs";
-import { extname, join } from "node:path";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 
-const outDir = fileURLToPath(new URL("../out", import.meta.url));
 const failures = [];
 
 const check = (condition, message) => {
@@ -12,45 +10,19 @@ const check = (condition, message) => {
   if (!condition) failures.push(message);
 };
 
-const mime = {
-  ".css": "text/css",
-  ".html": "text/html",
-  ".js": "text/javascript",
-  ".json": "application/json",
-  ".png": "image/png",
-  ".svg": "image/svg+xml",
-  ".webp": "image/webp",
-  ".woff2": "font/woff2"
-};
-
-const server = createServer((request, response) => {
-  const pathname = decodeURIComponent(new URL(request.url, "http://local").pathname);
-  const candidates = [
-    join(outDir, pathname),
-    join(outDir, pathname, "index.html"),
-    join(outDir, `${pathname.replace(/\/$/, "")}.html`)
-  ];
-
-  for (const file of candidates) {
-    if (!existsSync(file) || file.endsWith("/") || file.endsWith("out")) continue;
-    try {
-      response.writeHead(200, {
-        "cache-control": "no-store",
-        "content-type": mime[extname(file)] ?? "application/octet-stream"
-      });
-      response.end(readFileSync(file));
-      return;
-    } catch {
-      /* A directory candidate is not a file; try the next static-export form. */
-    }
-  }
-
-  response.writeHead(404);
-  response.end("not found");
-});
-
-await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-const origin = `http://127.0.0.1:${server.address().port}`;
+// The release already serves the export. A standalone run starts the same
+// server on a free port and reads its address once the listener is ready.
+let origin = process.env.QA_BASE_URL;
+let server;
+if (!origin) {
+  server = spawn("python3", [fileURLToPath(new URL("./serve-qa.py", import.meta.url)), "0"], { stdio: ["ignore", "pipe", "ignore"] });
+  process.on("exit", () => server.kill());
+  const [address] = await Promise.race([
+    once(server.stdout, "data"),
+    once(server, "exit").then(() => { throw new Error("QA server failed to start. Build the site first."); })
+  ]);
+  origin = address.toString().trim();
+}
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
@@ -179,7 +151,7 @@ try {
   }
 } finally {
   await browser.close();
-  server.close();
+  server?.kill();
 }
 
 if (failures.length) {

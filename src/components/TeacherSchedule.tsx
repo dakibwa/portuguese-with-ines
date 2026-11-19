@@ -18,8 +18,7 @@ import { TimeAhead } from "@/components/teacher/TimeAhead";
 import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
 import { TeacherTabs, type TeacherTab } from "@/components/teacher/TeacherTabs";
 import { ScheduleLoading, WeekLoading } from "@/components/teacher/ScheduleLoading";
-import { ReceiptsTab } from "@/components/teacher/ReceiptsTab";
-import { ExpressionsTab } from "@/components/teacher/ExpressionsTab";
+import { deferred } from "@/lib/deferred";
 import {
   AdminApiError,
   dismissNeedsYou,
@@ -70,6 +69,11 @@ import {
   type WeekHours,
   shortDateLabel,
 } from "@/lib/teacher-calendar";
+
+// The timetable opens first. Fetch the receipts and expression editor only
+// when their tabs open, including the expression painter and translations.
+const { Component: ReceiptsTab } = deferred(() => import("@/components/teacher/ReceiptsTab").then((module) => module.ReceiptsTab), { waiting: "Loading…" });
+const { Component: ExpressionsTab } = deferred(() => import("@/components/teacher/ExpressionsTab").then((module) => module.ExpressionsTab), { waiting: "Loading…" });
 
 const emptyWeek = hoursFromRules([]);
 

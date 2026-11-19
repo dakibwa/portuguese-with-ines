@@ -42,10 +42,22 @@ function contrastRatio(foreground, background) {
   return (values[0] + 0.05) / (values[1] + 0.05);
 }
 
-page.on("pageerror", (error) => logs.push(`pageerror:${error.message}`));
-page.on("console", (message) => {
-  if (message.type() === "error") logs.push(`console:${message.text()}`);
-});
+function recordErrors(target) {
+  target.on("pageerror", error => logs.push(`pageerror:${error.message}`));
+  target.on("console", message => {
+    if (message.type() !== "error") return;
+    const location = message.location().url;
+    if (message.text().includes("Failed to load resource") && location) {
+      const url = new URL(location, base);
+      if (url.origin === new URL(base).origin || url.origin === process.env.NEXT_PUBLIC_BOOKING_API_BASE_URL) {
+        logs.push(`Site resource unavailable: ${url.pathname}`);
+        return;
+      }
+    }
+    logs.push(`console:${message.text()}`);
+  });
+}
+recordErrors(page);
 
 // A visitor's first booking, from a clean browser cache: the lesson already
 // chosen, and the chosen lesson's summary readable at both widths.
@@ -292,10 +304,7 @@ for (const route of routes) {
 // account itself belongs inside that workspace, not as a second navigation
 // destination that changes label after hydration.
 const signedInPage = await browser.newPage({ viewport: { width: 1440, height: 1000 }, timezoneId: "Europe/Lisbon" });
-signedInPage.on("pageerror", (error) => logs.push(`pageerror:${error.message}`));
-signedInPage.on("console", (message) => {
-  if (message.type() === "error") logs.push(`console:${message.text()}`);
-});
+recordErrors(signedInPage);
 await signedInPage.addInitScript(() => {
   window.localStorage.setItem("ines-student-session", "qa-session");
 });
@@ -625,10 +634,7 @@ const qaExtraSeriesBookings = Array.from({ length: 8 }, (_, index) => {
 });
 let previewHasClash = false;
 const accountPage = await browser.newPage({ viewport: { width: 1440, height: 1000 }, timezoneId: "Europe/Lisbon" });
-accountPage.on("pageerror", (error) => logs.push(`pageerror:${error.message}`));
-accountPage.on("console", (message) => {
-  if (message.type() === "error") logs.push(`console:${message.text()}`);
-});
+recordErrors(accountPage);
 await accountPage.addInitScript(() => {
   window.localStorage.setItem("ines-student-session", "qa-session");
 });
@@ -2291,6 +2297,7 @@ const expression = {
   createdAt: "2026-10-13T00:00:00.000Z", updatedAt: "2026-10-13T00:00:00.000Z",
 };
 let expressionPicked = false;
+await accountPage.route(`**/expressions/${expression.id}/translations`, route => route.fulfill({ json: { translations: [] } }));
 await accountPage.route("**/me/expressions", route => route.fulfill({ json: {
   expression: expressionPicked ? expression : null, canPick: !expressionPicked, hasPublished: true, shuffleLabels: expressionPicked ? [] : [expression.expression],
 } }));

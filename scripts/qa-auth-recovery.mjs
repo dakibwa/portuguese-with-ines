@@ -243,6 +243,7 @@ try {
         await expect(state.page.locator("#lesson-calendar")).toHaveCount(0);
         assert.deepEqual(state.requests, []);
         assert.deepEqual(state.errors, []);
+        await expect(state.page.locator("h1")).toHaveAccessibleName("Your Lessons");
         expiredSessionChecks += 1;
       } finally { await state.context.close(); }
     }
@@ -341,7 +342,9 @@ try {
         await state.page.goto(`${base}/book/?view=lessons`);
         const panel = state.page.locator(".auth-panel");
         await expect(panel).toBeVisible();
-        if (await panel.locator(".google-signin").count()) {
+        // The failed SDK removes its own button. The earlier successful fixture
+        // exchanges already established whether this build enables Google.
+        if (googleChecks > 0) {
           googleChecks += 1;
           await expect.poll(() => scripts).toBe(1);
           await state.page.waitForLoadState("networkidle");
@@ -451,7 +454,6 @@ try {
       } finally { await state.context.close(); }
     }
   }
-  console.log(process.env.QA_AUTH_STORAGE_ONLY === "1"
-    ? `Authentication storage recovery passed in ${engine} at 320/390/1280px: ${storageChecks}/15 configured storage cases and ${expiredSessionChecks}/6 expired-session destinations, including password/Google sign-in, completed registration/reset/email change and valid recovery.`
-    : `Authentication recovery passed in ${engine} at 320/390/1280px: stale success/failure after switching forms, Google exchanges and SDK retry (${googleChecks}/15 configured cases), storage refusals and recovery (${storageChecks}/15 configured cases), expired-session destinations (${expiredSessionChecks}/6), reset notices, missing/expired links, mismatch prevention, retry and interrupted resets.`);
+  const scope = process.env.QA_AUTH_STORAGE_ONLY === "1" ? "Authentication storage recovery" : "Authentication recovery";
+  console.log(`${scope} passed in ${engine}. Exercised ${storageChecks} storage cases, ${expiredSessionChecks} expired-session destinations and ${googleChecks} Google checks.`);
 } finally { await browser.close(); }

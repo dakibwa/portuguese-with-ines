@@ -220,6 +220,7 @@ the release reuses the exact exported files and reruns the live `qa-flow` journe
 The booking tests and live Worker health check still run. A change to the site,
 fixtures, dependencies, public settings or runner starts a fresh proof. A manual
 release always builds afresh and runs every journey.
+Run `python3 scripts/serve-qa.py` after a build to serve the export locally on port 3000 with the same settings as CI.
 
 A fourteenth, `qa-homework`, waits off the release while homework is hidden
 (11 November 2026, Dan: "Hide homework for now"; `features.homework` in

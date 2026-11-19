@@ -179,8 +179,11 @@ export function subscribeToSession(onChange: (event: Event) => void) {
 
 /** A refusal from the account endpoints, keeping its status so a form can offer the next step. */
 export class AuthApiError extends Error {
-  constructor(message: string, readonly status: number) {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
     super(message);
+    this.status = status;
     this.name = "AuthApiError";
   }
 }
