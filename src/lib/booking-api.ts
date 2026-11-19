@@ -1,6 +1,7 @@
 import { HOME_CLOCK, TUTOR } from "@/lib/tutor";
 import { forgetSession, readSession } from "@/lib/auth-api";
-import { BOOKING_READ_TIMEOUT_MS, BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, MAX_BOOKING_HORIZON_DAYS, formatMoney } from "@/lib/config";
+import { withBookingReadDeadline, type PrimedRead } from "@/lib/booking-read";
+import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, MAX_BOOKING_HORIZON_DAYS, formatMoney } from "@/lib/config";
 import { BOOKING_REPLY_ERROR, isApiAmount, isApiInstant, isApiLesson, isApiRecord as isRecord } from "@/lib/api-response";
 import { wallTimeToUtc } from "@/lib/wall-time";
 
@@ -144,8 +145,6 @@ async function request<T>(path: string, init?: RequestInit, primed?: Promise<Res
   return data as T;
 }
 
-type PrimedRead = { url: string; response: Promise<Response>; signal: AbortSignal };
-
 declare global {
   interface Window {
     /** Set by the inline script on /book, before React exists. */
@@ -179,20 +178,17 @@ export function listLessonTypes() {
 // The deadline belongs to the shared read, independently of any calendar that
 // stops listening. Keep it active until the body finishes downloading too.
 async function readCalendarData<T>(path: string, session: string, early: PrimedRead | null | undefined, timeoutMessage: string) {
-  const controller = early ? null : new AbortController();
-  const timer = controller ? setTimeout(() => controller.abort(), BOOKING_READ_TIMEOUT_MS) : undefined;
-  const signal = early?.signal ?? controller?.signal;
-  try {
-    return await request<T>(path, {
-      signal,
-      headers: session ? { Authorization: `Bearer ${session}` } : undefined
-    }, early?.response);
-  } catch (error) {
-    if (signal?.aborted) throw new BookingApiError(timeoutMessage, 0);
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
+  return withBookingReadDeadline(early, async (signal) => {
+    try {
+      return await request<T>(path, {
+        signal,
+        headers: session ? { Authorization: `Bearer ${session}` } : undefined
+      }, early?.response);
+    } catch (error) {
+      if (signal.aborted) throw new BookingApiError(timeoutMessage, 0);
+      throw error;
+    }
+  });
 }
 
 /**

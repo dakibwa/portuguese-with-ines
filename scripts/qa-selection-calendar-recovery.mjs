@@ -667,6 +667,7 @@ try {
           await page.goto(`${base}${malformed.startsWith("teacher-") ? "/schedule/" : "/book/?view=lessons"}`);
           const warning = page.getByRole("alert").filter({ hasText: malformed.startsWith("account-") ? "account just now" : unreadable });
           await expect(warning).toBeVisible();
+          if (malformed === "account-booking") await expect(page.locator(".lesson-overview__empty")).toHaveCount(0);
           await check(state);
           assert.equal(await page.evaluate(() => localStorage.getItem("ines-student-session")), "isolated-continuity");
           recovered = true;
