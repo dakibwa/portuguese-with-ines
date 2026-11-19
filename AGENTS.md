@@ -24,7 +24,7 @@
 - Keep documentation, implementation and the published site aligned during product work. There is no separate daily alignment automation.
 - The current production direction is dark blue, lilac, cream, and coral, with organic splatty marks, Beth Ellen display text, and Montserrat body/UI text. Keep `public/visuals/` production-only and retain only assets referenced by the current site.
 - Keep the original business-card material as historical brand reference, not as a competing website specification.
-- Superseded visual work is stored outside the repository in Google Drive, at `My Drive/Português com a Inês/Archive/2026-07-24 - Superseded visual directions`. It is provenance only: do not inspect or reuse it as design input unless Dan explicitly asks to revisit a named archived item.
+- Superseded visual work is stored outside the repository in Google Drive, at `My Drive/Oh Life! Studios/Clients/Português com a Inês/Archive/2026-07-24 - Superseded visual directions`. It is provenance only: do not inspect or reuse it as design input unless Dan explicitly asks to revisit a named archived item.
 
 ## Documentation
 

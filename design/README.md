@@ -2492,7 +2492,7 @@ cards, not emails. Previews of every variant:
 
 Superseded visual work is archived outside the repository, in Google Drive at:
 
-`My Drive/Português com a Inês/Archive/2026-07-24 - Superseded visual directions`
+`My Drive/Oh Life! Studios/Clients/Português com a Inês/Archive/2026-07-24 - Superseded visual directions`
 
 That folder is an archive for provenance only. Do not use anything in it as a
 design source unless Dan explicitly asks to revisit a named archived item.
