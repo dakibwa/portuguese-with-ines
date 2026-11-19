@@ -104,6 +104,7 @@ import {
 } from "@/lib/booking-api";
 import {
   BOOKING_HORIZON_DAYS_FALLBACK,
+  MAX_BOOKING_HORIZON_DAYS,
   BOOKING_TIME_ZONE,
   CONTACT_WHATSAPP_URL,
   NOTICE_HOURS,
@@ -1718,15 +1719,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         return;
       }
 
-      /*
-       * Ask for more than the horizon and let the Worker clamp it, rather than
-       * hard-coding a window that has to be remembered every time the horizon
-       * moves. It was fixed at 62 days while the grid was sized from whatever
-       * horizon the API reported — so raising the horizon past 62 would have
-       * drawn weeks of empty cells announcing "no times free", which would have
-       * been a lie rather than a gap.
-       */
-      const until = addDaysToKey(todayKey, 140);
+      // The Worker clamps the requested range to the configured booking window.
+      const until = addDaysToKey(todayKey, MAX_BOOKING_HORIZON_DAYS);
       const moving = { manageToken: movingToken, seriesId: movingSeriesId, session: movingSeriesId ? readSession() : "", location: availabilityLocation };
       // Times fetched a moment ago (or ahead of time, while the page was idle)
       // show at once, with no "Checking what's free…" in between.
@@ -1795,7 +1789,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     if (!onlineOnlyRequest) return;
     let live = true;
     const moving = { manageToken: movingToken, seriesId: movingSeriesId, session: movingSeriesId ? readSession() : "" };
-    fetchAvailability(availabilityLessonTypeId, todayKey, addDaysToKey(todayKey, 140), undefined, moving)
+    fetchAvailability(availabilityLessonTypeId, todayKey, addDaysToKey(todayKey, MAX_BOOKING_HORIZON_DAYS), undefined, moving)
       .then((data) => { if (live) setOnlineSlots({ request: onlineOnlyRequest, slotsByDate: data.slotsByDate }); })
       .catch(() => {});
     return () => { live = false; };
@@ -1817,7 +1811,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
    */
   useEffect(() => {
     if (!todayKey || checkingSession || loadingSlots) return;
-    const until = addDaysToKey(todayKey, 140);
+    const until = addDaysToKey(todayKey, MAX_BOOKING_HORIZON_DAYS);
     const wanted: { typeId: string; manageToken?: string }[] = [];
     if (managed) {
       if (!isManagedReschedule && lessonChangeable && managedToken) {
@@ -1891,7 +1885,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     return dates;
   }, {});
   const isLessonsCalendarOverview = intent === "lessons" && !isManagedReschedule;
-  const allCalendarWeeks = viewTodayKey ? buildBookingWeeks(viewTodayKey, horizonDays) : [];
+  const weekHasFreeTime = (week: BookingWeek) => week.cells.some(cell => viewSlotsByDate[cell.key]?.length);
+  // A slot near midnight in Porto can fall beyond the nominal final date on
+  // the student's clock. Keep a boundary week there only if it contains a slot.
+  const endKey = viewTodayKey && addDaysToKey(viewTodayKey, horizonDays);
+  const allCalendarWeeks = viewTodayKey
+    ? buildBookingWeeks(viewTodayKey, horizonDays + 2).filter(week => week.key <= endKey || weekHasFreeTime(week))
+    : [];
   const firstRelevantWeek = allCalendarWeeks.findIndex((week) =>
     week.cells.some((cell) => Boolean(viewSlotsByDate[cell.key]?.length || allBookingsByDate[cell.key]?.length))
   );
@@ -1906,11 +1906,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       : !availabilityLessonTypeId && startsOnClosedWeekend
         ? allCalendarWeeks.slice(1)
         : allCalendarWeeks;
-  // Booking offers the whole horizon, four weeks at a time. The inclusive
-  // range can touch one more Monday–Sunday row than the horizon has weeks;
-  // that partial row is not shown.
+  // Keep the usual page count unless a free date needs the final partial week.
   const horizonWeekCount = Math.ceil(horizonDays / 7);
-  const bookingRangeWeeks = uncappedCalendarWeeks.slice(0, horizonWeekCount);
+  const bookingRangeWeeks = uncappedCalendarWeeks.filter((week, index) => index < horizonWeekCount || weekHasFreeTime(week));
   // Your lessons pages the same way, from this week through the horizon or to
   // the last booked lesson if that is later (an ongoing run is kept twelve
   // weeks ahead), so every lesson can be reached from the calendar.
@@ -2958,7 +2956,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         ? `${dropped.length === 1 ? "Your other chosen lesson" : `Your other ${dropped.length} chosen lessons`} came off with the change of lesson. Add ${dropped.length === 1 ? "it" : "them"} again if you need to.`
         : "");
       if (typeId !== lessonTypeId) {
-        const ready = todayKey ? peekAvailability(typeId, todayKey, addDaysToKey(todayKey, 140), { location: form.location }) : null;
+        const ready = todayKey ? peekAvailability(typeId, todayKey, addDaysToKey(todayKey, MAX_BOOKING_HORIZON_DAYS), { location: form.location }) : null;
         if (ready) {
           // Usually fetched while the page was idle: the days simply change,
           // with the new lesson's gap in the same commit, so the times kept

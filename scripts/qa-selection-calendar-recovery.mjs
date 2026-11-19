@@ -184,6 +184,50 @@ let cases = 0;
 try {
   {
     const width = 390;
+    // Free times stay reachable through the final partial week and when the
+    // Worker's horizon grows beyond the browser's old 140-day request.
+    for (const window of [
+      { today: "2026-09-30", horizonDays: 84, lessonDay: "2026-12-22", earlierDay: "2026-10-01" },
+      { today: "2026-10-02", horizonDays: 180, lessonDay: "2027-03-11", earlierDay: "2026-10-03" }
+    ]) {
+      const state = await fixture(width, async (path, request) => {
+        if (path !== "/availability") return null;
+        const query = new URL(request.url()).searchParams;
+        // Match the Worker's range clamp, so an unrequested later slot cannot
+        // make a short browser request appear to cover the whole horizon.
+        const days = [window.earlierDay, window.lessonDay].filter(day =>
+          day && day >= query.get("from") && day <= query.get("to"));
+        return { json: {
+          horizonDays: window.horizonDays,
+          timeZone: "Europe/Lisbon",
+          slotsByDate: Object.fromEntries(days.map(day => [day, [{
+            startAt: `${day}T10:00:00Z`, endAt: `${day}T11:00:00Z`
+          }]]))
+        } };
+      }, false);
+      try {
+        const { page } = state;
+        await page.clock.setFixedTime(new Date(`${window.today}T10:00:00Z`));
+        await page.goto(`${base}/book/?view=book`);
+        await expect(page.locator(`button[data-date-key="${window.earlierDay}"]`)).toBeEnabled();
+        await expect(page.locator("#booking-calendar-weeks")).toHaveAttribute("aria-busy", "false");
+        const target = page.locator(`button[data-date-key="${window.lessonDay}"]`);
+        const next = page.getByRole("button", { name: "Later weeks", exact: true });
+        for (let turns = 0; turns < Math.ceil(window.horizonDays / 28) && !await target.isVisible(); turns++) {
+          await expect(next, `${window.lessonDay} must remain reachable`).toBeEnabled();
+          const first = page.locator("button[data-date-key]").first();
+          const before = await first.getAttribute("data-date-key");
+          await next.click();
+          await expect(first).not.toHaveAttribute("data-date-key", before);
+        }
+        await expect(target).toBeVisible();
+        await expect(target).toBeEnabled();
+        await target.click();
+        await expect(page.getByRole("button", { name: "10:00", exact: true })).toBeVisible();
+        await check(state); cases += 1;
+      } finally { await state.context.close(); }
+    }
+
     // A spring gap has no UTC instant for the intended time. Legacy skipped
     // values still identify the correct date; neither their shifted time nor
     // a normal skipped week's time should be invented in the date list.
