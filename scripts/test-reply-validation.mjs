@@ -27,7 +27,7 @@ registerHooks({
 process.env.NEXT_PUBLIC_BOOKING_API_BASE_URL = "https://booking.example.invalid";
 
 const { BOOKING_REPLY_ERROR } = await import("@/lib/api-response");
-const { cancelBooking, createBooking, fetchAvailability, fetchBooking, forgetAvailability, previewSeries, rescheduleBooking, rescheduleSeries } = await import("@/lib/booking-api");
+const { cancelBooking, createBooking, fetchAvailability, fetchBooking, forgetAvailability, listLessonTypes, previewSeries, rescheduleBooking, rescheduleSeries } = await import("@/lib/booking-api");
 const { createBookingFor, fetchBookings, fetchSchedule, saveDayOff, saveRules } = await import("@/lib/admin-api");
 const { confirmEmailChange, fetchMe, requestEmailChange } = await import("@/lib/auth-api");
 
@@ -105,6 +105,15 @@ test("an unreadable calendar window can be retried, and old replies can omit it"
     forgetAvailability();
     await accepted(availability, { slotsByDate, horizonDays });
   }
+});
+
+test("paid confirmation requires a readable payment mode", async () => {
+  const catalogue = { lessonTypes: [] };
+  await refused(listLessonTypes, catalogue);
+  await refused(listLessonTypes, { ...catalogue, postpay: "false" });
+  await refused(listLessonTypes, { ...catalogue, paymentMode: "postpay", postpay: false, paymentReady: true });
+  await accepted(listLessonTypes, { ...catalogue, postpay: false }); // Earlier pay-on-the-day reply.
+  await accepted(listLessonTypes, { ...catalogue, paymentMode: "postpay", postpay: false, paymentReady: false });
 });
 
 test("a stalled availability read releases the calendar for a fresh retry", async (t) => {
