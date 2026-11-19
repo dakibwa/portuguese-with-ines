@@ -3,7 +3,7 @@ import "../workspace.css";
 import { pageMetadata } from "@/lib/page-metadata";
 import { preconnect } from "react-dom";
 import { BookingFlow } from "@/components/BookingFlow";
-import { AVAILABILITY_TIMEOUT_MS, BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, MAX_BOOKING_HORIZON_DAYS } from "@/lib/config";
+import { BOOKING_READ_TIMEOUT_MS, BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, MAX_BOOKING_HORIZON_DAYS } from "@/lib/config";
 
 export const metadata: Metadata = pageMetadata({
   title: "Booking | Português com a Inês",
@@ -38,7 +38,10 @@ export const metadata: Metadata = pageMetadata({
  */
 const primeBooking = BOOKING_API_BASE_URL
   ? `try{(function(b,z){var h={Accept:"application/json"};` +
-    `window.__inesLessonTypes=fetch(b+"/lesson-types",{headers:h}).then(function(r){return r.ok?r.json():null}).catch(function(){return null});` +
+    `function prime(url){if(typeof AbortSignal==="undefined"||typeof AbortSignal.timeout!=="function")return null;` +
+    `var signal=AbortSignal.timeout(${BOOKING_READ_TIMEOUT_MS}),response=fetch(url,{headers:h,signal:signal});` +
+    `response.catch(function(){});return {url:url,response:response,signal:signal}}` +
+    `window.__inesLessonTypes=prime(b+"/lesson-types");` +
     `var s="",r="";try{s=localStorage.getItem("ines-student-session")||"";r=localStorage.getItem("ines-returning-student")||""}catch(e){}` +
     `if(s){var m=fetch(b+"/me",{headers:{Accept:"application/json",Authorization:"Bearer "+s}});m.catch(function(){});window.__inesMe={token:s,response:m};return}` +
     `var q=new URLSearchParams(location.search);` +
@@ -46,7 +49,7 @@ const primeBooking = BOOKING_API_BASE_URL
     `var l=q.get("lesson"),t=l==="single"||l==="long"?l:r?"single":"trial";` +
     `var d=new Intl.DateTimeFormat("en-CA",{timeZone:z,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()),p=d.split("-");` +
     `var u=b+"/availability?"+new URLSearchParams({lessonType:t,from:d,to:new Date(Date.UTC(+p[0],p[1]-1,+p[2]+${MAX_BOOKING_HORIZON_DAYS})).toISOString().slice(0,10)});` +
-    `if(typeof AbortSignal.timeout!=="function")return;var signal=AbortSignal.timeout(${AVAILABILITY_TIMEOUT_MS});var a=fetch(u,{headers:h,signal:signal});a.catch(function(){});window.__inesAvailability={url:u,response:a,signal:signal}` +
+    `window.__inesAvailability=prime(u)` +
     `})(${JSON.stringify(BOOKING_API_BASE_URL)},${JSON.stringify(BOOKING_TIME_ZONE)})}catch(e){}`
   : "";
 

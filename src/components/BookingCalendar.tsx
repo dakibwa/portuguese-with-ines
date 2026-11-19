@@ -871,7 +871,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const [lessonTypes, setLessonTypes] = useState<LessonType[]>(staticLessonTypes);
   // Saved-card charging: set from the API, so the page tells the truth without
   // a rebuild when the switch is flipped.
-  const [postpay, setPostpay] = useState(false);
+  const [postpay, setPostpay] = useState<boolean | null>(null);
+  const lessonTypesRequest = useRef(0);
   const [paymentConfigurationError, setPaymentConfigurationError] = useState("");
   const [paymentConsent, setPaymentConsent] = useState(false);
   const [payment, setPayment] = useState<{ clientSecret: string } | null>(null);
@@ -1231,21 +1232,27 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // the page went on with its built-in lessons and "pay on the day", and a
   // booking then needed an agreement to pay it had no way to give.
   const loadLessonTypes = useCallback(() => {
+    const request = ++lessonTypesRequest.current;
+    setPostpay(null);
+    setPaymentConsent(false);
+    setPaymentConfigurationError("");
     setLessonTypesError("");
     listLessonTypes()
-      .then(({ lessonTypes: types, postpay: postpayOn, paymentReady }) => {
+      .then(({ lessonTypes: types, postpay: postpayOn, paymentReady, paymentMode }) => {
+        if (request !== lessonTypesRequest.current) return;
         setLessonTypes(types);
-        if (paymentReady === false || (postpayOn && !STRIPE_PUBLISHABLE_READY)) {
-          setPostpay(false);
+        if (paymentMode === "prepay" || paymentReady === false || (postpayOn && !STRIPE_PUBLISHABLE_READY)) {
           setPaymentConfigurationError(
             `Online payment is temporarily unavailable, so booking is paused. Please message ${TUTOR_NAME} instead.`
           );
           return;
         }
         setPaymentConfigurationError("");
-        setPostpay(Boolean(postpayOn));
+        setPostpay(postpayOn);
       })
-      .catch((error: Error) => setLessonTypesError(error.message));
+      .catch((error: Error) => {
+        if (request === lessonTypesRequest.current) setLessonTypesError(error.message);
+      });
   }, []);
 
   const closeManagedLesson = useCallback(() => {
@@ -2203,7 +2210,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     !loadingSlots &&
     // Paused card payments never stand in the way of a free lesson, and
     // neither does not yet knowing how lessons are paid.
-    (freeLesson || (!paymentConfigurationError && !lessonTypesError)) &&
+    (freeLesson || postpay !== null) &&
     (!needsPaymentConsent || paymentConsent);
 
   useEffect(() => {
@@ -3657,6 +3664,34 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     });
   }
 
+  const showLoadAlertInForm = isConfirmingBooking && student && !checkingSession && !payment && !freeLesson && Boolean(lessonTypesError);
+  const loadAlert = loadError ? (
+    <div className="booking-alert" role="status">
+      <AlertCircle size={18} aria-hidden="true" />
+      {/* Every alert alike: what happened, then its ways on as small
+          outline buttons side by side. */}
+      <div className="booking-alert__body">
+        <p>{loadError}</p>
+        <div className="booking-alert__actions">
+          <button
+            className="button button--outline button--compact"
+            disabled={loadingSlots}
+            onClick={() => {
+              if (lessonTypesError) loadLessonTypes();
+              if (availabilityError) loadAvailability();
+            }}
+            type="button"
+          >
+            Try again
+          </button>
+          <a className="button button--outline button--compact" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
+            Message {TUTOR_NAME}<span className="visually-hidden"> (opens in a new tab)</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <section className="booking-steps" aria-label={`Book a ${LANGUAGE} lesson`}>
       {/* A teacher who is also a student keeps a way back to the schedule. */}
@@ -3694,32 +3729,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           }}
         />
       ) : null}
-      {loadError ? (
-        <div className="booking-alert" role="status">
-          <AlertCircle size={18} aria-hidden="true" />
-          {/* Every alert alike: what happened, then its ways on as small
-              outline buttons side by side. */}
-          <div className="booking-alert__body">
-            <p>{loadError}</p>
-            <div className="booking-alert__actions">
-              <button
-                className="button button--outline button--compact"
-                disabled={loadingSlots}
-                onClick={() => {
-                  if (lessonTypesError) loadLessonTypes();
-                  if (availabilityError) loadAvailability();
-                }}
-                type="button"
-              >
-                Try again
-              </button>
-              <a className="button button--outline button--compact" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
-                Message {TUTOR_NAME}<span className="visually-hidden"> (opens in a new tab)</span>
-              </a>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {showLoadAlertInForm ? null : loadAlert}
 
       <StageElement
         aria-label={student ? "Account, upcoming and past lessons" : undefined}
@@ -5144,6 +5154,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       </label>
 
                       <div className="booking-confirmation-payment">
+                        {showLoadAlertInForm ? loadAlert : null}
                         {submitError ? (
                           <div className="booking-alert" role="alert">
                             <AlertCircle size={18} aria-hidden="true" />
@@ -5181,6 +5192,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                               <li>Free, with nothing to pay and no card needed</li>
                               <li>Please give {TUTOR_NAME} {noticeHours} hours&rsquo; notice to move or cancel</li>
                             </>
+                          ) : postpay === null ? (
+                            !paymentConfigurationError && !lessonTypesError && <li role="status">Checking lesson prices and payment terms…</li>
                           ) : postpay ? (
                             <>
                               <li>No payment is taken now</li>

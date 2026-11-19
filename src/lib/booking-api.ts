@@ -1,6 +1,6 @@
 import { HOME_CLOCK, TUTOR } from "@/lib/tutor";
 import { forgetSession, readSession } from "@/lib/auth-api";
-import { AVAILABILITY_TIMEOUT_MS, BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, MAX_BOOKING_HORIZON_DAYS, formatMoney } from "@/lib/config";
+import { BOOKING_READ_TIMEOUT_MS, BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, MAX_BOOKING_HORIZON_DAYS, formatMoney } from "@/lib/config";
 import { BOOKING_REPLY_ERROR, isApiAmount, isApiInstant, isApiLesson, isApiRecord as isRecord } from "@/lib/api-response";
 import { wallTimeToUtc } from "@/lib/wall-time";
 
@@ -86,7 +86,7 @@ export type LessonTypesResponse = {
   lessonTypes: LessonType[];
   paymentMode?: "off" | "prepay" | "postpay";
   /** True when students save a card and the lesson charges after it ends. */
-  postpay?: boolean;
+  postpay: boolean;
   paymentReady?: boolean;
 };
 
@@ -144,17 +144,23 @@ async function request<T>(path: string, init?: RequestInit, primed?: Promise<Res
   return data as T;
 }
 
+type PrimedRead = { url: string; response: Promise<Response>; signal: AbortSignal };
+
 declare global {
   interface Window {
     /** Set by the inline script on /book, before React exists. */
-    __inesLessonTypes?: Promise<LessonTypesResponse | null> | null;
+    __inesLessonTypes?: PrimedRead | null;
     /** The first calendar's free times, asked for by the same script. */
-    __inesAvailability?: { url: string; response: Promise<Response>; signal: AbortSignal } | null;
+    __inesAvailability?: PrimedRead | null;
   }
 }
 
 function validateLessonTypes(data: LessonTypesResponse) {
-  if (!isRecord(data) || !Array.isArray(data.lessonTypes) || !data.lessonTypes.every((type) =>
+  if (!isRecord(data) || typeof data.postpay !== "boolean" ||
+    (data.paymentReady !== undefined && typeof data.paymentReady !== "boolean") ||
+    (data.paymentMode !== undefined && !["off", "prepay", "postpay"].includes(data.paymentMode)) ||
+    (data.paymentMode !== undefined && data.paymentReady !== false && data.postpay !== (data.paymentMode === "postpay")) ||
+    !Array.isArray(data.lessonTypes) || !data.lessonTypes.every((type) =>
     isRecord(type) && typeof type.id === "string" && typeof type.name === "string" &&
     typeof type.duration_minutes === "number" && Number.isFinite(type.duration_minutes) && type.duration_minutes > 0 &&
     typeof type.price_cents === "number" && Number.isFinite(type.price_cents) && type.price_cents >= 0
@@ -165,30 +171,24 @@ function validateLessonTypes(data: LessonTypesResponse) {
 export function listLessonTypes() {
   // Use the request the document already started, if there was one. Cleared on
   // read so a later call goes to the network rather than replaying a stale list.
-  if (typeof window !== "undefined" && window.__inesLessonTypes) {
-    const primed = window.__inesLessonTypes;
-    window.__inesLessonTypes = null;
-    return primed.then(
-      (data) => data ?? request<LessonTypesResponse>("/lesson-types")
-    ).then(validateLessonTypes);
-  }
-
-  return request<LessonTypesResponse>("/lesson-types").then(validateLessonTypes);
+  const early = typeof window !== "undefined" ? window.__inesLessonTypes : null;
+  if (early) window.__inesLessonTypes = null;
+  return readCalendarData<LessonTypesResponse>("/lesson-types", "", early, "Checking lesson prices and payment terms took too long. Please try again.").then(validateLessonTypes);
 }
 
 // The deadline belongs to the shared read, independently of any calendar that
 // stops listening. Keep it active until the body finishes downloading too.
-async function readAvailability(path: string, session: string, early: Window["__inesAvailability"]) {
+async function readCalendarData<T>(path: string, session: string, early: PrimedRead | null | undefined, timeoutMessage: string) {
   const controller = early ? null : new AbortController();
-  const timer = controller ? setTimeout(() => controller.abort(), AVAILABILITY_TIMEOUT_MS) : undefined;
+  const timer = controller ? setTimeout(() => controller.abort(), BOOKING_READ_TIMEOUT_MS) : undefined;
   const signal = early?.signal ?? controller?.signal;
   try {
-    return await request<AvailabilityResponse>(path, {
+    return await request<T>(path, {
       signal,
       headers: session ? { Authorization: `Bearer ${session}` } : undefined
     }, early?.response);
   } catch (error) {
-    if (signal?.aborted) throw new BookingApiError("Checking free times took too long. Please try again.", 0);
+    if (signal?.aborted) throw new BookingApiError(timeoutMessage, 0);
     throw error;
   } finally {
     clearTimeout(timer);
@@ -217,7 +217,7 @@ export function fetchAvailability(
     const primed = typeof window !== "undefined" ? window.__inesAvailability : null;
     if (primed) window.__inesAvailability = null;
     const early = primed && !session && primed.url === `${BOOKING_API_BASE_URL}${path}` ? primed : null;
-    const reply = readAvailability(path, session, early).then((data) => {
+    const reply = readCalendarData<AvailabilityResponse>(path, session, early, "Checking free times took too long. Please try again.").then((data) => {
       const days = data.horizonDays;
       if (days !== undefined && (!Number.isInteger(days) || days < 1 || days > MAX_BOOKING_HORIZON_DAYS)) unreadableReply();
       if (!isRecord(data.slotsByDate) || !Object.values(data.slotsByDate).every((slots) =>

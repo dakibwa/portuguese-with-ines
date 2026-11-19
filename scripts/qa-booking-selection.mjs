@@ -28,7 +28,15 @@ try {
     await context.route("**/me/homework", route => route.fulfill({ json: { homework: [] } }));
     await context.route("**/me", route => json(route, { student, bookings, series, sameDayFeeCents: 500, cardsAccepted: true }));
     await context.route("**/me/recurring-rates", route => json(route, { rates }));
-    await context.route("**/lesson-types", route => json(route, { lessonTypes: types, paymentMode: "postpay", postpay: true, paymentReady: true }));
+    let pendingTerms;
+    let holdTerms = width === 390;
+    await context.route("**/lesson-types", route => {
+      if (holdTerms) {
+        pendingTerms = route;
+        return;
+      }
+      return json(route, { lessonTypes: types, paymentMode: "postpay", postpay: true, paymentReady: true });
+    });
     await context.route("**/availability?*", route => {
       const url = new URL(route.request().url());
       availabilityPlaces.push(url.searchParams.get("location") ?? "online");
@@ -133,6 +141,16 @@ try {
     }
     await start();
     await choose("2026-09-14");
+    if (holdTerms) {
+      const confirmButton = page.getByRole("button", { name: "Book lesson & agree to pay", exact: true });
+      await expect(confirmButton).toBeDisabled();
+      await expect(page.locator("#booking-payment-summary")).toContainText("Checking lesson prices and payment terms");
+      holdTerms = false;
+      await pendingTerms.abort();
+      await page.locator("#booking-confirmation-stage").getByRole("button", { name: "Try again" }).click();
+      await expect(page.getByRole("button", { name: "Agree to terms & privacy" })).toBeVisible();
+      await expect(confirmButton).toBeDisabled();
+    }
     await page.getByRole("radio", { name: "In Porto", exact: true }).check();
     await expect.poll(() => availabilityPlaces.includes("porto")).toBe(true);
     // In Porto the day is marked online only and its times are shown, not offered.
