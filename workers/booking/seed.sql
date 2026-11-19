@@ -9,8 +9,7 @@ INSERT OR REPLACE INTO lesson_types (id, slug, name, description, duration_minut
 -- Her teaching hours, Porto time (confirmed by Dan, 26 August 2026).
 --   Mon-Tue  first 10:00, last lesson starts 19:00
 --   Wed-Fri  first 17:00, last lesson starts 19:00
--- These are start times. A 90-minute lesson beginning at 19:00 runs to 20:30,
--- which is intended.
+-- The whole lesson must fit between these Porto opening and finishing times.
 DELETE FROM availability_rules;
 INSERT INTO availability_rules (weekday, start_minute, last_start_minute, active) VALUES
   (1, 600, 1140, 1),

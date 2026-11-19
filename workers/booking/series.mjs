@@ -15,7 +15,7 @@
  * change instead of drifting to 16:30 for half the year.
  */
 
-import { computeAvailability, dailyFinishProblem, isSlotBookable } from "./availability.mjs";
+import { computeAvailability, loadTeachingHours, loadSettings, isSlotBookable } from "./availability.mjs";
 import { homeZone, addDaysToKey, dateKey, parseDateKey, zonedParts, zonedToUtc } from "./time.mjs";
 
 /**
@@ -93,6 +93,8 @@ export async function planOccurrences(env, { fromKey, minuteOfDay, count, lesson
     ? await computeAvailability(env, { ...checked, fromKey: wanted[0].key, toKey: wanted.at(-1).key, dates: new Set(wanted.map((week) => week.key)) })
     : { slotsByDate: {} };
 
+  const hours = teacher && wanted.length
+    ? await loadTeachingHours(env, fromKey, wanted.at(-1).key, (await loadSettings(env)).slotIntervalMinutes) : null;
   const bookable = [];
   const skipped = [];
   for (const occurrence of wanted) {
@@ -104,7 +106,7 @@ export async function planOccurrences(env, { fromKey, minuteOfDay, count, lesson
     if (teacher) {
       // Her weekly slot keeps the daily finish and days off. The slot claim checks clashes.
       const endAt = new Date(occurrence.startAt.getTime() + lessonType.duration_minutes * 60000);
-      const problem = dailyFinishProblem(env, occurrence.startAt, endAt) || await teacherWeekProblem(env, occurrence, now);
+      const problem = occurrence.startAt <= now ? "That time has already passed." : hours.problem(occurrence.startAt, endAt);
       if (problem) skipped.push({ key: occurrence.key, startAt: occurrence.startAt.toISOString(), reason: problem });
       else bookable.push({ ...occurrence, endAt });
       continue;
@@ -120,17 +122,6 @@ export async function planOccurrences(env, { fromKey, minuteOfDay, count, lesson
   }
 
   return { bookable, skipped };
-}
-
-async function teacherWeekProblem(env, occurrence, now) {
-  if (occurrence.startAt <= now) return "That time has already passed.";
-  const dayOff = await env.DB.prepare(
-    `SELECT 1 FROM availability_exceptions WHERE date = ? AND weekday IS NULL AND kind = 'blocked'
-       AND (start_minute IS NULL OR start_minute <= 0) AND (end_minute IS NULL OR end_minute >= 1440) LIMIT 1`
-  )
-    .bind(occurrence.key)
-    .first();
-  return dayOff ? "You have that day off." : "";
 }
 
 /**

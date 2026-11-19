@@ -16,11 +16,9 @@ import {
   dateExtras,
   dateKey,
   daysOff,
-  extraSpan,
   hoursFromRules,
   hoursProblem,
   labelOnlineOnly,
-  lastStartIn,
   lessonStarts,
   mondayOf,
   needsYou,
@@ -34,7 +32,6 @@ import {
   shownAsAdded,
   setOnlineOnlyHours,
   shiftDate,
-  startsLabel,
   timeAhead,
   timeOffClashes,
   weeklyBlocks,
@@ -42,7 +39,7 @@ import {
 } from "../src/lib/teacher-calendar.ts";
 
 test("timetable trims empty edges without hiding early, late or overnight lessons", () => {
-  const normal = { windows: [{ start: 540, lastStart: 1110 }], lessons: [], blocks: [], step: 30, editing: false };
+  const normal = { windows: [{ start: 540, end: 1110 }], lessons: [], blocks: [], step: 30, editing: false };
   assert.deepEqual(timetableBounds(normal), { start: 540, end: 1140 });
   assert.deepEqual(timetableBounds({ ...normal, lessons: [{ start: 345, end: 405 }, { start: 1350, end: 1430 }] }), { start: 300, end: 1440 });
   assert.deepEqual(timetableBounds({ ...normal, lessons: [{ start: 0, end: 45 }, { start: 1395, end: 1440 }] }), { start: 0, end: 1440 });
@@ -53,7 +50,7 @@ test("timetable trims empty edges without hiding early, late or overnight lesson
 
 test("weekly-hour warnings use Porto time and only changed starts inside booked lessons", () => {
   const before = hoursFromRules([{ weekday: 1, start_minute: 600, last_start_minute: 690 }]);
-  const after = { ...before, 1: [{ start: 600, lastStart: 630 }] };
+  const after = { ...before, 1: [{ start: 600, end: 660 }] };
   const bookings = [
     { id: "summer", status: "confirmed", starts_at: "2026-09-07T10:00:00Z", ends_at: "2026-09-07T11:00:00Z" },
     { id: "winter", status: "confirmed", starts_at: "2026-11-02T11:00:00Z", ends_at: "2026-11-02T12:00:00Z" },
@@ -62,12 +59,12 @@ test("weekly-hour warnings use Porto time and only changed starts inside booked 
     { id: "past", status: "confirmed", starts_at: "2026-08-31T10:00:00Z", ends_at: "2026-08-31T11:00:00Z" },
   ];
   const now = new Date("2026-09-07T08:00:00Z");
-  assert.deepEqual(bookingsAffectedByHours(bookings, before, after, 30, now).map(row => row.id), ["summer", "winter"]);
-  assert.deepEqual(bookingsAffectedByHours(bookings, before, before, 30, now), []);
-  assert.deepEqual(bookingsAffectedByHours(bookings, after, before, 30, now).map(row => row.id), ["summer", "winter"], "Adding hours across a booked lesson warns too");
+  assert.deepEqual(bookingsAffectedByHours(bookings, before, after, now).map(row => row.id), ["summer", "winter"]);
+  assert.deepEqual(bookingsAffectedByHours(bookings, before, before, now), []);
+  assert.deepEqual(bookingsAffectedByHours(bookings, after, before, now).map(row => row.id), [], "Extending working hours leaves existing lessons inside them");
   const overnight = [{ id: "overnight", status: "confirmed", starts_at: "2026-09-06T22:30:00Z", ends_at: "2026-09-07T00:30:00Z" }];
   const empty = hoursFromRules([]);
-  assert.equal(bookingsAffectedByHours(overnight, empty, { ...empty, 1: [{ start: 0, lastStart: 30 }] }, 30, new Date("2026-09-01")).length, 1, "The Monday half of a Sunday-night lesson is included");
+  assert.equal(bookingsAffectedByHours(overnight, { ...empty, 1: [{ start: 0, end: 30 }] }, empty, new Date("2026-09-01")).length, 1, "The Monday half of a Sunday-night lesson is included");
 });
 
 test("Porto wall times round-trip across DST and reject the missing spring hour", () => {
@@ -99,45 +96,28 @@ test("moving an autumn lesson preserves its occurrence of the repeated hour", ()
   assert.throws(() => wallTimeToUtc("2027-03-28", "01:30", "Europe/Lisbon", "2027-03-21T01:30Z"), /clocks change/);
 });
 
-test("paint and erase preserve the actual bookable starts at inclusive last-start boundaries", () => {
+test("paint and erase preserve the actual bookable starts at the finish she paints", () => {
   const original = [
-    { start: 600, lastStart: 690 },
-    { start: 810, lastStart: 1140 },
+    { start: 600, end: 690 },
+    { start: 810, end: 1140 },
   ];
   const split = paintHours(original, 630, 660, false);
   assert.deepEqual(split, [
-    { start: 600, lastStart: 600 },
-    { start: 690, lastStart: 690 },
-    { start: 810, lastStart: 1140 },
+    { start: 600, end: 630 },
+    { start: 810, end: 1140 },
   ]);
   const added = paintHours(split, 780, 720, true);
-  const actual = candidateStartMinutes({
-    startRanges: added,
-    duration: 90,
-    interval: 30,
-  });
-  assert.deepEqual(
-    actual,
-    [
-      600, 690, 720, 750, 780, 810, 840, 870, 900, 930, 960, 990, 1020, 1050,
-      1080, 1110, 1140,
-    ],
-  );
-  assert.equal(
-    actual.at(-1),
-    1140,
-    "19:00 remains a valid start for a 90-minute lesson",
-  );
+  assert.deepEqual(added, [{ start: 600, end: 630 }, { start: 720, end: 1140 }]);
   assert.deepEqual(original, [
-    { start: 600, lastStart: 690 },
-    { start: 810, lastStart: 1140 },
+    { start: 600, end: 690 },
+    { start: 810, end: 1140 },
   ]);
 });
 
 test("precise windows preserve each first-start-anchored grid, matching the Worker", () => {
   const precise = [
-    { start: 615, lastStart: 700 },
-    { start: 680, lastStart: 760 },
+    { start: 615, end: 700 },
+    { start: 680, end: 760 },
   ];
   assert.equal(canPaintHours(precise, 30), false);
   assert.strictEqual(paintHours(precise, 600, 690, false), precise);
@@ -150,15 +130,15 @@ test("precise windows preserve each first-start-anchored grid, matching the Work
     { id: 1, weekday: 1, start_minute: 615, last_start_minute: 700, active: 1 },
     { id: 2, weekday: 2, start_minute: 600, last_start_minute: 690, active: 0 },
   ]);
-  assert.deepEqual(week[1], [{ start: 615, lastStart: 700 }]);
+  assert.deepEqual(week[1], [{ start: 615, end: 700 }]);
   assert.deepEqual(week[2], []);
   assert.equal(hoursProblem(week), null);
   assert.match(
-    hoursProblem({ ...week, 1: [{ start: Number.NaN, lastStart: 700 }] }),
+    hoursProblem({ ...week, 1: [{ start: Number.NaN, end: 700 }] }),
     /Monday/,
   );
   assert.match(
-    hoursProblem({ ...week, 2: [{ start: 900, lastStart: 800 }] }),
+    hoursProblem({ ...week, 2: [{ start: 900, end: 800 }] }),
     /Tuesday/,
   );
 });
@@ -694,13 +674,10 @@ test("hours chosen on the Timetable: time off is never online only or extra hour
 
   // Extra hours are lesson starts, kept as the Worker keeps them: 15:00–17:00
   // at 30 minutes starts 15:00 to 16:30, and times off the grid cover their starts.
-  assert.deepEqual([[900, 1020], [900, 1000], [900, 910]].map(([start, end]) => lastStartIn({ start, end }, 30)), [990, 990, 900]);
-  assert.deepEqual([extraSpan({ start: 900, end: 1000 }, 30), extraSpan({ start: 1390, end: 1440 }, 30)], [{ start: 900, end: 1020 }, { start: 1390, end: 1440 }]);
-  assert.deepEqual([startsLabel({ start: 900, end: 1020 }, 30), startsLabel({ start: 900, end: 930 }, 30)], ["15:00–16:30", "15:00"]);
   // Offered only where a lesson could not start yet: never inside her hours,
   // and never for a whole day (a day online only from end to end opens on all of it).
-  const hours = [{ start: 615, lastStart: 705 }, { start: 780, lastStart: 810 }];
-  assert.deepEqual([[630, 660], [690, 750], [690, 780], [780, 840], [0, 1440]].map(([start, end]) => offersExtraHours(hours, { start, end }, 30)), [false, true, true, false, false]);
+  const hours = [{ start: 615, end: 705 }, { start: 780, end: 810 }];
+  assert.deepEqual([[630, 660], [690, 750], [690, 780], [780, 840], [0, 1440]].map(([start, end]) => offersExtraHours(hours, { start, end }, 30)), [false, true, true, true, false]);
   // Time off and extra hours are never both, either way round.
   const evening = { start: 1080, end: 1200 };
   assert.deepEqual(chooseHours({ ...none, off: [{ start: 1140, end: 1260 }] }, null, "extra", evening),
@@ -714,12 +691,9 @@ test("hours chosen on the Timetable: time off is never online only or extra hour
   const later = { start: 1080, end: 1260 };
   assert.deepEqual(chooseHours(both, block, "extra", later), { ...none, online: [later], extra: [later] });
   assert.deepEqual(chooseHours(both, block, "not working", evening), none);
-  // Extra hours are lesson starts on her grid: here 18:00, 18:30, 19:00 and
-  // 19:30. Not working at times typed off that grid takes the start inside
-  // them and leaves the rest where they were. Cut as plain time, the hours
-  // left began at 18:45 and gained a start at 19:45, later than she offered.
+  // An off-grid cut removes those precise minutes from the working window.
   assert.deepEqual(chooseHours({ ...none, extra: [evening] }, { kind: "extra", span: evening }, "not working", { start: 1095, end: 1125 }, 30).extra,
-    [{ start: 1080, end: 1110 }, { start: 1140, end: 1200 }]);
+    [{ start: 1080, end: 1095 }, { start: 1125, end: 1200 }]);
   assert.deepEqual(chooseHours(both, block, null, evening), { ...none, extra: [evening] }, "Open again takes only the label off");
   // On a day online only from end to end, extra hours never cut the day's label.
   const allDay = { start: 0, end: 1440 };
@@ -728,8 +702,8 @@ test("hours chosen on the Timetable: time off is never online only or extra hour
   // While saving, a date's extra hours are drawn as the Worker will keep them; weekly ones never change.
   const weeklyExtra = { id: 7, date: null, weekday: 2, kind: "extra", note: "", start_minute: 600, end_minute: 600 };
   const saving = withDayChanges([weeklyExtra, { ...weeklyExtra, id: 8, date: "2026-09-08", weekday: null }], new Map([["2026-09-08", { extra: [{ start: 900, end: 1000 }] }]]), 30);
-  assert.deepEqual(saving.map(({ id, start_minute, end_minute }) => [id, start_minute, end_minute]), [[7, 600, 600], [0, 900, 990]]);
-  assert.deepEqual(dateExtras(saving, "2026-09-08", 30), [{ start: 900, end: 1020 }]);
+  assert.deepEqual(saving.map(({ id, start_minute, end_minute }) => [id, start_minute, end_minute]), [[7, 600, 600], [0, 900, 1000]]);
+  assert.deepEqual(dateExtras(saving, "2026-09-08", 30), [{ start: 900, end: 1000 }]);
 
   let count = 0;
   const id = () => `new-${++count}`;

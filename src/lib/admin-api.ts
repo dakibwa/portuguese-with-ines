@@ -58,6 +58,8 @@ export type AvailabilityRule = {
 };
 export type WeeklyRule = { weekday: number; startMinute: number; lastStartMinute: number };
 export type AvailabilityException = {
+  /** Exact finishing minute for extra hours. Older replies provide the last grid start. */
+  finish_minute?: number | null;
   id: number;
   /** Null for a block that repeats every week on `weekday`, such as lunch. */
   date: string | null;

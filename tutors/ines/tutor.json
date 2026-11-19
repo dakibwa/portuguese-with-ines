@@ -46,7 +46,6 @@
     "whatsapp": "+351 963 161 134"
   },
   "bookings": {
-    "latestFinishMinute": 1170,
     "$comment": "Never change the reference prefix or calendar UID domain for a tutor with lessons: calendars match updates by the UID's domain, and students and receipts quote the reference prefix.",
     "referencePrefix": "PT",
     "calendarUidDomain": "portuguesewithines.com"

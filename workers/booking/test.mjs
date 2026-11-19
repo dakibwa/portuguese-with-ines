@@ -7,7 +7,6 @@
  */
 
 import assert from "node:assert/strict";
-import { DEFAULT_TUTOR } from "./tutor.mjs";
 import { deliver, renderEmail, splitWhen } from "./email.mjs";
 import * as templates from "./email-templates.mjs";
 import { candidateStartMinutes, computeAvailability, isSlotBookable } from "./availability.mjs";
@@ -131,7 +130,7 @@ await test("the default booking window is twelve weeks and clamps later availabi
           },
           async all() {
             if (sql.includes("FROM availability_rules")) {
-              return { results: [{ weekday: 1, start_minute: 600, last_start_minute: 600 }] };
+              return { results: [{ weekday: 1, start_minute: 600, last_start_minute: 660 }] };
             }
             return { results: [] };
           }
@@ -162,7 +161,7 @@ await test("moving a recurrence ignores only that sequence's existing lessons", 
           },
           async all() {
             if (sql.includes("FROM availability_rules")) {
-              return { results: [{ weekday: 1, start_minute: 600, last_start_minute: 600 }] };
+              return { results: [{ weekday: 1, start_minute: 600, last_start_minute: 660 }] };
             }
             if (sql.includes("FROM bookings")) {
               return {
@@ -194,17 +193,14 @@ await test("moving a recurrence ignores only that sequence's existing lessons", 
   assert.equal(moving.slotsByDate["2026-09-07"]?.[0]?.startAt, "2026-09-07T09:00:00.000Z");
 });
 
-// These cross-midnight cases exercise a tutor who teaches without a daily finish limit.
-const overnightTutor = { ...DEFAULT_TUTOR, bookings: {} };
-
 await test("a late lesson checks bookings after midnight before offering its start", async () => {
   const occupied = { id: "next-day", starts_at: "2026-11-03T00:15:00.000Z", ends_at: "2026-11-03T01:15:00.000Z" };
-  const env = { TUTOR: overnightTutor, DB: { prepare(sql) {
+  const env = { DB: { prepare(sql) {
     let values = [];
     return {
       bind(...args) { values = args; return this; },
       async all() {
-        if (sql.includes("FROM availability_rules")) return { results: [{ weekday: 1, start_minute: 1380, last_start_minute: 1410 }] };
+        if (sql.includes("FROM availability_rules")) return { results: [{ weekday: 1, start_minute: 1380, last_start_minute: 1440 }] };
         if (sql.includes("FROM bookings")) return { results: occupied.ends_at > values[0] && occupied.starts_at < values[1] ? [occupied] : [] };
         return { results: [] };
       }
@@ -228,7 +224,7 @@ await test("time off and online-only hours follow elapsed lessons across midnigh
       { day: "2026-10-25", minute: 90, duration: 60, blockedStart: 60, blockedEnd: 90, free: true }
     ]) {
       const blockedDay = scenario.blockedDay ?? scenario.day;
-      const env = { TUTOR: overnightTutor, DB: { prepare(sql) {
+      const env = { DB: { prepare(sql) {
         let values = [];
         return {
           bind(...args) { values = args; return this; },
@@ -236,18 +232,19 @@ await test("time off and online-only hours follow elapsed lessons across midnigh
             if (mode === "online-only" && sql.includes("FROM settings")) return { results: [{ key: "online_only_periods", value: JSON.stringify([
               { id: "clock-test", fromDate: blockedDay, toDate: blockedDay, startMinute: scenario.blockedStart ?? 0, endMinute: scenario.blockedEnd ?? 1440 }
             ]) }] };
-            if (sql.includes("FROM availability_rules")) return { results: [{ weekday: weekdayOf(scenario.day), start_minute: scenario.minute, last_start_minute: scenario.minute }] };
+            if (sql.includes("FROM availability_rules")) return { results: [{ weekday: weekdayOf(scenario.day), start_minute: scenario.minute, last_start_minute: Math.min(1440, scenario.minute + 240) }] };
             if (mode === "blocked" && sql.includes("FROM availability_exceptions") && blockedDay >= values[0] && blockedDay <= values[1]) return { results: [{ date: blockedDay, kind: "blocked", start_minute: scenario.blockedStart, end_minute: scenario.blockedEnd }] };
             return { results: [] };
           }
         };
       } } };
+      const { year, month, day } = parseDateKey(scenario.day);
       const { slotsByDate } = await computeAvailability(env, {
         fromKey: scenario.day, toKey: scenario.day, lessonType: { duration_minutes: scenario.duration },
         location: "porto",
         now: new Date(`${addDaysToKey(scenario.day, -2)}T08:00:00Z`)
       });
-      assert.equal(Boolean(slotsByDate[scenario.day]?.length), scenario.free, `${mode}: ${scenario.day}`);
+      assert.equal(Boolean(slotsByDate[scenario.day]?.some(slot => slot.startAt === zonedToUtc(year, month, day, scenario.minute).toISOString())), scenario.free, `${mode}: ${scenario.day}`);
     }
   }
 });
@@ -286,7 +283,7 @@ await test("14-hour notice hides early slots, allows the boundary and rejects a 
             async all() {
               // No settings row: this also exercises a freshly provisioned/missing setting.
               return { results: sql.includes("FROM availability_rules")
-                ? [{ weekday: weekdayOf(day), start_minute: 570, last_start_minute: 630 }]
+                ? [{ weekday: weekdayOf(day), start_minute: 570, last_start_minute: 690 }]
                 : [] };
             }
           };
@@ -330,13 +327,13 @@ await test("invalid timezones are rejected", () => {
 
 const asTime = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 
-await test("Inês’s bookable lessons finish by 19:30 Porto time, including extra hours and weekly lessons", async () => {
-  for (const [day, finish] of [["2026-09-07", "18:30"], ["2026-11-02", "19:30"]]) {
+await test("lessons must fit the saved working hours, including gaps and extra hours", async () => {
+  for (const [day, finish, offset] of [["2026-09-07", 1170, 60], ["2026-11-02", 1200, 0]]) {
     const env = { DB: { prepare(sql) { return {
       bind() { return this; },
       async all() {
-        if (sql.includes("FROM availability_rules")) return { results: [{ weekday: 1, start_minute: 1020, last_start_minute: 1170 }] };
-        if (sql.includes("FROM availability_exceptions")) return { results: [{ date: day, kind: "extra", start_minute: 1185, end_minute: 1260 }] };
+        if (sql.includes("FROM availability_rules")) return { results: [{ weekday: 1, start_minute: 960, last_start_minute: finish }] };
+        if (sql.includes("FROM availability_exceptions")) return { results: [{ date: day, kind: "extra", start_minute: 855, end_minute: 900, note: "Working hours (exact finish)" }] };
         return { results: [] };
       }
     }; } } };
@@ -344,22 +341,23 @@ await test("Inês’s bookable lessons finish by 19:30 Porto time, including ext
     for (const duration of [30, 60, 90]) {
       const lessonType = { duration_minutes: duration };
       const { slotsByDate } = await computeAvailability(env, { fromKey: day, toKey: day, lessonType, now });
-      const last = slotsByDate[day].at(-1);
-      assert.equal(last.endAt, `${day}T${finish}:00.000Z`);
+      const slots = slotsByDate[day], last = slots.at(-1);
+      assert.equal(last.endAt, `${day}T${asTime(finish - offset)}:00.000Z`);
+      assert.equal(slots.some(slot => new Date(slot.startAt).getUTCHours() < (960-offset)/60), duration === 30, "a lesson cannot bridge the gap after extra hours");
       const tooLate = new Date(Date.parse(last.startAt) + 15 * 60000);
       const stale = await isSlotBookable(env, { startAt: tooLate, lessonType, now });
       assert.equal(stale.ok, false);
-      assert.match(stale.reason, /19:30 Porto time/);
-      const teacherRun = await planOccurrences(env, { fromKey: day, minuteOfDay: 1170 - duration + 15, count: 2, lessonType, now, teacher: true });
+      assert.match(stale.reason, /working hours/);
+      const teacherRun = await planOccurrences(env, { fromKey: day, minuteOfDay: finish - duration + 15, count: 2, lessonType, now, teacher: true });
       assert.equal(teacherRun.bookable.length, 0);
     }
   }
 });
 
 await test("a 15-minute interval offers every quarter hour, and blocks still remove overlaps", () => {
-  const range = [{ start: 600, lastStart: 720 }];
+  const range = [{ start: 600, end: 720 }];
   const starts = candidateStartMinutes({ startRanges: range, duration: 60, interval: 15 }).map(asTime);
-  assert.deepEqual(starts, ["10:00", "10:15", "10:30", "10:45", "11:00", "11:15", "11:30", "11:45", "12:00"]);
+  assert.deepEqual(starts, ["10:00", "10:15", "10:30", "10:45", "11:00", "11:15", "11:30", "11:45"]);
   // Time off from 11:00 to 11:30 withholds every start whose hour would touch it.
   const blocked = candidateStartMinutes({
     startRanges: range,
@@ -367,11 +365,11 @@ await test("a 15-minute interval offers every quarter hour, and blocks still rem
     duration: 60,
     interval: 15
   }).map(asTime);
-  assert.deepEqual(blocked, ["10:00", "11:30", "11:45", "12:00"]);
+  assert.deepEqual(blocked, ["10:00", "11:30", "11:45"]);
 });
 
 await test("a blocked span withholds every lesson that would overlap it", () => {
-  const range = [{ start: 600, lastStart: 1140 }];
+  const range = [{ start: 600, end: 1140 }];
   // She is out 13:00-14:00.
   const blockedSpans = [{ start: 780, end: 840 }];
   const starts = candidateStartMinutes({ startRanges: range, blockedSpans, duration: 60, interval: 30 }).map(asTime);
@@ -386,7 +384,7 @@ await test("a blocked span withholds every lesson that would overlap it", () => 
 
 await test("a lunch block withholds a long lesson earlier than a short one", () => {
   // Her Mon-Tue rule, with 12:30-13:30 blocked every weekday.
-  const startRanges = [{ start: 600, lastStart: 1140 }];
+  const startRanges = [{ start: 600, end: 1140 }];
   const blockedSpans = [{ start: 750, end: 810 }];
   const hour = candidateStartMinutes({ startRanges, blockedSpans, duration: 60, interval: 30 }).map(asTime);
   const longer = candidateStartMinutes({ startRanges, blockedSpans, duration: 90, interval: 30 }).map(asTime);
@@ -407,24 +405,24 @@ await test("a lunch block withholds a long lesson earlier than a short one", () 
 await test("overlapping rules merge instead of double-offering a time", () => {
   const starts = candidateStartMinutes({
     startRanges: [
-      { start: 600, lastStart: 720 },
-      { start: 660, lastStart: 780 }
+      { start: 600, end: 720 },
+      { start: 660, end: 780 }
     ],
     duration: 60,
     interval: 30
   });
   assert.equal(new Set(starts).size, starts.length, "a time was offered twice");
   assert.equal(asTime(starts[0]), "10:00");
-  assert.equal(asTime(starts.at(-1)), "13:00");
+  assert.equal(asTime(starts.at(-1)), "12:30");
   assert.deepEqual(candidateStartMinutes({
-    startRanges: [{ start: 600, lastStart: 660 }, { start: 615, lastStart: 645 }],
+    startRanges: [{ start: 600, end: 660 }, { start: 615, end: 645 }],
     duration: 60, interval: 30
-  }), [600, 615, 630, 645, 660], "an extra window keeps its own first start when it overlaps weekly hours");
+  }), [600, 615, 630], "an extra window keeps its own first start when it overlaps weekly hours");
 });
 
 await test("a whole-day block leaves nothing bookable", () => {
   const starts = candidateStartMinutes({
-    startRanges: [{ start: 600, lastStart: 1140 }],
+    startRanges: [{ start: 600, end: 1140 }],
     blockedSpans: [{ start: 0, end: 1440 }],
     duration: 60,
     interval: 30
