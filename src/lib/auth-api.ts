@@ -1,5 +1,6 @@
 "use client";
 
+import { withBookingReadDeadline, type PrimedRead } from "@/lib/booking-read";
 import { BOOKING_API_BASE_URL } from "@/lib/config";
 import type { BookingStatus } from "@/lib/booking-api";
 import { BOOKING_REPLY_ERROR, isApiLesson, isApiRecord } from "@/lib/api-response";
@@ -360,7 +361,7 @@ export async function confirmEmailChange(token: string, changeToken: string) {
 declare global {
   interface Window {
     /** The account, asked for by /book's inline script for the stored session. */
-    __inesMe?: { token: string; response: Promise<Response> } | null;
+    __inesMe?: (PrimedRead & { token: string }) | null;
   }
 }
 
@@ -416,16 +417,20 @@ export async function fetchMe(token: string) {
   // sent with; any later read asks again.
   const primed = typeof window !== "undefined" ? window.__inesMe : null;
   if (primed) window.__inesMe = null;
-  let response: Response;
-  try {
-    response = await (primed?.token === token ? primed.response : fetch(`${BOOKING_API_BASE_URL}/me`, {
-      headers: { Accept: "application/json", Authorization: `Bearer ${token}` }
-    }));
-  } catch {
-    throw new Error("We couldn’t reach the booking system. Please check your connection and try again.");
-  }
-
-  const data: unknown = await response.json().catch(() => null);
+  const early = primed?.token === token ? primed : null;
+  const { response, data } = await withBookingReadDeadline(early, async (signal) => {
+    try {
+      const response = await (early?.response ?? fetch(`${BOOKING_API_BASE_URL}/me`, {
+        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+        signal
+      }));
+      const data: unknown = await response.json().catch(() => null);
+      if (signal.aborted) throw signal.reason;
+      return { response, data };
+    } catch {
+      throw new Error("We couldn’t reach the booking system. Please check your connection and try again.");
+    }
+  });
 
   // An expired or tampered session is not an error to show — it just means
   // signing in again.

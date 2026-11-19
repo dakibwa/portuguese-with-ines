@@ -78,6 +78,20 @@ test("an account with a bad lesson, date, weekly run or NIF is unreadable, not s
   })) await assert.rejects(() => (answer(reply), me()), unreadable, name);
 });
 
+test("a stalled account body times out and the same session can retry", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  globalThis.fetch = async (_url, { signal }) => new Response(new ReadableStream({
+    start(controller) {
+      signal.addEventListener("abort", () => controller.error(signal.reason), { once: true });
+    }
+  }));
+  const rejected = assert.rejects(fetchMe("session"), /check your connection and try again/);
+  t.mock.timers.tick(15_000);
+  await rejected;
+  answer({ student, bookings: [], series: [] });
+  assert.equal((await fetchMe("session")).student.id, student.id);
+});
+
 test("Inês's hours with a bad exception, label or weekday are unreadable", async () => {
   const schedule = () => fetchSchedule("teacher");
   await accepted(schedule, { rules, exceptions: [{ id: 1, date: null, kind: "blocked", weekday: 1, start_minute: 750, end_minute: 810, note: "Lunch" }] });

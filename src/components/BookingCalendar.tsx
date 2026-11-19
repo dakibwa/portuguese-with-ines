@@ -2133,7 +2133,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     !(intent === "lessons" && accountStep) &&
     !isConfirmingBooking &&
     !needsLessonsSignIn &&
-    ((intent === "lessons" && accountView === "upcoming") ||
+    ((intent === "lessons" && accountView === "upcoming" && loadedAccount) ||
       Boolean(intent === "book" && lessonType) ||
       Boolean(managed));
   // Booking with a day chosen: the times sit beside the calendar, or on a

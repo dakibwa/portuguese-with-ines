@@ -1116,7 +1116,8 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   lessons` with a `?` tooltip, the student's name beneath it as the account's
   menu, and `Book a lesson`; then the next lesson with its Meet link, then the
   calendar four weeks at a time, without free-time choices. There is no
-  separate list to keep in step with it.
+  separate list to keep in step with it. If the account read stalls for 15 seconds,
+  the student can retry with their existing session.
   Signed-out visitors can browse lesson types, dates, and times before they are
   asked to sign in; booking asks only at confirmation. Their way to lessons
   already booked is the site header's `Sign in`, beside the bar's menu button

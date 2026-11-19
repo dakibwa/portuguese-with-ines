@@ -38,12 +38,12 @@ export const metadata: Metadata = pageMetadata({
  */
 const primeBooking = BOOKING_API_BASE_URL
   ? `try{(function(b,z){var h={Accept:"application/json"};` +
-    `function prime(url){if(typeof AbortSignal==="undefined"||typeof AbortSignal.timeout!=="function")return null;` +
-    `var signal=AbortSignal.timeout(${BOOKING_READ_TIMEOUT_MS}),response=fetch(url,{headers:h,signal:signal});` +
+    `function prime(url,headers){if(typeof AbortSignal==="undefined"||typeof AbortSignal.timeout!=="function")return null;` +
+    `var signal=AbortSignal.timeout(${BOOKING_READ_TIMEOUT_MS}),response=fetch(url,{headers:headers||h,signal:signal});` +
     `response.catch(function(){});return {url:url,response:response,signal:signal}}` +
     `window.__inesLessonTypes=prime(b+"/lesson-types");` +
     `var s="",r="";try{s=localStorage.getItem("ines-student-session")||"";r=localStorage.getItem("ines-returning-student")||""}catch(e){}` +
-    `if(s){var m=fetch(b+"/me",{headers:{Accept:"application/json",Authorization:"Bearer "+s}});m.catch(function(){});window.__inesMe={token:s,response:m};return}` +
+    `if(s){var m=prime(b+"/me",{Accept:"application/json",Authorization:"Bearer "+s});if(m){m.token=s;window.__inesMe=m}return}` +
     `var q=new URLSearchParams(location.search);` +
     `if(q.get("view")==="lessons"||["manage","token","emailToken","card","signin"].some(function(k){return q.has(k)}))return;` +
     `var l=q.get("lesson"),t=l==="single"||l==="long"?l:r?"single":"trial";` +
