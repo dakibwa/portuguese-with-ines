@@ -1,4 +1,4 @@
-import { availabilityRevisionSql, computeAvailability, dailyFinishProblem, extraStartRanges, inTimeOff, isSlotBookable, listLessonTypes, loadLessonType, loadSettings, normaliseBlockedSpans, normaliseOnlineOnlyPeriods, onlineOnlyProblem } from "./availability.mjs";
+import { EXTRA_HOURS_NOTE, availabilityRevisionSql, calendarExceptions, computeAvailability, loadTeachingHours, inTimeOff, isSlotBookable, listLessonTypes, loadLessonType, loadSettings, normaliseBlockedSpans, normaliseOnlineOnlyPeriods, onlineOnlyProblem } from "./availability.mjs";
 import {
   OPEN_ENDED_HORIZON_WEEKS,
   SERIES_LENGTHS,
@@ -3882,11 +3882,8 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
     priceSnapshot = lessonPriceSnapshot(student.id, lessonType);
   }
   const teacher = Boolean(series.added_by_teacher);
-  // A run she placed is planned as one she added is: held only by her days
-  // off and her other lessons. A student's own run she had moved outside her
-  // published hours, or next to another lesson, was still planned by the
-  // student's rules, so every new week was skipped and the run ran out with
-  // nobody told. Its weeks stay the student's own in how they are paid.
+  // Teacher-placed runs keep her notice and buffer rules when extended.
+  // Their payment terms still belong to the student who booked them.
   const hers = teacher || await placedByTeacher(env, series.id);
   const checkedSettings = await loadSettings(env);
   const { lessonBufferMinutes } = checkedSettings;
@@ -4947,8 +4944,7 @@ async function rebookTerms(env, row, settings, now = new Date(), known = {}) {
     return refuse(`This lesson is too close now to book again here, so please message ${tutor.shortName}.`);
   }
 
-  const finishProblem = dailyFinishProblem(env, row.starts_at, row.ends_at);
-  if (finishProblem) return refuse(finishProblem);
+
 
   // `known` lets a list of lessons (Your lessons) pass the student it holds
   // and share one price look-up per lesson type, rather than asking per row.
@@ -4971,11 +4967,14 @@ async function rebookTerms(env, row, settings, now = new Date(), known = {}) {
   // Booked with no card and no agreement to pay, it comes back only while free.
   if (row.payment_status === FREE && priceCents !== 0) return refuse("This lesson is no longer free, so please book it from the calendar.");
 
-  // Time off she has taken since; her published hours are not asked for, so a
-  // lesson she placed outside them can still be booked again.
+  // Report newly taken time off specifically before checking the remaining working hours.
   if (await inTimeOff(env, row.starts_at, row.ends_at)) {
     return refuse(`${tutor.shortName} has taken that time off since, so it can't be booked again.`);
   }
+  const date = dateKey(new Date(row.starts_at));
+  const hours = await loadTeachingHours(env, date, date, settings.slotIntervalMinutes);
+  const hoursProblem = hours.problem(row.starts_at, row.ends_at);
+  if (hoursProblem) return refuse(hoursProblem);
   if (onlineOnlyProblem(settings, row.starts_at, row.ends_at, row.location)) {
     return refuse("That time is now online only, so please book an online lesson from the calendar.");
   }
@@ -6745,7 +6744,7 @@ async function teacherRestoreLesson(request, env, ctx, id, authorization) {
   const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
   if (!row) return fail("That booking could not be found.", 404, request, env);
   const now = new Date();
-  const problem = restoreProblem(row, now) || dailyFinishProblem(env, row.starts_at, row.ends_at);
+  const problem = restoreProblem(row, now) || authorization.hours.problem(row.starts_at, row.ends_at);
   if (problem) return fail(problem, 409, request, env);
 
   const clash = await env.DB.prepare(
@@ -6899,7 +6898,7 @@ async function teacherChangeLength(request, env, ctx, bookingId, body, authoriza
     }
     const endAt = endOf(lesson);
     // Her own lessons keep no gap, as when she adds one.
-    const reason = (past ? pastChangeProblem(lesson) : dailyFinishProblem(env, lesson.starts_at, endAt)) ||
+    const reason = (past ? pastChangeProblem(lesson) : authorization.hours.problem(lesson.starts_at, endAt)) ||
       lengthKeptReason(lesson, types.get(lesson.lesson_type_id), lessonType, amountCents) ||
       (others.some((other) => other.id !== lesson.id && other.starts_at < endAt && other.ends_at > lesson.starts_at)
         ? "it would run into another lesson" : "");
@@ -7021,7 +7020,7 @@ function daysBetweenKeys(fromKey, toKey) {
  * way) takes none of it and is named in the reply. A place change is the
  * student's own: the new place and a new sequence, after which `notify`
  * reconciles the one Google event and its Meet room. She is held only by
- * overlap and the daily finish, never by her start windows, time off or online-only periods, and no fee
+ * overlap and her saved working hours. Her choice of location still overrides online-only periods, and no fee
  * is ever created. A lesson already had, a record included, is corrected the
  * same way within the past, on its own and with nothing sent to anyone.
  */
@@ -7108,7 +7107,7 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
       reason = "its payment is going through";
     }
     if (past) reason ||= pastChangeProblem(lesson);
-    else if (startAt !== lesson.starts_at || lengthChanges) reason ||= dailyFinishProblem(env, startAt, endAt);
+    else if (startAt !== lesson.starts_at || lengthChanges) reason ||= authorization.hours.problem(startAt, endAt);
     reason ||= lengthChanges ? lengthKeptReason(lesson, currentType, nextType, amountCents) : "";
     if (reason) {
       kept.push({ lesson, reason });
@@ -7352,6 +7351,13 @@ async function handleAdmin(request, env, ctx, url, path) {
 
 async function handleAdminAction(request, env, ctx, url, path, admin, adminBody, authorization) {
 
+  // Bind the timetable snapshot to these writes, including the weeks in a teacher move.
+  if (request.method === "POST" && /^\/admin\/bookings(?:\/[^/]+\/(?:change|reschedule|restore))?$/.test(path)) {
+    const settings = await loadSettings(env);
+    const hours = await loadTeachingHours(env, dateKey(new Date()), "9999-12-31", settings.slotIntervalMinutes);
+    authorization = { ...authorization, hours, sql: `(${authorization.sql}) AND ${availabilityRevisionSql()}`,
+      values: [...authorization.values, settings.availabilityRevision] };
+  }
   // Her picker must offer same-day and back-to-back lessons, just as her
   // booking writes allow. The admin gate above checks accounts and access keys.
   if (request.method === "GET" && path === "/admin/lesson-availability") {
@@ -7451,7 +7457,8 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
   }
 
   if (request.method === "GET" && path === "/admin/availability") {
-    const [rules, exceptions] = await Promise.all([
+    const [settings, rules, exceptions] = await Promise.all([
+      loadSettings(env),
       env.DB.prepare("SELECT * FROM availability_rules ORDER BY weekday, start_minute").all(),
       // Weekly blocks (lunch) too: the calendar has to show every time students
       // cannot book, not only the one-off dates.
@@ -7459,7 +7466,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
         .bind(dateKey(new Date(), homeZone()))
         .all()
     ]);
-    return json({ rules: rules.results ?? [], exceptions: exceptions.results ?? [], settings: await loadSettings(env) }, 200, request, env);
+    return json({ rules: rules.results ?? [], exceptions: calendarExceptions(exceptions.results ?? [], settings.slotIntervalMinutes), settings }, 200, request, env);
   }
 
   if (request.method === "POST" && path === "/admin/online-only") {
@@ -7510,11 +7517,11 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     for (const rule of body.rules) {
       const weekday = rule?.weekday;
       const start = rule?.startMinute;
-      // The latest a lesson may begin, not when she finishes.
+      // The existing wire and column names carry her finish time.
       const lastStart = rule?.lastStartMinute;
       if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6 ||
           !Number.isInteger(start) || !Number.isInteger(lastStart) ||
-          lastStart < start || start < 0 || lastStart > 1440) {
+          lastStart <= start || start < 0 || lastStart > 1440) {
         return fail("Invalid weekly time range. No hours were changed.", 400, request, env);
       }
       statements.push(
@@ -7540,7 +7547,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     const dayOff = typeof body.dayOff === "boolean" ? body.dayOff : undefined;
     const blocks = "blocks" in body ? normaliseBlockedSpans(body.blocks) : undefined;
     // Sent as the times she chose; kept as the starts they give at her interval.
-    const extra = "extra" in body ? extraStartRanges(body.extra, (await loadSettings(env)).slotIntervalMinutes) : undefined;
+    const extra = "extra" in body ? normaliseBlockedSpans(body.extra) : undefined;
     if (blocks === null || extra === null) return fail("Those times could not be saved. Please reload and try again.", 400, request, env);
     if (dayOff === undefined && blocks === undefined && extra === undefined) return fail("Nothing to change.", 400, request, env);
     // As with her weekly hours: the date's whole set is replaced by what one
@@ -7584,13 +7591,13 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       }
     }
     if (extra) {
-      // An extra row ends at its last start, as availability reads it.
+      // Save the actual finish, including off-grid minutes.
       statements.push(env.DB.prepare(`DELETE FROM availability_exceptions WHERE date = ? AND weekday IS NULL AND kind = 'extra' AND (${authorization.sql})`).bind(body.date, ...authorization.values));
       for (const range of extra) {
         statements.push(
           env.DB.prepare(
-            `INSERT INTO availability_exceptions (date, kind, start_minute, end_minute, note, created_at) SELECT ?, 'extra', ?, ?, '', ? WHERE (${authorization.sql})`
-          ).bind(body.date, range.start, range.lastStart, created, ...authorization.values)
+            `INSERT INTO availability_exceptions (date, kind, start_minute, end_minute, note, created_at) SELECT ?, 'extra', ?, ?, ?, ? WHERE (${authorization.sql})`
+          ).bind(body.date, range.start, range.end, EXTRA_HOURS_NOTE, created, ...authorization.values)
         );
       }
     }
@@ -7601,7 +7608,8 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     )
       .bind(body.date)
       .all();
-    return json({ ok: true, exceptions: results ?? [] }, 200, request, env);
+    const { slotIntervalMinutes } = await loadSettings(env);
+    return json({ ok: true, exceptions: calendarExceptions(results ?? [], slotIntervalMinutes) }, 200, request, env);
   }
 
   // --- Bookings on a student's behalf --------------------------------------
@@ -8007,7 +8015,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
      */
     const past = start <= new Date();
     if (!past) {
-      const problem = dailyFinishProblem(env, start, endsAt);
+      const problem = authorization.hours.problem(start, endsAt);
       if (problem) return fail(problem, 409, request, env);
     }
     if (past && wantsRepeat) return fail("A weekly run starts today or later.", 400, request, env);
@@ -8017,11 +8025,8 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     if (paid && wantsRepeat) return fail("Tick weekly lessons as paid one at a time, from each lesson.", 400, request, env);
 
     /*
-     * Within the daily finish, her own bookings are checked for clashes, not against her published
-     * hours or the notice window. Those exist to shape what students may choose;
-     * she is the one who decides, and squeezing in a lesson outside them is a
-     * normal thing for her to do. A double booking is never intended, so that
-     * is still refused.
+     * Her bookings fit the working hours and can be back-to-back or at short notice.
+     * Both confirmed lessons and active holds can occupy the time.
      */
     const clash = await env.DB.prepare(
       `SELECT reference, student_id, starts_at FROM bookings
@@ -8219,7 +8224,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       .first();
     const endsAt = new Date(start.getTime() + lessonType.duration_minutes * 60000);
     if (start.getTime() > Date.now() && (start.getTime() !== Date.parse(row.starts_at) || endsAt.getTime() !== Date.parse(row.ends_at))) {
-      const problem = dailyFinishProblem(env, start, endsAt);
+      const problem = authorization.hours.problem(start, endsAt);
       if (problem) return fail(problem, 409, request, env);
     }
 

@@ -1,15 +1,14 @@
 import type { Span, TeachingWindow } from "./teacher-calendar";
 
 /** Trim empty edges while keeping every start, lesson and timed break visible. */
-export function timetableBounds({ windows, lessons, blocks, step, editing }: {
+export function timetableBounds({ windows, lessons, blocks, editing }: {
   windows: TeachingWindow[];
   lessons: Span[];
   blocks: Span[];
-  step: number;
   editing: boolean;
 }) {
   const spans = [
-    ...windows.filter(window => Number.isFinite(window.start) && Number.isFinite(window.lastStart)).map(window => ({ start: window.start, end: window.lastStart + step })),
+    ...windows,
     ...lessons,
     ...blocks.filter(block => block.start > 0 || block.end < 1440),
   ].filter(span => Number.isFinite(span.start) && Number.isFinite(span.end) && span.end > span.start);

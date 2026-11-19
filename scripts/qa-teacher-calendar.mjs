@@ -259,7 +259,7 @@ async function fixture(width, options = {}) {
           ...state.exceptions.filter((entry) => !(entry.date === data.date && entry.weekday == null && entry.kind === "extra")),
           ...data.extra.map((span) => ({
             ...row(span.startMinute, span.startMinute + (Math.ceil((span.endMinute - span.startMinute) / 30) - 1) * 30),
-            kind: "extra",
+            kind: "extra", finish_minute: span.endMinute,
           })),
         ];
       return route.fulfill({
@@ -604,13 +604,13 @@ try {
     await choice.getByLabel("Until", { exact: true }).fill("18:00");
     await choice.getByRole("button", { name: "Extra hours", exact: true }).click();
     await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-08", extra: [{ startMinute: 960, endMinute: 1080 }] });
-    await expect(note).toHaveText("Lessons can start 16:00–17:30 on Tue 8 Sept.");
+    await expect(note).toHaveText("Working hours 16:00–18:00 on Tue 8 Sept.");
     await expect(page.locator(".teacher-block-label", { hasText: "Extra hours 16:00–18:00" })).toBeVisible();
     for (const minute of [960, 1050]) await expect(slot(page, 2, minute)).toHaveClass(/is-available/);
     // Pressed again they open as their block, their starts in words, and go with Not working.
     await slot(page, 2, 1020).click();
     await expect(choice.getByRole("button", { name: "Extra hours", exact: true })).toHaveAttribute("aria-pressed", "true");
-    await expect(choice.locator(".teacher-slot-menu__starts")).toHaveText("Lessons can start 16:00–17:30");
+    await expect(choice.locator(".teacher-slot-menu__starts")).toHaveText("Working hours 16:00–18:00");
     await choice.getByRole("button", { name: "Not working", exact: true }).click();
     await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-08", extra: [] });
     await expect(page.locator(".teacher-block-label", { hasText: "Extra hours" })).toHaveCount(0);
@@ -749,7 +749,7 @@ try {
         last_start_minute,
       ]),
     [
-      [480, 480],
+      [480, 510],
       [540, 690],
     ],
   );
@@ -759,10 +759,10 @@ try {
     "Another day's precise hours must survive painting",
   );
   await slot(page, 3, 600).click();
-  await expect(page.getByLabel("Wednesday window 1, first start")).toHaveValue(
+  await expect(page.getByLabel("Wednesday window 1, start time")).toHaveValue(
     "10:15",
   );
-  await page.getByLabel("Wednesday window 1, last start").fill("09:00");
+  await page.getByLabel("Wednesday window 1, finish time").fill("09:00");
   await expect(
     page.getByRole("button", { name: "Save weekly hours", exact: true }),
   ).toBeDisabled();

@@ -500,16 +500,16 @@ free times and removes selected times that cannot be booked in the new place.
   are; the week's timetable keeps its own paper. They
   use the site's buttons: coral for the main action, outline for the other, a
   small outline button or the quiet lilac chip for a rare one. Weekly hours is headed `Your weekly hours` with two dabs:
-  tap or drag to mark when a lesson can start, and that it repeats every week.
+  tap or drag to mark working hours, and that they repeat every week.
 - `Edit weekly hours` in the Timetable opens the repeating weekly pattern in
   the same calendar. `View lessons` returns to the chosen week and day without
   losing unsaved hours; only `Save weekly hours` saves them, and booking
   activity must never silently discard that draft.
   The edit control also marks a waiting draft. Clicking or
-  dragging marks lesson start times. Preserve exact existing first/last-start
-  values and provide an exact-time editor. New lesson times must also fit
-  the full lesson before or at 19:30 Porto time.
-  If changed hours cross an existing lesson, say once that it is outside the new
+  dragging marks working time. The exact-time editor shows Start and Finish
+  in Porto time. Each lesson must fit in full within the working hours Inês
+  sets for that date.
+  If removing working time cuts into an existing lesson, say once that it is outside the new
   hours and stays booked, then show each as a booked-lesson card. Check booked
   lessons before allowing a save.
   Half-hour cells include both quarter-hour starts when the booking interval

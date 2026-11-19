@@ -26,19 +26,24 @@ function overlaps(startA, endA, startB, endB) {
   return startA < endB && startB < endA;
 }
 
-/** The last instant a lesson starting on this teaching date may occupy. */
-function dailyFinishAt(tutor, { year, month, day }) {
-  const minute = tutor.bookings?.latestFinishMinute;
-  return minute == null ? Infinity : zonedToUtc(year, month, day, minute, tutor.place.timeZone).getTime();
+// Earlier extra-hour rows stored the last grid start. New saves keep the exact finish.
+export const EXTRA_HOURS_NOTE = "Working hours (exact finish)";
+
+function extraFinishMinute(row, interval) {
+  if (row.end_minute == null) return 1440;
+  return row.note === EXTRA_HOURS_NOTE ? row.end_minute : Math.min(1440, row.end_minute + interval);
 }
 
-export function dailyFinishProblem(env, startAt, endAt) {
-  const tutor = tutorOf(env);
-  const day = zonedParts(new Date(startAt), tutor.place.timeZone);
-  if (new Date(endAt).getTime() <= dailyFinishAt(tutor, day)) return "";
-  const minute = tutor.bookings.latestFinishMinute;
-  const clock = [Math.floor(minute / 60), minute % 60].map(part => String(part).padStart(2, "0")).join(":");
-  return `Lessons must finish by ${clock} ${tutor.place.city} time.`;
+/** Older open editors still read end_minute as the last start in an extra window. */
+export function calendarExceptions(rows, interval) {
+  return rows.map(row => {
+    if (row.kind !== "extra") return row;
+    const finish = extraFinishMinute(row, interval);
+    if (row.note !== EXTRA_HOURS_NOTE) return { ...row, finish_minute: finish };
+    const start = row.start_minute ?? 0;
+    const last = start + Math.max(0, Math.ceil((finish - start) / interval) - 1) * interval;
+    return { ...row, end_minute: last, finish_minute: finish, note: "" };
+  });
 }
 
 /** Bumped in the same transaction as teaching-hour and notice-setting writes. */
@@ -73,19 +78,6 @@ export function normaliseBlockedSpans(blocks) {
   return merged.some((span) => span.start === 0 && span.end === 1440) ? null : merged;
 }
 
-/**
- * Extra hours on one date arrive as the span of times she chose and are kept
- * as the start ranges her weekly hours are: the first start and the last, the
- * last booking-interval step before the span ends. At 30 minutes 15:00–17:00
- * starts 15:00 to 16:30, so a 90-minute lesson may begin at 16:30 as it may at
- * a weekly last start.
- */
-export function extraStartRanges(extra, interval) {
-  const spans = normaliseBlockedSpans(extra);
-  if (!spans || !Number.isInteger(interval) || interval < 1) return null;
-  return spans.map((span) => ({ start: span.start, lastStart: span.start + (Math.ceil((span.end - span.start) / interval) - 1) * interval }));
-}
-
 /** Date ranges are inclusive; the same real span of teaching-clock time applies each day. */
 export function normaliseOnlineOnlyPeriods(periods) {
   if (!Array.isArray(periods) || periods.length > 100) return null;
@@ -105,7 +97,7 @@ export function normaliseOnlineOnlyPeriods(periods) {
 
 function onlineOnlySpans(periods, from, to) {
   if (!periods.length) return [];
-  return eachDateKey(from, to).flatMap(key => blockedInstantSpans(key, periods
+  return eachDateKey(from, to).flatMap(key => instantSpans(key, periods
     .filter(period => period.fromDate <= key && key <= period.toDate)
     .map(period => ({ start: period.startMinute, end: period.endMinute }))));
 }
@@ -123,10 +115,8 @@ export function onlineOnlyProblem(settings, startAt, endAt, location) {
 /**
  * Candidate start times (minutes from midnight, Porto) for one day.
  *
- * `startRanges` are {start, lastStart} — both are *start* times, so a lesson
- * beginning at lastStart may legitimately finish after it. `blockedSpans` are
- * real spans of time: a lesson is withheld when it would overlap one, not
- * merely when it begins inside one.
+ * The grid uses each opening minute as its anchor and excludes the finish.
+ * The caller checks the elapsed lesson against the working time in real instants.
  */
 export function candidateStartMinutes({ startRanges, blockedSpans = [], duration, interval }) {
   const starts = new Set();
@@ -134,7 +124,7 @@ export function candidateStartMinutes({ startRanges, blockedSpans = [], duration
   // Each window owns its starting grid. Merging a 10:15 extra window into
   // 10:00 weekly hours would erase 10:15 when the interval is 30 minutes.
   for (const range of startRanges) {
-    for (let minute = range.start; minute <= range.lastStart; minute += interval) {
+    for (let minute = range.start; minute < range.end; minute += interval) {
       if (blockedSpans.some((span) => overlaps(minute, minute + duration, span.start, span.end))) continue;
       starts.add(minute);
     }
@@ -144,7 +134,7 @@ export function candidateStartMinutes({ startRanges, blockedSpans = [], duration
 }
 
 /** Time off covers actual instants, including both copies of a repeated hour. */
-function blockedInstantSpans(key, spans) {
+function instantSpans(key, spans) {
   if (!spans.length) return [];
   const { start, end } = dayBounds(key);
   const startMs = start.getTime(), endMs = end.getTime();
@@ -167,6 +157,72 @@ function blockedInstantSpans(key, spans) {
   return intervals;
 }
 
+/** Read one timetable snapshot for a single booking or a whole weekly run. */
+export async function loadTeachingHours(env, fromKey, toKey, interval) {
+  const [rules, exceptions] = await Promise.all([
+    env.DB.prepare("SELECT weekday, start_minute, last_start_minute FROM availability_rules WHERE active = 1").all(),
+    // One-off overrides in range, plus every recurring weekly block.
+    env.DB.prepare(
+      `SELECT date, weekday, kind, start_minute, end_minute, note FROM availability_exceptions
+       WHERE (date BETWEEN ? AND ?) OR weekday IS NOT NULL`
+    )
+      .bind(fromKey, toKey)
+      .all()
+  ]);
+  const rulesByWeekday = new Map();
+  for (const rule of rules.results ?? []) {
+    const list = rulesByWeekday.get(rule.weekday) ?? [];
+    list.push({ start: rule.start_minute, end: rule.last_start_minute });
+    rulesByWeekday.set(rule.weekday, list);
+  }
+
+  const exceptionsByDate = new Map();
+  const recurringByWeekday = new Map();
+
+  for (const exception of exceptions.results ?? []) {
+    if (exception.weekday !== null && exception.weekday !== undefined) {
+      const list = recurringByWeekday.get(exception.weekday) ?? [];
+      list.push(exception);
+      recurringByWeekday.set(exception.weekday, list);
+      continue;
+    }
+
+    const list = exceptionsByDate.get(exception.date) ?? [];
+    list.push(exception);
+    exceptionsByDate.set(exception.date, list);
+  }
+
+  const days = new Map();
+  function day(key) {
+    if (days.has(key)) return days.get(key);
+    const weekday = weekdayOf(key);
+    const exceptions = [...(recurringByWeekday.get(weekday) ?? []), ...(exceptionsByDate.get(key) ?? [])];
+    const startRanges = [...(rulesByWeekday.get(weekday) ?? []), ...exceptions.filter(row => row.kind === "extra")
+      .map(row => ({ start: row.start_minute ?? 0, end: extraFinishMinute(row, interval) }))];
+    const open = [];
+    // Combine touching windows for coverage, keeping each starting grid for the picker.
+    const windows = startRanges.filter(span => span.start < span.end);
+    for (const span of instantSpans(key, windows).sort((a, b) => a.start - b.start)) {
+      const last = open.at(-1);
+      if (last && span.start <= last.end) last.end = Math.max(last.end, span.end);
+      else open.push(span);
+    }
+    const blocked = instantSpans(key, exceptions.filter(row => row.kind === "blocked")
+      .map(row => ({ start: row.start_minute ?? 0, end: row.end_minute ?? 1440 })));
+    const contains = (start, end) => open.some(span => span.start <= start && end <= span.end)
+      && !blocked.some(span => overlaps(start, end, span.start, span.end));
+    const value = { startRanges, contains };
+    days.set(key, value);
+    return value;
+  }
+  function problem(startAt, endAt) {
+    const start = new Date(startAt), end = new Date(endAt);
+    return day(dateKey(start)).contains(start.getTime(), end.getTime())
+      ? "" : `The whole lesson must fit within ${tutorOf(env).shortName}’s working hours.`;
+  }
+  return { day, problem };
+}
+
 /**
  * True when one-off time off covers any part of the lesson on its Porto
  * date(s): a whole day off, or hours that overlap it. Weekly blocks and her
@@ -179,7 +235,7 @@ export async function inTimeOff(env, startAt, endAt) {
   const { results } = await env.DB.prepare(
     "SELECT date, start_minute, end_minute FROM availability_exceptions WHERE weekday IS NULL AND kind = 'blocked' AND date BETWEEN ? AND ?"
   ).bind(fromKey, toKey).all();
-  const spans = eachDateKey(fromKey, toKey).flatMap(key => blockedInstantSpans(key, (results ?? [])
+  const spans = eachDateKey(fromKey, toKey).flatMap(key => instantSpans(key, (results ?? [])
     .filter(exception => exception.date === key)
     .map(exception => ({ start: exception.start_minute ?? 0, end: exception.end_minute ?? 1440 }))));
   return spans.some(span => overlaps(start.getTime(), end.getTime(), span.start, span.end));
@@ -242,7 +298,6 @@ export async function computeAvailability(
   { fromKey, toKey, lessonType, now, ignoreBookingId = null, ignoreSeriesId = null, ignoreHoldsOf = null, ignoreHorizon = false, teacher = false, location = "online", dates = null }
 ) {
   const settings = await loadSettings(env);
-  const tutor = tutorOf(env);
   const duration = Number(lessonType.duration_minutes);
   const interval = settings.slotIntervalMinutes;
   // Each lesson, booked or proposed, reaches this far past its end, so two
@@ -269,15 +324,8 @@ export async function computeAvailability(
   const windowEnd = dayBounds(end).end.toISOString();
   const exceptionsEnd = addDaysToKey(end, Math.ceil(duration / 1440));
 
-  const [rules, exceptions, booked] = await Promise.all([
-    env.DB.prepare("SELECT weekday, start_minute, last_start_minute FROM availability_rules WHERE active = 1").all(),
-    // One-off overrides in range, plus every recurring weekly block.
-    env.DB.prepare(
-      `SELECT date, weekday, kind, start_minute, end_minute FROM availability_exceptions
-       WHERE (date BETWEEN ? AND ?) OR weekday IS NOT NULL`
-    )
-      .bind(start, exceptionsEnd)
-      .all(),
+  const [hours, booked] = await Promise.all([
+    loadTeachingHours(env, start, end, interval),
     // A slot is busy when it is confirmed, and also while it is held for a
     // checkout that has not been abandoned yet — otherwise two students could
     // pay for the same time. An expired hold stops counting automatically.
@@ -296,60 +344,19 @@ export async function computeAvailability(
       .all()
   ]);
 
-  const rulesByWeekday = new Map();
-  for (const rule of rules.results ?? []) {
-    const list = rulesByWeekday.get(rule.weekday) ?? [];
-    list.push({ start: rule.start_minute, lastStart: rule.last_start_minute });
-    rulesByWeekday.set(rule.weekday, list);
-  }
-
-  const exceptionsByDate = new Map();
-  const recurringByWeekday = new Map();
-
-  for (const exception of exceptions.results ?? []) {
-    if (exception.weekday !== null && exception.weekday !== undefined) {
-      const list = recurringByWeekday.get(exception.weekday) ?? [];
-      list.push(exception);
-      recurringByWeekday.set(exception.weekday, list);
-      continue;
-    }
-
-    const list = exceptionsByDate.get(exception.date) ?? [];
-    list.push(exception);
-    exceptionsByDate.set(exception.date, list);
-  }
-
   const busy = (booked.results ?? [])
     .filter((row) => (!ignoreBookingId || row.id !== ignoreBookingId) && (!ignoreSeriesId || row.series_id !== ignoreSeriesId)
       && !(ignoreHoldsOf && row.status === "pending_payment" && row.student_id === ignoreHoldsOf))
     .map((row) => ({ start: new Date(row.starts_at).getTime(), end: new Date(row.ends_at).getTime() + bufferMs }));
 
-  const blocked = eachDateKey(start, exceptionsEnd).flatMap(key => blockedInstantSpans(key, [
-    ...(recurringByWeekday.get(weekdayOf(key)) ?? []),
-    ...(exceptionsByDate.get(key) ?? [])
-  ].filter(exception => exception.kind === "blocked")
-    .map(exception => ({ start: exception.start_minute ?? 0, end: exception.end_minute ?? 1440 }))));
-  if (!teacher && location === "porto") blocked.push(...onlineOnlySpans(settings.onlineOnlyPeriods, start, exceptionsEnd));
+  const placeBlocks = !teacher && location === "porto" ? onlineOnlySpans(settings.onlineOnlyPeriods, start, exceptionsEnd) : [];
 
   const slotsByDate = {};
 
   for (const key of eachDateKey(start, end)) {
     if (dates && !dates.has(key)) continue;
-    const dayExceptions = [
-      ...(recurringByWeekday.get(weekdayOf(key)) ?? []),
-      ...(exceptionsByDate.get(key) ?? [])
-    ];
-
-    // Weekly and extra ranges set possible starts. The daily finish limits the full lesson.
-    const startRanges = [
-      ...(rulesByWeekday.get(weekdayOf(key)) ?? []),
-      ...dayExceptions
-        .filter((exception) => exception.kind === "extra")
-        .map((exception) => ({ start: exception.start_minute ?? 0, lastStart: exception.end_minute ?? 1440 }))
-    ];
-
+    const { startRanges, contains } = hours.day(key);
     const { year, month, day } = parseDateKey(key);
-    const finishAt = dailyFinishAt(tutor, { year, month, day });
     const daySlots = [];
 
     for (const minute of candidateStartMinutes({ startRanges, duration, interval })) {
@@ -360,8 +367,8 @@ export async function computeAvailability(
       if (wall.year !== year || wall.month !== month || wall.day !== day || wall.hour * 60 + wall.minute !== minute) continue;
       const slotEnd = new Date(slotStart.getTime() + duration * 60000);
 
-      if (slotStart < earliest || slotEnd.getTime() > finishAt) continue;
-      if (blocked.some(span => overlaps(slotStart.getTime(), slotEnd.getTime(), span.start, span.end))) continue;
+      if (slotStart < earliest || !contains(slotStart.getTime(), slotEnd.getTime())) continue;
+      if (placeBlocks.some(span => overlaps(slotStart.getTime(), slotEnd.getTime(), span.start, span.end))) continue;
       if (busy.some((entry) => overlaps(slotStart.getTime(), slotEnd.getTime() + bufferMs, entry.start, entry.end))) continue;
 
       daySlots.push({ startAt: slotStart.toISOString(), endAt: slotEnd.toISOString() });
@@ -370,7 +377,7 @@ export async function computeAvailability(
     if (daySlots.length) slotsByDate[key] = daySlots;
   }
 
-  return { slotsByDate, settings };
+  return { slotsByDate, settings, hours };
 }
 
 /**
@@ -386,7 +393,7 @@ export async function isSlotBookable(
   if (Number.isNaN(start.getTime())) return { ok: false, reason: "That time could not be understood." };
 
   const key = dateKey(start, homeZone());
-  const { slotsByDate, settings: checkedSettings } = await computeAvailability(env, {
+  const { slotsByDate, settings: checkedSettings, hours } = await computeAvailability(env, {
     fromKey: key,
     toKey: key,
     lessonType,
@@ -426,7 +433,7 @@ export async function isSlotBookable(
     return { ok: false, reason: "That's further ahead than booking is open. Please choose an earlier date." };
   }
 
-  const finishProblem = dailyFinishProblem(env, start, endAt);
-  if (finishProblem) return { ok: false, reason: finishProblem };
+  const hoursProblem = hours?.problem(start, endAt);
+  if (hoursProblem) return { ok: false, reason: hoursProblem };
   return { ok: false, reason: "That time has just been taken or is no longer available. Please choose another." };
 }

@@ -24,7 +24,7 @@ export const WEEKDAYS = [
   { value: 0, name: "Sunday", short: "Sun" },
 ];
 
-export type TeachingWindow = { start: number; lastStart: number };
+export type TeachingWindow = Span;
 export type WeekHours = Record<number, TeachingWindow[]>;
 
 // Building an Intl formatter costs far more than formatting with one, and her
@@ -79,10 +79,10 @@ export function hoursFromRules(rules: AvailabilityRule[]): WeekHours {
     WEEKDAYS.map((day) => [day.value, []]),
   ) as WeekHours;
   for (const rule of rules) {
-    if (rule.active === 0) continue;
+    if (rule.active === 0 || rule.start_minute >= rule.last_start_minute) continue;
     week[rule.weekday].push({
       start: rule.start_minute,
-      lastStart: rule.last_start_minute,
+      end: rule.last_start_minute,
     });
   }
   for (const windows of Object.values(week))
@@ -105,13 +105,13 @@ export function hoursProblem(week: WeekHours) {
     for (const window of week[day.value] ?? []) {
       if (
         !Number.isInteger(window.start) ||
-        !Number.isInteger(window.lastStart) ||
+        !Number.isInteger(window.end) ||
         window.start < 0 ||
         window.start > 1439 ||
-        window.lastStart > 1440 ||
-        window.lastStart < window.start
+        window.end > 1440 ||
+        window.end <= window.start
       ) {
-        return `Check ${day.name}’s hours: the last start must be at or after the first.`;
+        return `Check ${day.name}’s hours: the finish must be after the start.`;
       }
     }
   }
@@ -123,25 +123,24 @@ export function lessonStarts(windows: TeachingWindow[], interval = 30) {
   if (!Number.isFinite(interval) || interval < 1) return [];
   const starts = new Set<number>();
   for (const window of windows) {
-    if (!Number.isFinite(window.start) || !Number.isFinite(window.lastStart)) continue;
-    for (let minute = window.start; minute <= window.lastStart; minute += interval) starts.add(minute);
+    if (!Number.isFinite(window.start) || !Number.isFinite(window.end)) continue;
+    for (let minute = window.start; minute < window.end; minute += interval) starts.add(minute);
   }
   return [...starts].sort((a, b) => a - b);
 }
 
-/** Booked lessons touched by a changed weekly start time still stay booked. */
-export function bookingsAffectedByHours(bookings: AdminBooking[], before: WeekHours, after: WeekHours, interval: number, now: Date) {
+/** Warn if some of a booked lesson’s working time is being removed. */
+export function bookingsAffectedByHours(bookings: AdminBooking[], before: WeekHours, after: WeekHours, now: Date) {
   const changes = new Map(WEEKDAYS.map(({ value }) => {
-    const saved = new Set(lessonStarts(before[value] ?? [], interval));
-    const draft = new Set(lessonStarts(after[value] ?? [], interval));
-    return [value, [...new Set([...saved, ...draft])].filter(minute => saved.has(minute) !== draft.has(minute))];
+    const old = mergeSpans(before[value] ?? []), next = mergeSpans(after[value] ?? []);
+    return [value, next.reduce(removeSpan, old)];
   }));
   return bookings.filter(booking => {
     if (booking.status !== "confirmed" || Date.parse(booking.ends_at) <= now.getTime()) return false;
     const weeks = new Set([mondayOf(dateKey(new Date(booking.starts_at))), mondayOf(dateKey(new Date(Date.parse(booking.ends_at) - 1)))]);
     return [...weeks].some(week => bookingSegments([booking], week).some(segment => {
       const weekday = new Date(`${segment.date}T12:00:00Z`).getUTCDay();
-      return changes.get(weekday)?.some(minute => minute >= segment.start && minute < segment.end);
+      return overlapsSpan(changes.get(weekday) ?? [], segment.start, segment.end);
     }));
   }).sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
 }
@@ -152,8 +151,8 @@ export function canPaintHours(windows: TeachingWindow[], interval: number) {
     windows.every(
       (window) =>
         window.start % interval === 0 &&
-        window.lastStart % interval === 0 &&
-        window.lastStart < 1440,
+        window.end % interval === 0 &&
+        window.end <= 1440,
     )
   );
 }
@@ -179,8 +178,8 @@ export function paintHours(
   const result: TeachingWindow[] = [];
   for (const minute of [...starts].sort((a, b) => a - b)) {
     const last = result.at(-1);
-    if (last && last.lastStart + interval === minute) last.lastStart = minute;
-    else result.push({ start: minute, lastStart: minute });
+    if (last && last.end === minute) last.end = minute + interval;
+    else result.push({ start: minute, end: minute + interval });
   }
   return result;
 }
@@ -236,28 +235,6 @@ export function removeSpan(spans: Span[], cut: Span) {
   );
 }
 
-/**
- * Extra hours are lesson starts, a step of her booking interval apart from
- * each block's first. Taking a stretch out of them takes the starts inside it
- * and leaves every other start where it was. Cut as plain time, a stretch at
- * minutes off that grid left hours beginning at the cut, and the Worker,
- * which keeps a block as its first and last start, stepped new starts from
- * there: off her grid, and one later than any she had offered.
- */
-export function removeStarts(spans: Span[], cut: Span, interval: number) {
-  return spans.flatMap((span) => {
-    if (cut.end <= span.start || cut.start >= span.end) return [span];
-    const kept: Span[] = [];
-    for (let start = span.start; start < span.end; start += interval) {
-      if (start >= cut.start && start < cut.end) continue;
-      const before = kept.at(-1);
-      if (before && before.end === start) before.end = Math.min(1440, start + interval);
-      else kept.push({ start, end: Math.min(1440, start + interval) });
-    }
-    return kept;
-  });
-}
-
 export function overlapsSpan(spans: Span[], start: number, end: number) {
   return spans.some((span) => span.start < end && start < span.end);
 }
@@ -287,59 +264,23 @@ export function dateBlocks(
   );
 }
 
-/**
- * Extra hours on one date (11 November 2026, Dan: "can Ines also have the
- * option to add in working hours too against her normal weekly hours"):
- * times a lesson can start, exactly as her weekly hours are. On the Timetable
- * they are a span of times; the Worker keeps their first start and their
- * last, the last booking-interval step before the span ends, so 15:00–17:00
- * at 30 minutes starts 15:00 to 16:30.
- */
-export function lastStartIn(span: Span, interval: number) {
-  return span.start + Math.max(0, Math.ceil((span.end - span.start) / interval) - 1) * interval;
-}
-
-/** The times extra hours cover: from their first start to their last start's end. */
-export function extraSpan(span: Span, interval: number): Span {
-  return { start: span.start, end: Math.min(1440, lastStartIn(span, interval) + interval) };
-}
-
-/** `15:00–16:30`, or `15:00` alone: when lessons can start within `span`. */
-export function startsLabel(span: Span, interval: number) {
-  const last = lastStartIn(span, interval);
-  return last > span.start ? `${minuteLabel(span.start)}–${minuteLabel(last)}` : minuteLabel(span.start);
-}
-
-/**
- * One date's own extra hours as the Worker keeps them, first and last start;
- * no times means the whole day, as availability reads it. Weekly extra rows
- * are not hers to change here, so they are left out.
- */
-export function dateExtraWindows(exceptions: AvailabilityException[], date: string): TeachingWindow[] {
+/** Exact finish of dated extra hours, including rows saved by the old editor. */
+export function dateExtraWindows(exceptions: AvailabilityException[], date: string, interval: number): TeachingWindow[] {
   return exceptions
     .filter((exception) => exception.kind === "extra" && exception.weekday == null && exception.date === date)
-    .map((exception) => ({ start: exception.start_minute ?? 0, lastStart: exception.end_minute ?? 1440 }))
+    .map((exception) => ({ start: exception.start_minute ?? 0, end: exception.finish_minute ?? Math.min(1440, (exception.end_minute ?? 1440) + interval) }))
     .sort((a, b) => a.start - b.start);
 }
 
 /** The same as the times they cover on the Timetable, merged. */
 export function dateExtras(exceptions: AvailabilityException[], date: string, interval: number): Span[] {
-  return mergeSpans(dateExtraWindows(exceptions, date).map((window) => ({ start: window.start, end: Math.min(1440, window.lastStart + interval) })));
+  return mergeSpans(dateExtraWindows(exceptions, date, interval));
 }
 
-/**
- * Whether the choice offers `Extra hours` for `span`: only where they would
- * let a lesson start where none could yet, some start in it (each interval
- * step from its start) outside every window of starts she already has that
- * day, weekly or extra. Times inside her hours gain nothing. Never for the
- * whole day, which the Worker refuses as it refuses a whole day of time off:
- * pressed on a day online only from end to end, the choice opens on all of it.
- */
+/** Offer extra hours when any part of the chosen span extends the current working time. */
 export function offersExtraHours(windows: TeachingWindow[], span: Span, interval: number) {
   if (!(interval >= 1) || (span.start <= 0 && span.end >= 1440)) return false;
-  for (let minute = span.start; minute < span.end; minute += interval)
-    if (!windows.some((window) => window.start <= minute && minute <= window.lastStart)) return true;
-  return false;
+  return !mergeSpans(windows).some(window => window.start <= span.start && span.end <= window.end);
 }
 
 /** Time blocked every week on this weekday, such as lunch. */
@@ -489,12 +430,10 @@ export function chooseHours(
   original: HoursBlock | null,
   kind: HoursChoice,
   span: Span,
-  /** Her booking interval, so extra hours lose whole starts (`removeStarts`). */
-  interval?: number,
 ) {
   let { off, online, extra } = current;
   const was = (of: HoursKind) => original?.kind === of || (of === "online" && Boolean(original?.online));
-  const withoutExtra = (cut: Span) => interval ? removeStarts(extra, cut, interval) : removeSpan(extra, cut);
+  const withoutExtra = (cut: Span) => removeSpan(extra, cut);
   // A kind chosen replaces the block pressed; opening again and not working take only the times set.
   if (original && kind && kind !== "not working") {
     if (was("off")) off = removeSpan(off, original.span);
@@ -591,7 +530,6 @@ function localMinute(value: string) {
 export function withDayChanges(
   exceptions: AvailabilityException[],
   changes: Map<string, { dayOff?: boolean; blocks?: Span[]; extra?: Span[] }>,
-  interval: number,
 ) {
   let rows = exceptions;
   for (const [date, change] of changes) {
@@ -610,7 +548,7 @@ export function withDayChanges(
     if (change.extra)
       rows = [
         ...rows.filter((row) => !(row.date === date && row.weekday == null && row.kind === "extra")),
-        ...change.extra.map((span) => oneOffRow(date, span.start, lastStartIn(span, interval), "extra")),
+        ...change.extra.map((span) => oneOffRow(date, span.start, span.end, "extra")),
       ];
   }
   return rows;
@@ -628,6 +566,7 @@ function oneOffRow(
     weekday: null,
     kind,
     note: "",
+    ...(kind === "extra" ? { finish_minute: end } : {}),
     start_minute: start,
     end_minute: end,
   };

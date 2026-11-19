@@ -43,7 +43,6 @@ import {
   shownAsAdded,
   spanAround,
   spanLabel,
-  startsLabel,
   weeklyBlocks,
   type HoursBlock,
   type HoursChoice,
@@ -166,7 +165,7 @@ export function WeeklyTimetable({
       (hours[WEEKDAYS[index].value] ?? []).length > 0 ||
       (!editing &&
         (segments.some((segment) => segment.date === shiftDate(weekStart, index)) ||
-          dateExtraWindows(exceptions, shiftDate(weekStart, index)).length > 0)),
+          dateExtraWindows(exceptions, shiftDate(weekStart, index), interval).length > 0)),
   );
   const activeDay = shown.includes(mobileDay)
     ? mobileDay
@@ -179,7 +178,7 @@ export function WeeklyTimetable({
     .flat()
     .filter(
       (window) =>
-        Number.isFinite(window.start) && Number.isFinite(window.lastStart),
+        Number.isFinite(window.start) && Number.isFinite(window.end),
     );
   const { start, end } = timetableBounds({
     windows: allWindows,
@@ -193,7 +192,6 @@ export function WeeklyTimetable({
         ...onlineOnlyHours(onlineOnly, date),
       ];
     }),
-    step,
     editing,
   });
   const onlineShown = !editing && shown.some(index => onlineOnlyHours(onlineOnly, shiftDate(weekStart, index)).length > 0);
@@ -206,7 +204,7 @@ export function WeeklyTimetable({
   const menuSpan = slotMenu?.span ? chosenSpan() : null;
   const choices = slotMenu?.span ? hoursChoices({ ...slotMenu, span: slotMenu.span }) : null;
   // When lessons could start in the times as typed, said while Extra hours is the kind in view.
-  const starts = choices?.extra && menuSpan ? startsLabel(menuSpan, interval) : null;
+  const starts = choices?.extra && menuSpan ? spanLabel(menuSpan) : null;
   const startsShown = Boolean(starts) && (slotMenu?.original?.kind === "extra" || extraInView);
 
   useLayoutEffect(() => {
@@ -240,7 +238,7 @@ export function WeeklyTimetable({
             ...segments
               .filter((segment) => segment.date === date)
               .map((segment) => segment.start),
-            ...dateExtraWindows(exceptions, date).map((window) => window.start),
+            ...dateExtraWindows(exceptions, date, interval).map((window) => window.start),
           ]),
     ].filter(Number.isFinite);
     const usual = allWindows.map((window) => window.start);
@@ -327,7 +325,7 @@ export function WeeklyTimetable({
     if (!editing) {
       setFocus({ day, minute });
       // A time gone can only have a lesson recorded in it (15 October 2026,
-      // Dan); a day off or a weekly block can still hold one she arranges.
+      // Dan); the server checks working hours for every future lesson.
       if (locked(day, minute)) {
         if (onAddLesson) openSlotMenu({ day, minute, single: true, span: null, original: null });
         return;
@@ -481,7 +479,7 @@ export function WeeklyTimetable({
       pressed: (kind: HoursKind) => original?.kind === kind || (kind === "online" && original?.kind === "extra" &&
         online.some((span) => span.start <= original.span.start && original.span.end <= span.end)),
       // Extra hours pressed can always take new times, short of the whole day.
-      extra: offersExtraHours([...(hours[menu.day] ?? []), ...dateExtraWindows(exceptions, date)], live, interval) ||
+      extra: offersExtraHours([...(hours[menu.day] ?? []), ...dateExtraWindows(exceptions, date, interval)], live, interval) ||
         (original?.kind === "extra" && (live.start > 0 || live.end < 1440)),
       openAgain: original?.kind === "off" || original?.kind === "online" || touches(dateBlocks(exceptions, date)) || touches(online),
       notWorking: original?.kind === "extra" || touches(dateExtras(exceptions, date, interval)),
@@ -639,9 +637,9 @@ export function WeeklyTimetable({
               {(hours[exactDay] ?? []).map((window, index) => (
                 <div className="teacher-exact-window" key={index}>
                   <label>
-                    <span>First start</span>
+                    <span>Start</span>
                     <input
-                      aria-label={`${WEEKDAYS.find((d) => d.value === exactDay)!.name} window ${index + 1}, first start`}
+                      aria-label={`${WEEKDAYS.find((d) => d.value === exactDay)!.name} window ${index + 1}, start time`}
                       type="time"
                       disabled={disabled}
                       value={
@@ -657,19 +655,19 @@ export function WeeklyTimetable({
                     />
                   </label>
                   <label>
-                    <span>Last start</span>
+                    <span>Finish</span>
                     <input
-                      aria-label={`${WEEKDAYS.find((d) => d.value === exactDay)!.name} window ${index + 1}, last start`}
-                      type={window.lastStart === 1440 ? "text" : "time"}
+                      aria-label={`${WEEKDAYS.find((d) => d.value === exactDay)!.name} window ${index + 1}, finish time`}
+                      type={window.end === 1440 ? "text" : "time"}
                       disabled={disabled}
                       value={
-                        Number.isFinite(window.lastStart)
-                          ? minuteLabel(window.lastStart)
+                        Number.isFinite(window.end)
+                          ? minuteLabel(window.end)
                           : ""
                       }
                       onChange={(event) =>
                         updateExact(index, {
-                          lastStart: parseMinute(event.target.value),
+                          end: parseMinute(event.target.value),
                         })
                       }
                     />
@@ -699,7 +697,7 @@ export function WeeklyTimetable({
                 onClick={() =>
                   onChange(exactDay, [
                     ...(hours[exactDay] ?? []),
-                    { start: 600, lastStart: 690 },
+                    { start: 600, end: 690 },
                   ])
                 }
               >
@@ -774,7 +772,7 @@ export function WeeklyTimetable({
               const blocks = editing ? [] : dateBlocks(exceptions, date);
               const online = editing ? [] : onlineOnlyHours(onlineOnly, date);
               // Extra hours are drawn as her weekly hours are: washed where a lesson can start.
-              const extraWindows = editing ? [] : dateExtraWindows(exceptions, date);
+              const extraWindows = editing ? [] : dateExtraWindows(exceptions, date, interval);
               const extraStarts = lessonStarts(extraWindows, interval);
               const extras = editing ? [] : dateExtras(exceptions, date, interval);
               const sameAsExtra = (span: Span) => extras.some((other) => other.start === span.start && other.end === span.end);
@@ -862,7 +860,7 @@ export function WeeklyTimetable({
                           className={`teacher-time-slot ${selected ? "is-available" : ""} ${mixed ? "is-partial" : ""} ${weeklyClass} ${hourClass}`}
                           aria-pressed={mixed ? "mixed" : selected}
                           disabled={disabled}
-                          aria-label={`${day.name} ${selected ? availableTimes.join(" and ") : minuteLabel(minute)}, ${selected ? "lesson start available" : "unavailable"}`}
+                          aria-label={`${day.name} ${selected ? availableTimes.join(" and ") : minuteLabel(minute)}, ${selected ? "working hours" : "unavailable"}`}
                           {...pointer}
                           onClick={(event) => {
                             if (
@@ -1132,7 +1130,7 @@ export function WeeklyTimetable({
                   {/* What extra hours at these times give a student; also the chip's description. */}
                   {starts ? (
                     <ul className="booking-payment-facts teacher-slot-menu__starts" hidden={!startsShown} id={startsId}>
-                      <li>Lessons can start {starts}</li>
+                      <li>Working hours {starts}</li>
                     </ul>
                   ) : null}
                   {/* Each wears the swatch of what it makes, as the key does,

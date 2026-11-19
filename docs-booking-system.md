@@ -107,9 +107,9 @@ returns `alsoStudent`; `/book/?view=lessons` then opens their lessons, with
 `Your schedule` to go back, and the schedule shows them `My lessons`. Plain
 `/book/` and booking still go to the schedule. Adding them again is 409.
 
-Inês can add lessons outside her published start times and inside the student
-notice window. A future lesson must finish by 19:30 Porto time and must be free
-of clashes.
+Inês can add a future lesson anywhere it fits within her saved working hours.
+The student notice window and the gap between lessons do not apply to her own
+bookings. A clash or time off still prevents the booking.
 
 The student's confirmation of a lesson she adds says Inês booked it and
 carries the calendar invitation. While they have never been in, or have not yet
@@ -120,7 +120,7 @@ works; the invitation still carries the manage link. Her own copy says
 (see *Which emails Inês gets*).
 
 **Recording a lesson already had.** A `startAt` at or before now is a
-lesson she is recording, not booking. It is checked for clashes only (the daily finish, weekly
+lesson she is recording, not booking. It is checked for clashes only (weekly
 hours, time off and the notice window don't apply), and the same student at
 the same start answers 409 `They already have this lesson.` Nothing else a
 booking does happens: no email to the student or to her, so no calendar
@@ -179,11 +179,9 @@ password reset.
 
 `How often` adds a weekly slot instead (4, 6 or 8 weeks, or until stopped),
 one email for the run. The first date is the one she chose, so it is booked
-like a single lesson she adds. Every lesson must finish by 19:30 Porto time. The weeks after
-it are also checked against her days off and her other lessons, not her
-published hours or the notice window, and the run is marked `booking_series.added_by_teacher` so
-the nightly top-up keeps doing so. A week that cannot be booked is left out and
-named in both emails.
+like a single lesson she adds. Each following week and the nightly top-up check
+the saved working hours and time off for that date. A week that cannot be
+booked is left out and named in both emails.
 
 **Paying for the lessons she adds** (migration 0023).
 A lesson Inês adds records its price and `added_by_teacher = 1`. One she
@@ -575,7 +573,7 @@ coalesce into the date's latest choice. A failed older save keeps a newer
 choice queued; failure of the latest choice puts that date back as saved and
 says so.
 
-Weekly-hours drafts warn when changed lesson start times overlap an existing
+Weekly-hours drafts warn when removing working time overlaps an existing
 confirmed lesson in Porto time, including ongoing and future lessons. Saving
 waits for booked lessons to load; the warning and save confirmation both state
 that existing lessons stay booked. Each clash is the same lesson card, its
@@ -596,8 +594,8 @@ reopening it brings them back, and an existing day off keeps its note. `extra`
 is the date's extra hours as spans of times in the same `{ startMinute,
 endMinute }` terms as `blocks` (end exclusive); each is stored as a `kind =
 'extra'` row whose `start_minute` is its first start and whose `end_minute` is
-its last start, the last step of `slot_interval_minutes` before the span ends,
-as availability reads an extra window. Weekly blocks and weekly extra rows are
+its exact finish. Older extra-hour rows held the final grid start and cover the
+interval up to their previously displayed finish. Weekly blocks and weekly extra rows are
 never touched there. Malformed or whole-day `blocks` or `extra`, and past
 dates, are refused rather than partly saved. `GET /admin/availability` returns
 weekly blocks alongside the upcoming one-off rows so the calendar shows every
@@ -614,17 +612,14 @@ takes `expected`, the week's ranges as the page last read or saved them, and
 one-off rows; a refused hours save says to reload, and after a refused date
 her page reads her days again and shows them as they are. Both fields are
 optional; a save without one is not checked.
-On her Timetable, taking a stretch out of a date's extra hours (`Not working`,
-or time off over them) takes the lesson starts inside it and leaves every
-other start where it was, so times typed off her start grid never shift the
-hours left or add a later start.
+Removing part of a date’s extra hours preserves the exact stretches on either side.
 
 The Timetable's `Edit weekly hours` control edits the usual weekly pattern in
 the same calendar with click/drag, touch or keyboard input. `View lessons`
 returns to the chosen week and day. Neither switching mode nor leaving the
 tab saves or discards a draft; Timetable and its edit control mark unsaved hours.
 `Save weekly hours` writes the existing first-start and
-last-start rule format. The separate 19:30 daily finish applies to all lesson lengths.
+last-start field names for compatibility. Their values are the opening and finishing times.
 Precise existing windows remain available through `Set exact hours` and
 are not rounded by the grid. Drafts survive week/view changes and booking
 actions, and validation prevents the API from silently dropping invalid rows.
@@ -1270,7 +1265,7 @@ occurrences with their bookmarks, require the preview's revision at commit.
 A concurrent hours or time-off change therefore requires a fresh preview.
 Student creation and moves also refresh the target notice cutoff just before
 claiming; a weekly move refuses a plan that crosses a source or target boundary
-while validation runs. Inês's explicit calendar additions retain their override.
+while validation runs. Inês's own future bookings and changes also check the saved hours at write time.
 
 - **The occurrences are ordinary rows in `bookings`.** A series is only the
   recipe that made them. That is what puts the time in Inês's calendar for real,
@@ -1388,15 +1383,13 @@ while validation runs. Inês's explicit calendar additions retain their override
   change of day, time or place records the run in the `teacher_placed_runs`
   setting (a list of run ids, pruned to runs still going each time one is
   added, so no migration), and the nightly top-up plans a run in it as it
-  plans one she added: respecting the daily finish, her days off and her other lessons, with
-  no gap and no notice. Without that, a student's own run she moved outside
-  her published hours would have every new week skipped and run out with
-  nobody told. Its weeks stay the student's own in how they are paid
+  plans one she added, checking working hours and overlaps for each week
+  without student notice or buffer. The payment terms stay the student’s own
   (`added_by_teacher` is unchanged), and the student moving the whole run
   themselves takes it off the list. A place change is handled as a student's:
   the new sequence makes the Meet sync patch the one Google event, adding or
-  removing its room. Her change respects overlaps and the daily finish. She can
-  still override published start times, time off and online-only periods. One email tells the student (`Inês has changed
+  removing its room. Her change must fit the working hours and avoid overlaps.
+  Her existing online-only location override still applies. One email tells the student (`Inês has changed
   your lesson` / `Inês has changed your weekly lessons`), naming any week
   that stayed; a time-only move of one lesson keeps the words it always had.
 - **Inês can correct a lesson already had.**
@@ -1964,13 +1957,14 @@ Admin changes may relax it to a whole number from 0 through 14 hours. A
 stricter window requires updated published terms and student consent before
 implementation.
 
-`availability_rules.last_start_minute` limits when a lesson may begin. A separate daily cutoff
-requires every newly booked, moved or restored lesson to **finish by 19:30 Porto
-time**, including weekly lessons and one-off extra hours. The latest possible
-starts are 18:30 for 60 minutes and 18:00 for 90 minutes. An earlier published
-last start still limits student bookings. The buffer between lessons does not
-bring the cutoff forward. Existing confirmed lessons keep their times until
-Inês or the student changes them.
+Inês sets the start and finish of each teaching window in Porto time. The existing
+`availability_rules.last_start_minute` column holds the finish she entered.
+A lesson can finish exactly at that time. For a 20:00 finish, the last possible
+60-minute start is 19:00 and the last 90-minute start is 18:30. Weekly and
+extra working hours can meet or overlap. No part of the lesson can fall into
+a gap or time off. The same rule applies to bookings, moves, length changes,
+restorations and weekly extensions by either person. Saving hours leaves
+confirmed lessons in place. The buffer applies between lessons.
 
 `settings.lesson_buffer_minutes` is **15**: the 15 minutes after every lesson
 stay free. A student cannot book a lesson that starts within 15 minutes of

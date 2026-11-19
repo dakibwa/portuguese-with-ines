@@ -158,6 +158,15 @@ async function test(name, fn) {
   try { await fn(); await drain(); passed++; }
   catch (error) { console.error(`FAIL: ${name}`); throw error; }
 }
+// Calendar-independent payment, account and teacher journeys use fixture times throughout the week.
+async function testWithTeachingWeek(name, fn) {
+  await test(name, async () => {
+    const insert = db.prepare("INSERT INTO availability_rules (weekday,start_minute,last_start_minute) VALUES (?,0,1170)");
+    const ids = Array.from({ length: 7 }, (_, day) => insert.run(day).lastInsertRowid);
+    try { await fn(); await drain(); }
+    finally { for (const id of ids) db.prepare("DELETE FROM availability_rules WHERE id=?").run(id); }
+  });
+}
 function student(id) {
   db.prepare("INSERT INTO students (id,email,name,password_hash,created_at,stripe_customer_id,stripe_payment_method) VALUES (?,?,?,'',?,?,?)")
     .run(id, `${id}@example.invalid`, "Test Student", new Date().toISOString(), `cus_${id}`, `pm_${id}`);
@@ -794,7 +803,7 @@ await test("13.5 hours ahead on the next Porto day is late; lesson-day wording k
   assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE reference='next-day-legacy'").get().same_day_fee_status, "not_required");
   assert.deepEqual(charges.filter((charge) => charge.key.includes(lateId) || charge.key.includes(legacyId)).map((charge) => charge.amount), [500]);
 });
-await test("teacher move and cancellation have no student action fee and cannot alter processing charges", async () => {
+await testWithTeachingWeek("teacher move and cancellation have no student action fee and cannot alter processing charges", async () => {
   booking("teacher-action", { start: "2026-09-05T18:00:00.000Z", end: "2026-09-05T19:00:00.000Z" });
   db.prepare("UPDATE bookings SET student_changed_at='2026-09-05T09:00:00.000Z' WHERE id='teacher-action'").run();
   const result = await call("/admin/bookings/teacher-action/reschedule", { user: "teacher", body: { startAt: "2026-09-09T12:00:00.000Z" } });
@@ -820,7 +829,7 @@ await test("teacher move and cancellation have no student action fee and cannot 
   assert.ok(expiredSessions.includes("cs_declined") && expiredSessions.includes("cs_declined_fee"));
   assert.equal((await call(`/bookings/${await token(declined)}/payment`, { body: { purpose: "lesson" } })).status, 409);
 });
-await test("a lesson already had and charged is never moved to a time to come, where its link would refund it", async () => {
+await testWithTeachingWeek("a lesson already had and charged is never moved to a time to come, where its link would refund it", async () => {
   const where = (id) => ({ ...db.prepare("SELECT starts_at,sequence,payment_status FROM bookings WHERE id=?").get(id) });
   const move = (id, startAt) => call(`/admin/bookings/${id}/reschedule`, { user: "teacher", body: { startAt } });
   try {
@@ -1404,7 +1413,7 @@ await test("a password-reset request cannot issue a link after the account addre
     db.prepare("DELETE FROM students WHERE id=?").run(id);
   }
 });
-await test("teacher creation atomically loses to a concurrent student claim", async () => {
+await testWithTeachingWeek("teacher creation atomically loses to a concurrent student claim", async () => {
   beforeRun = (sql) => {
     if (sql.startsWith("INSERT INTO bookings")) {
       beforeRun = null;
@@ -2266,7 +2275,7 @@ await test("Meet setup stays inert while the calendar is not configured", async 
   assert.equal((await call("/admin/google-calendar/connect", { user: "teacher" })).status, 503);
 });
 
-await test("Meet links follow booking ownership and disappear for Porto or cancellation", async () => {
+await testWithTeachingWeek("Meet links follow booking ownership and disappear for Porto or cancellation", async () => {
   student("meet-owner"); sessions["meet-owner"] = await createSession("meet-owner", env.BOOKING_TOKEN_SECRET);
   const id = linkedBooking("meet-owned", { owner: "meet-owner", start: "2026-10-05T09:00:00.000Z", end: "2026-10-05T10:00:00.000Z" });
   db.prepare("UPDATE bookings SET meeting_url='https://meet.google.com/abc-defg-hij' WHERE reference='meet-owned'").run();
@@ -2597,7 +2606,7 @@ await test("settings reject a slot interval that would hang availability, and ma
 });
 await test("weekly hours refuse malformed replacements without erasing or partly saving the timetable", async () => {
   const original = db.prepare("SELECT * FROM availability_rules ORDER BY id").all();
-  const valid = { weekday: 1, startMinute: 600, lastStartMinute: 1140 };
+  const valid = { weekday: 1, startMinute: 600, lastStartMinute: 1200 };
   const save = (rules, user = "teacher") => call("/admin/availability", { user, body: { rules }, headers: { "CF-Connecting-IP": "198.51.100.88" } });
   assert.equal((await save([valid], "alice")).status, 401);
   for (const rules of [
@@ -2613,6 +2622,15 @@ await test("weekly hours refuse malformed replacements without erasing or partly
     const saved = await save([valid]);
     assert.equal(saved.status, 200);
     assert.equal((await saved.json()).count, 1);
+    // Monday closes at 20:00 Porto time. Both lesson lengths may finish exactly then.
+    for (const [type, latest] of [["single", "18:00"], ["long", "17:30"]]) {
+      const query = `/availability?from=2026-09-21&to=2026-09-21&lessonType=${type}`;
+      const reply = await (await call(query, { method: "GET", user: null })).json();
+      const last = reply.slotsByDate["2026-09-21"].at(-1);
+      assert.equal(last.startAt, `2026-09-21T${latest}:00.000Z`);
+      assert.equal(last.endAt, "2026-09-21T19:00:00.000Z");
+    }
+
     // A page names the week it last read. One that has not seen a change made
     // on another device is refused, and writes nothing.
     const read = (rules, expected) => call("/admin/availability", { user: "teacher", body: { rules, expected } });
@@ -2716,21 +2734,21 @@ await test("the teacher calendar replaces one date's time off and extra hours, e
 
     const replaced = await extra({ extra: [{ startMinute: 960, endMinute: 1000 }, { startMinute: 600, endMinute: 660 }, { startMinute: 900, endMinute: 960 }] });
     assert.equal(replaced.status, 200);
-    assert.deepEqual(extras(), ["600-630", "900-990"], "sorted, merged, and each kept as its first and last start");
+    assert.deepEqual(extras(), ["600-660", "900-1000"], "the exact finish survives merging and saving");
     assert.equal(revision(), before + 1);
-    assert.deepEqual((await replaced.json()).exceptions.filter((row) => row.kind === "extra").map((row) => [row.start_minute, row.end_minute]), [[600, 630], [900, 990]]);
+    assert.deepEqual((await replaced.json()).exceptions.filter((row) => row.kind === "extra").map((row) => [row.start_minute, row.end_minute, row.finish_minute]), [[600, 630, 660], [900, 990, 1000]]);
     assert.deepEqual(extras("2026-09-13"), ["600-600"], "another date keeps its extra hours");
     assert.ok(db.prepare("SELECT 1 FROM availability_exceptions WHERE id = ?").get(weekly), "weekly extra hours are never replaced");
     // Exactly those starts can be booked, beside the weekly 07:00 (Porto is UTC+1).
     const saturdayStarts = async () => ((await (await call(`/availability?lessonType=single&from=${saturday}&to=${saturday}`, { method: "GET", user: null })).json())
       .slotsByDate[saturday] ?? []).map((slot) => slot.startAt.slice(11, 16));
-    assert.deepEqual(await saturdayStarts(), ["06:00", "09:00", "09:30", "14:00", "14:30", "15:00", "15:30"]);
+    assert.deepEqual(await saturdayStarts(), ["09:00", "14:00", "14:30"]);
     // The interval is read from her settings; an empty list takes them all away.
     db.prepare("UPDATE settings SET value = '15' WHERE key = 'slot_interval_minutes'").run();
     assert.equal((await extra({ extra: [{ startMinute: 900, endMinute: 960 }] })).status, 200);
-    assert.deepEqual(extras(), ["900-945"]);
+    assert.deepEqual(extras(), ["900-960"]);
     assert.equal((await extra({ extra: [] })).status, 200);
-    assert.deepEqual(await saturdayStarts(), ["06:00"]);
+    assert.deepEqual(await saturdayStarts(), []);
   } finally {
     db.prepare("UPDATE settings SET value = ? WHERE key = 'slot_interval_minutes'").run(interval);
     db.prepare("DELETE FROM availability_exceptions WHERE date IN ('2026-09-12', '2026-09-13', '2026-09-14') OR id = ?").run(lunch);
@@ -2757,7 +2775,7 @@ await test("login reserves each attempt atomically and a success cannot reopen t
   assert.equal((await login("seq@example.invalid", "the-real-password", ip)).status, 200, "the eighth attempt, correct, is admitted");
   assert.equal((await login("seq@example.invalid", "the-real-password", ip)).status, 429, "and does not reopen the window");
 });
-await test("admin-token guessing is throttled before the comparison; a teacher session never is", async () => {
+await testWithTeachingWeek("admin-token guessing is throttled before the comparison; a teacher session never is", async () => {
   const ip = "203.0.113.77";
   const guess = (bearer) => call("/admin/students", { method: "GET", user: null, headers: { Authorization: `Bearer ${bearer}`, "CF-Connecting-IP": ip } });
   const guesses = [];
@@ -2861,7 +2879,7 @@ await test("admin-token guessing is throttled before the comparison; a teacher s
     db.prepare("DELETE FROM students WHERE id=?").run(id);
   }
 });
-await test("Inês's calendar copy omits the student's manage link; the student's keeps it", async () => {
+await testWithTeachingWeek("Inês's calendar copy omits the student's manage link; the student's keeps it", async () => {
   Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0", TEACHER_NOTIFICATIONS_ENABLED: "1" });
   sentEmails.length = 0;
   try {
@@ -3155,7 +3173,7 @@ await test("moving a recurrence leaves a lesson inside 14 hours where it is and 
   assert.deepEqual((({ cancelled, kept }) => ({ cancelled, kept }))(await stopped.json()), { cancelled: 2, kept: 1 });
   assert.match(sentEmails.findLast((sent) => sent.subject.startsWith("Your weekly lessons are cancelled")).text, /One lesson was too close to cancel and stays as it was\./);
 });
-await test("a moved recurrence cannot land on the lesson it leaves inside the window", async () => {
+await testWithTeachingWeek("a moved recurrence cannot land on the lesson it leaves inside the window", async () => {
   const at = new Date().toISOString();
   db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES ('keep-clash','alice','single',6,1410,?,?)").run(at, at);
   booking("keep-clash-1", { series: "keep-clash", start: "2026-09-05T23:30:00.000Z", end: "2026-09-06T01:00:00.000Z" });
@@ -3254,7 +3272,7 @@ await test("teacher cancellation sends an escaped personal message to both inbox
 // 13 November 2026, Dan: "ok yeah do that". The same lesson back, one email
 // each way, only for her own cancellation of a lesson still to come with no
 // money moved, and only while nothing else has the time.
-await test("she puts back a lesson she cancelled, as it was, while its time is still free", async () => {
+await testWithTeachingWeek("she puts back a lesson she cancelled, as it was, while its time is still free", async () => {
   captureEmail();
   env.TEACHER_NOTIFICATIONS_ENABLED = "1";
   env.TEACHER_EMAIL = "ines@example.invalid";
@@ -3696,7 +3714,7 @@ await test("a confirmed address change proves the new address, so Inês's bookin
     releaseEmail();
   }
 });
-await test("Inês's bookings never alter a password-less account she created, or a teacher's account", async () => {
+await testWithTeachingWeek("Inês's bookings never alter a password-less account she created, or a teacher's account", async () => {
   const email = "no-password@example.invalid";
   captureEmail();
   try {
@@ -3735,7 +3753,7 @@ await test("Inês's bookings never alter a password-less account she created, or
     db.prepare("DELETE FROM password_resets WHERE nonce='teacher-reset'").run();
   }
 });
-await test("an address proven between Inês's read and the transition keeps its password and sessions", async () => {
+await testWithTeachingWeek("an address proven between Inês's read and the transition keeps its password and sessions", async () => {
   const registered = await call("/auth/register", { user: null, headers: { "CF-Connecting-IP": "198.51.100.65" }, body: { email: "proving@example.invalid", name: "Pro Ving", password: "proving-password" } });
   assert.equal(registered.status, 201, await registered.clone().text());
   const { student: account, session } = await registered.json();
@@ -3838,7 +3856,7 @@ await test("a session presented as a manage link opens nothing, even a row keyed
     db.prepare("DELETE FROM bookings WHERE id=?").run(signed);
   }
 });
-await test("Inês can record a no-show until the lesson ends, when it is charged, and not before", async () => {
+await testWithTeachingWeek("Inês can record a no-show until the lesson ends, when it is charged, and not before", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   // It is 10:00 (charged at the end since 2 November 2026, Dan): one lesson
   // ends at 10:30, one ended a minute ago, one ends at 10:05.
@@ -4017,7 +4035,7 @@ await test("a Google creation race still applies ownership rules to the winning 
 });
 await test("a weekly move across spring's missing hour changes nothing and permits a valid retry", async () => {
   const now = new Date().toISOString();
-  const rule = db.prepare("INSERT INTO availability_rules (weekday,start_minute,last_start_minute) VALUES (0,0,180)").run().lastInsertRowid;
+  const rule = db.prepare("INSERT INTO availability_rules (weekday,start_minute,last_start_minute) VALUES (0,0,240)").run().lastInsertRowid;
   db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES ('spring-move','alice','single',0,600,?,?)").run(now, now);
   for (const day of [21, 28]) booking(`spring-move-${day}`, { series: "spring-move", start: `2027-03-${day}T10:00:00.000Z`, end: `2027-03-${day}T11:00:00.000Z` });
   const rows = () => db.prepare("SELECT starts_at,ends_at,sequence FROM bookings WHERE series_id='spring-move' ORDER BY starts_at").all();
@@ -4047,7 +4065,7 @@ function forgetStudent(email) {
   db.prepare("DELETE FROM student_recurring_rates WHERE student_id=?").run(row.id);
   db.prepare("DELETE FROM students WHERE id=?").run(row.id);
 }
-await test("Inês's weekly slot books outside her hours, skips her days off, and waits for the student's card", async () => {
+await testWithTeachingWeek("Inês's weekly lesson at an early working hour skips days off and waits for the student's card", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const email = "weekly-added@example.invalid";
   const dayOff = db.prepare("INSERT INTO availability_exceptions (date,kind,start_minute,end_minute,note,created_at) VALUES ('2026-10-21','blocked',NULL,NULL,'',?)")
@@ -4088,7 +4106,7 @@ await test("Inês's weekly slot books outside her hours, skips her days off, and
     forgetStudent(email);
   }
 });
-await test("the nightly top-up keeps Inês's weekly slot hers, outside her hours", async () => {
+await testWithTeachingWeek("the nightly top-up keeps Inês’s early weekly time", async () => {
   const email = "topped-up@example.invalid";
   try {
     await call("/admin/students", { user: "teacher", body: { email, name: "Tomás Top" } });
@@ -4139,7 +4157,7 @@ await test("the nightly top-up keeps Inês's weekly slot hers, outside her hours
     forgetStudent(email);
   }
 });
-await test("a student's own weekly run she moves outside her hours goes on being extended, and is theirs again once they move it", async () => {
+await testWithTeachingWeek("a student’s weekly run moved by the teacher keeps its new working time until the student moves it", async () => {
   await drain();
   db.exec("DELETE FROM booking_refunds; DELETE FROM bookings; DELETE FROM booking_series; DELETE FROM stripe_events; DELETE FROM email_log;");
   const at = new Date().toISOString();
@@ -4170,7 +4188,7 @@ await test("a student's own weekly run she moves outside her hours goes on being
     db.exec("DELETE FROM bookings WHERE series_id='placed-run'; DELETE FROM booking_series WHERE id='placed-run'; DELETE FROM settings WHERE key='teacher_placed_runs';");
   }
 });
-await test("a saved card can authorise the named lessons and repeats without entering card details or charging early", async () => {
+await testWithTeachingWeek("a saved card can authorise the named lessons and repeats without entering card details or charging early", async () => {
   const id = "saved-card-approval", email = `${id}@example.invalid`;
   student(id);
   db.prepare("UPDATE students SET email_verified_at=? WHERE id=?").run(new Date().toISOString(), id);
@@ -4228,7 +4246,7 @@ await test("a saved card can authorise the named lessons and repeats without ent
     assert.equal((await call("/me/card", { token: ownToken, body })).status, 409, "a repeat press cannot consent or charge twice");
   } finally { beforeRun = null; forgetStudent(email); }
 });
-await test("with nothing outstanding, a saved card is agreed to for lessons to come with no card details", async () => {
+await testWithTeachingWeek("with nothing outstanding, a saved card is agreed to for lessons to come with no card details", async () => {
   const id = "saved-card-ahead", email = `${id}@example.invalid`;
   student(id);
   db.prepare("UPDATE students SET email_verified_at=? WHERE id=?").run(new Date().toISOString(), id);
@@ -4258,7 +4276,7 @@ await test("with nothing outstanding, a saved card is agreed to for lessons to c
     assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(had).payment_status, "not_required", "a lesson already had is never swept in");
   } finally { forgetStudent(email); }
 });
-await test("a prepared card link needs the student's approval and covers exactly the past lessons she ticked plus future repeats", async () => {
+await testWithTeachingWeek("a prepared card link needs the student's approval and covers exactly the past lessons she ticked plus future repeats", async () => {
   const previousClock = clock;
   clock = NativeDate.parse("2026-10-27T18:30:00Z");
   const id = "combined-card", email = `${id}@example.invalid`;
@@ -4373,7 +4391,7 @@ await test("a prepared card link needs the student's approval and covers exactly
     clock = previousClock;
   }
 });
-await test("a card saved from the account pays for the lessons Inês added from then on, and only those", async () => {
+await testWithTeachingWeek("a card saved from the account pays for the lessons Inês added from then on, and only those", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const email = "card-later@example.invalid";
   const add = (startAt, extra = {}) => call("/admin/bookings", { user: "teacher", body: { studentId: idOf(email), name: "Carla Later", lessonType: "single", startAt, ...extra } });
@@ -4635,7 +4653,7 @@ await test("a sign-in link signs an existing student in once, while the address 
     forgetStudent("linked-squat@example.invalid");
   }
 });
-await test("she sets a student up and adds their lessons without emailing them, then one welcome lists them all", async () => {
+await testWithTeachingWeek("she sets a student up and adds their lessons without emailing them, then one welcome lists them all", async () => {
   captureEmail();
   const to = (email) => sentEmails.filter((sent) => sent.to[0] === email);
   try {
@@ -4741,7 +4759,7 @@ await test("she welcomes a student with no lessons: they are asked to book their
     forgetStudent("free-booker@example.invalid");
   }
 });
-await test("she can set a student up from a name alone and give their email later, until they sign in", async () => {
+await testWithTeachingWeek("she can set a student up from a name alone and give their email later, until they sign in", async () => {
   captureEmail();
   const to = (email) => sentEmails.filter((sent) => sent.to[0] === email);
   try {
@@ -4807,7 +4825,7 @@ await test("she can set a student up from a name alone and give their email late
     db.prepare("DELETE FROM students WHERE email LIKE 'no-email:%'").run();
   }
 });
-await test("she adds lessons for a student with no email yet: nothing leaves for the address that is not there, and the real one follows every lesson", async () => {
+await testWithTeachingWeek("she adds lessons for a student with no email yet: nothing leaves for the address that is not there, and the real one follows every lesson", async () => {
   captureEmail();
   Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", TEACHER_NOTIFICATIONS_ENABLED: "1" });
   const isolated = "Dina Dias";
@@ -4908,7 +4926,7 @@ await test("she adds lessons for a student with no email yet: nothing leaves for
     db.prepare("DELETE FROM students WHERE name IN (?, ?)").run(isolated, full);
   }
 });
-await test("she makes a sign-in link to send on WhatsApp: nothing is emailed, and a student with no email gets in once and can add a card", async () => {
+await testWithTeachingWeek("she makes a sign-in link to send on WhatsApp: nothing is emailed, and a student with no email gets in once and can add a card", async () => {
   try {
     const { student } = await (await call("/admin/students", { user: "teacher", body: { name: "Wanda Whats" } })).json();
     const emails = db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n;
@@ -4942,7 +4960,7 @@ await test("she makes a sign-in link to send on WhatsApp: nothing is emailed, an
     db.prepare("DELETE FROM students WHERE name = 'Wanda Whats'").run();
   }
 });
-await test("her price for a student prices their lessons, and only lessons nothing is settled on follow a change", async () => {
+await testWithTeachingWeek("her price for a student prices their lessons, and only lessons nothing is settled on follow a change", async () => {
   try {
     const add = (body) => call("/admin/students", { user: "teacher", body });
     assert.equal((await add({ email: "priced@example.invalid", name: "Rita", prices: { 60: 50 } })).status, 400);
@@ -5637,7 +5655,7 @@ await test("expression picks stay closed until EXPRESSIONS_FOR_STUDENTS is \"1\"
   }
 });
 
-await test("students' translations wait for Inês, and only approved ones are shown, without names", async () => {
+await testWithTeachingWeek("students' translations wait for Inês, and only approved ones are shown, without names", async () => {
   for (const file of ["0026-expressions.sql", "0027-expression-picks.sql", "0037-expression-translations.sql"]) db.exec(readFileSync(new URL(`./migrations/${file}`, import.meta.url), "utf8"));
   for (const id of ["translator-a", "translator-b"]) { student(id); sessions[id] = await createSession(id, env.BOOKING_TOKEN_SECRET); }
   db.prepare("UPDATE students SET name = 'Ana Sousa' WHERE id = 'translator-a'").run();
@@ -5696,7 +5714,7 @@ await test("students' translations wait for Inês, and only approved ones are sh
   }
 });
 
-await test("her student list says who is in and who has a card, and she can send anyone a fresh way in", async () => {
+await testWithTeachingWeek("her student list says who is in and who has a card, and she can send anyone a fresh way in", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('launch-check','launch-check-0000@example.invalid','Launch Verification','x','2026-09-05T08:56:55.286Z')").run();
   student("setup-empty"); student("setup-past");
@@ -6550,7 +6568,7 @@ await test("Inês changes a weekly run's length from one lesson on, and cancels 
 
 // 10 November 2026, Dan: "allow her malleability to change wholesale recurring
 // stuff from 60 to 90, 90 to 60, the dates, the in porto or online etc".
-await test("Inês changes when, how long and where for every week from one, across the October clock change, and later weeks follow", async () => {
+await testWithTeachingWeek("Inês changes when, how long and where for every week from one, across the October clock change, and later weeks follow", async () => {
   const email = "weekly-change@example.invalid";
   db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('wendy',?,'Wendy Weekly','',?)").run(email, new Date().toISOString());
   db.prepare("INSERT INTO student_recurring_rates (student_id,duration_minutes,amount_cents,redeemed_at) VALUES ('wendy',60,2000,?)").run(new Date().toISOString());
@@ -6559,7 +6577,7 @@ await test("Inês changes when, how long and where for every week from one, acro
   try {
     const late = await call("/admin/bookings", { user: "teacher", body: { studentId: "wendy", lessonType: "long", startAt: "2026-10-07T18:30:00.000Z", repeat: "open" } });
     assert.equal(late.status, 409);
-    assert.match(await late.text(), /19:30 Porto time/);
+    assert.match(await late.text(), /working hours/);
     // Wednesdays at 17:15 in Porto, open-ended: twelve weeks, the last nine after the clocks go back.
     const added = await call("/admin/bookings", { user: "teacher", body: { studentId: "wendy", lessonType: "single", startAt: "2026-10-07T16:15:00.000Z", repeat: "open" } });
     assert.equal(added.status, 201, await added.clone().text());
@@ -6643,7 +6661,7 @@ await test("Inês changes when, how long and where for every week from one, acro
   }
 });
 
-await test("Inês changes one lesson's time and place together; a paid lesson moves but keeps its length", async () => {
+await testWithTeachingWeek("Inês changes one lesson's time and place together; a paid lesson moves but keeps its length", async () => {
   const email = "one-change@example.invalid";
   db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('olga1',?,'Olga One','',?)").run(email, new Date().toISOString());
   db.prepare("INSERT INTO student_recurring_rates (student_id,duration_minutes,amount_cents,redeemed_at) VALUES ('olga1',60,2000,?)").run(new Date().toISOString());
@@ -6772,7 +6790,7 @@ await test("her change corrects a lesson already had, a record included, quietly
   }
 });
 
-await test("a weekly time change keeps Porto's wall clock across the March clock change, and brings a week moved on its own back to the new day", async () => {
+await testWithTeachingWeek("a weekly time change keeps Porto's wall clock across the March clock change, and brings a week moved on its own back to the new day", async () => {
   const email = "march-change@example.invalid";
   db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('marta',?,'Marta March','',?)").run(email, new Date().toISOString());
   try {
@@ -6811,7 +6829,7 @@ async function cancelledLesson(owner, name, start, patch = {}) {
   return { id, manage: await token(id) };
 }
 
-await test("a student Inês set up books their cancelled weekly lesson again: a new lesson in the run at the same time and price, emailed once each way", async () => {
+await testWithTeachingWeek("a student Inês set up books their cancelled weekly lesson again: a new lesson in the run at the same time and price, emailed once each way", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   // Set up by hand: never signed in, no password, no card, address unproven.
   const email = "rebook-hand@example.invalid";
@@ -6890,7 +6908,7 @@ await test("a student Inês set up books their cancelled weekly lesson again: a 
   }
 });
 
-await test("Book again refuses all but their own free, settled cancellation, outside the notice window, free of other lessons and time off, at their price, writing and sending nothing", async () => {
+await testWithTeachingWeek("Book again refuses all but their own free, settled cancellation, outside the notice window, free of other lessons and time off, at their price, writing and sending nothing", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const email = "rita@example.invalid";
   db.prepare("INSERT INTO students (id,email,name,password_hash,created_at,stripe_customer_id,stripe_payment_method) VALUES ('rita',?,'Rita Refused','',?,'cus_rita','pm_rita')")
@@ -6918,7 +6936,7 @@ await test("Book again refuses all but their own free, settled cancellation, out
       ["refund-on-record", "2026-10-09T10:00:00.000Z", {}, /payment to sort out/],
       ["charge-started", "2026-10-10T10:00:00.000Z", { charge_started_at: "2026-09-04T10:00:00.000Z" }, /payment to sort out/],
       ["paid-by-hand", "2026-10-08T10:00:00.000Z", { payment_status: "not_required", payment_consent_version: "paid-by-hand", added_by_teacher: 1 }, /payment to sort out/],
-      ["after-finish", "2026-10-05T18:30:00.000Z", {}, /19:30 Porto time/],
+      ["after-finish", "2026-10-05T18:30:00.000Z", {}, /working hours/],
       ["too-close", new Date(Date.now() + 13 * 3600000).toISOString(), {}, /too close now/],
       ["in-the-way", "2026-10-12T10:00:00.000Z", {}, /taken since/],
       ["day-off", "2026-10-13T10:00:00.000Z", {}, /taken that time off since/],
@@ -7008,7 +7026,7 @@ await test("a lesson the student booked on their card is booked again on it, agr
   }
 });
 
-await test("a lesson Inês added for a student with a standing card is booked again on that card, as a lesson she adds would be", async () => {
+await testWithTeachingWeek("a lesson Inês added for a student with a standing card is booked again on that card, as a lesson she adds would be", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const email = "sian@example.invalid";
   const agreed = "2026-09-01T09:00:00.000Z";
@@ -7067,7 +7085,7 @@ const lessonCardState = (id) => ({
   student: { ...db.prepare("SELECT * FROM students WHERE id=?").get(id) }
 });
 
-await test("the first Checkout email becomes the contact and sign-in address from either card setup route", async () => {
+await testWithTeachingWeek("the first Checkout email becomes the contact and sign-in address from either card setup route", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   for (const route of ["account", "lesson"]) {
     const id = `checkout-contact-${route}`;
@@ -7112,7 +7130,7 @@ await test("the first Checkout email becomes the contact and sign-in address fro
   }
 });
 
-await test("a Checkout address already used by another account or an invalid address cannot replace the stand-in", async () => {
+await testWithTeachingWeek("a Checkout address already used by another account or an invalid address cannot replace the stand-in", async () => {
   const id = "checkout-contact-conflict";
   try {
     const [lesson] = await handSetUpStudent(id, "2026-10-14T10:00:00.000Z", null);
@@ -7209,7 +7227,7 @@ await test("older card setups recover missing contact details without payments, 
   }
 });
 
-await test("a hand-set-up student pays for every week by card from a lesson's link: Stripe's page, then the run goes on the card, charged nothing now", async () => {
+await testWithTeachingWeek("a hand-set-up student pays for every week by card from a lesson's link: Stripe's page, then the run goes on the card, charged nothing now", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const id = "paula";
   try {
@@ -7281,7 +7299,7 @@ await test("a hand-set-up student pays for every week by card from a lesson's li
   }
 });
 
-await test("paying by card for this lesson only puts that lesson on the card, with the student's own Stripe customer; the run and its other weeks stay paid to Inês", async () => {
+await testWithTeachingWeek("paying by card for this lesson only puts that lesson on the card, with the student's own Stripe customer; the run and its other weeks stay paid to Inês", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const id = "lena";
   try {
@@ -7307,7 +7325,7 @@ await test("paying by card for this lesson only puts that lesson on the card, wi
   }
 });
 
-await test("Pay by card is offered and started only for a lesson of hers to come, paid to her at a price, from a student account while cards are taken; refusals write nothing", async () => {
+await testWithTeachingWeek("Pay by card is offered and started only for a lesson of hers to come, paid to her at a price, from a student account while cards are taken; refusals write nothing", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const id = "rhea";
   const sessionCount = checkoutRequests.length;
@@ -7382,7 +7400,7 @@ await test("Pay by card is offered and started only for a lesson of hers to come
   }
 });
 
-await test("a lesson changed while Stripe's page was open is never put on the card, and the card is not kept", async () => {
+await testWithTeachingWeek("a lesson changed while Stripe's page was open is never put on the card, and the card is not kept", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const id = "ciro";
   try {
@@ -7430,7 +7448,7 @@ await test("a lesson changed while Stripe's page was open is never put on the ca
   }
 });
 
-await test("a lesson put on a card from its link is charged when it ends, or the no-show fee instead; Remove card puts her lessons back to being paid to her", async () => {
+await testWithTeachingWeek("a lesson put on a card from its link is charged when it ends, or the no-show fee instead; Remove card puts her lessons back to being paid to her", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const id = "noor";
   try {
@@ -7471,7 +7489,7 @@ await test("a lesson put on a card from its link is charged when it ends, or the
 });
 
 // 11 November 2026, Dan: signing in asks them to pay for any outstanding lessons.
-await test("a hand-set-up student's account lists exactly their outstanding lessons, oldest first, as the card preview reads them", async () => {
+await testWithTeachingWeek("a hand-set-up student's account lists exactly their outstanding lessons, oldest first, as the card preview reads them", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const id = "oona";
   try {

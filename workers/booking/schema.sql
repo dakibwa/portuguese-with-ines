@@ -19,10 +19,7 @@ CREATE TABLE IF NOT EXISTS lesson_types (
 -- Recurring weekly teaching hours. weekday: 0=Sunday .. 6=Saturday, matching
 -- JavaScript's getUTCDay() so there is one convention end to end.
 --
--- last_start_minute is the latest time a lesson may *begin*, not the time she
--- finishes. That distinction is the whole point: "last lesson at 19:00" then
--- holds for a 90-minute lesson exactly as it does for a 60-minute one, instead
--- of silently becoming 18:30 for the longer format.
+-- last_start_minute retains its original name and holds the finish of the teaching window.
 CREATE TABLE IF NOT EXISTS availability_rules (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
   weekday           INTEGER NOT NULL CHECK (weekday BETWEEN 0 AND 6),
