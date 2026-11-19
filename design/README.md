@@ -507,8 +507,8 @@ free times and removes selected times that cannot be booked in the new place.
   activity must never silently discard that draft.
   The edit control also marks a waiting draft. Clicking or
   dragging marks lesson start times. Preserve exact existing first/last-start
-  values and provide an exact-time editor. The last start is not a finishing
-  time.
+  values and provide an exact-time editor. New lesson times must also fit
+  the full lesson before or at 19:30 Porto time.
   If changed hours cross an existing lesson, say once that it is outside the new
   hours and stays booked, then show each as a booked-lesson card. Check booked
   lessons before allowing a save.

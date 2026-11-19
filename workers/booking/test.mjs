@@ -7,6 +7,7 @@
  */
 
 import assert from "node:assert/strict";
+import { DEFAULT_TUTOR } from "./tutor.mjs";
 import { deliver, renderEmail, splitWhen } from "./email.mjs";
 import * as templates from "./email-templates.mjs";
 import { candidateStartMinutes, computeAvailability, isSlotBookable } from "./availability.mjs";
@@ -193,9 +194,12 @@ await test("moving a recurrence ignores only that sequence's existing lessons", 
   assert.equal(moving.slotsByDate["2026-09-07"]?.[0]?.startAt, "2026-09-07T09:00:00.000Z");
 });
 
+// These cross-midnight cases exercise a tutor who teaches without a daily finish limit.
+const overnightTutor = { ...DEFAULT_TUTOR, bookings: {} };
+
 await test("a late lesson checks bookings after midnight before offering its start", async () => {
   const occupied = { id: "next-day", starts_at: "2026-11-03T00:15:00.000Z", ends_at: "2026-11-03T01:15:00.000Z" };
-  const env = { DB: { prepare(sql) {
+  const env = { TUTOR: overnightTutor, DB: { prepare(sql) {
     let values = [];
     return {
       bind(...args) { values = args; return this; },
@@ -224,7 +228,7 @@ await test("time off and online-only hours follow elapsed lessons across midnigh
       { day: "2026-10-25", minute: 90, duration: 60, blockedStart: 60, blockedEnd: 90, free: true }
     ]) {
       const blockedDay = scenario.blockedDay ?? scenario.day;
-      const env = { DB: { prepare(sql) {
+      const env = { TUTOR: overnightTutor, DB: { prepare(sql) {
         let values = [];
         return {
           bind(...args) { values = args; return this; },
@@ -326,16 +330,30 @@ await test("invalid timezones are rejected", () => {
 
 const asTime = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 
-await test("lastStart is a start time, so lesson length does not shorten the day", () => {
-  // Her Wed-Fri rule: first start 17:00, last start 19:00.
-  const range = [{ start: 1020, lastStart: 1140 }];
-  const hour = candidateStartMinutes({ startRanges: range, duration: 60, interval: 30 });
-  const longer = candidateStartMinutes({ startRanges: range, duration: 90, interval: 30 });
-
-  // Both formats must still offer 19:00 — the 90-minute one simply runs to 20:30.
-  assert.equal(asTime(hour.at(-1)), "19:00");
-  assert.equal(asTime(longer.at(-1)), "19:00");
-  assert.deepEqual(hour, longer);
+await test("Inês’s bookable lessons finish by 19:30 Porto time, including extra hours and weekly lessons", async () => {
+  for (const [day, finish] of [["2026-09-07", "18:30"], ["2026-11-02", "19:30"]]) {
+    const env = { DB: { prepare(sql) { return {
+      bind() { return this; },
+      async all() {
+        if (sql.includes("FROM availability_rules")) return { results: [{ weekday: 1, start_minute: 1020, last_start_minute: 1170 }] };
+        if (sql.includes("FROM availability_exceptions")) return { results: [{ date: day, kind: "extra", start_minute: 1185, end_minute: 1260 }] };
+        return { results: [] };
+      }
+    }; } } };
+    const now = new Date(`${addDaysToKey(day, -2)}T08:00:00Z`);
+    for (const duration of [30, 60, 90]) {
+      const lessonType = { duration_minutes: duration };
+      const { slotsByDate } = await computeAvailability(env, { fromKey: day, toKey: day, lessonType, now });
+      const last = slotsByDate[day].at(-1);
+      assert.equal(last.endAt, `${day}T${finish}:00.000Z`);
+      const tooLate = new Date(Date.parse(last.startAt) + 15 * 60000);
+      const stale = await isSlotBookable(env, { startAt: tooLate, lessonType, now });
+      assert.equal(stale.ok, false);
+      assert.match(stale.reason, /19:30 Porto time/);
+      const teacherRun = await planOccurrences(env, { fromKey: day, minuteOfDay: 1170 - duration + 15, count: 2, lessonType, now, teacher: true });
+      assert.equal(teacherRun.bookable.length, 0);
+    }
+  }
 });
 
 await test("a 15-minute interval offers every quarter hour, and blocks still remove overlaps", () => {
