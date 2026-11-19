@@ -1,4 +1,4 @@
-import { availabilityRevisionSql, computeAvailability, extraStartRanges, inTimeOff, isSlotBookable, listLessonTypes, loadLessonType, loadSettings, normaliseBlockedSpans, normaliseOnlineOnlyPeriods, onlineOnlyProblem } from "./availability.mjs";
+import { availabilityRevisionSql, computeAvailability, dailyFinishProblem, extraStartRanges, inTimeOff, isSlotBookable, listLessonTypes, loadLessonType, loadSettings, normaliseBlockedSpans, normaliseOnlineOnlyPeriods, onlineOnlyProblem } from "./availability.mjs";
 import {
   OPEN_ENDED_HORIZON_WEEKS,
   SERIES_LENGTHS,
@@ -4947,6 +4947,9 @@ async function rebookTerms(env, row, settings, now = new Date(), known = {}) {
     return refuse(`This lesson is too close now to book again here, so please message ${tutor.shortName}.`);
   }
 
+  const finishProblem = dailyFinishProblem(env, row.starts_at, row.ends_at);
+  if (finishProblem) return refuse(finishProblem);
+
   // `known` lets a list of lessons (Your lessons) pass the student it holds
   // and share one price look-up per lesson type, rather than asking per row.
   const student = known.student?.id === row.student_id && isStudentLike(known.student) ? known.student
@@ -6742,7 +6745,7 @@ async function teacherRestoreLesson(request, env, ctx, id, authorization) {
   const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
   if (!row) return fail("That booking could not be found.", 404, request, env);
   const now = new Date();
-  const problem = restoreProblem(row, now);
+  const problem = restoreProblem(row, now) || dailyFinishProblem(env, row.starts_at, row.ends_at);
   if (problem) return fail(problem, 409, request, env);
 
   const clash = await env.DB.prepare(
@@ -6895,8 +6898,8 @@ async function teacherChangeLength(request, env, ctx, bookingId, body, authoriza
       types.set(lesson.lesson_type_id, await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(lesson.lesson_type_id).first());
     }
     const endAt = endOf(lesson);
-    // Her own lessons keep no gap, as when she adds one: only an overlap stops it.
-    const reason = (past ? pastChangeProblem(lesson) : "") ||
+    // Her own lessons keep no gap, as when she adds one.
+    const reason = (past ? pastChangeProblem(lesson) : dailyFinishProblem(env, lesson.starts_at, endAt)) ||
       lengthKeptReason(lesson, types.get(lesson.lesson_type_id), lessonType, amountCents) ||
       (others.some((other) => other.id !== lesson.id && other.starts_at < endAt && other.ends_at > lesson.starts_at)
         ? "it would run into another lesson" : "");
@@ -6912,7 +6915,7 @@ async function teacherChangeLength(request, env, ctx, bookingId, body, authoriza
   }
   if (!planned.length) {
     return fail(
-      kept.length === 1 ? `This lesson keeps its length: ${kept[0].reason}.`
+      kept.length === 1 ? `This lesson keeps its length: ${kept[0].reason.replace(/\.$/, "")}.`
         : kept.length ? "None of these lessons can change length. Open each one to see why."
         : `${following ? "These lessons are" : "This lesson is"} already ${lessonType.duration_minutes} minutes.`,
       409, request, env
@@ -7018,7 +7021,7 @@ function daysBetweenKeys(fromKey, toKey) {
  * way) takes none of it and is named in the reply. A place change is the
  * student's own: the new place and a new sequence, after which `notify`
  * reconciles the one Google event and its Meet room. She is held only by
- * overlap, never by her hours, time off or online-only periods, and no fee
+ * overlap and the daily finish, never by her start windows, time off or online-only periods, and no fee
  * is ever created. A lesson already had, a record included, is corrected the
  * same way within the past, on its own and with nothing sent to anyone.
  */
@@ -7099,11 +7102,13 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
     }
     const nextLocation = location ?? lesson.location;
     if (startAt === lesson.starts_at && !lengthChanges && nextLocation === lesson.location) continue;
-    const endAt = new Date(Date.parse(startAt) + nextType.duration_minutes * 60000).toISOString();
+    const endAt = startAt === lesson.starts_at && !lengthChanges ? lesson.ends_at
+      : new Date(Date.parse(startAt) + nextType.duration_minutes * 60000).toISOString();
     if (lesson.payment_status === "processing" || lesson.charge_started_at || lesson.same_day_fee_status === "processing" || refunding.has(lesson.id)) {
       reason = "its payment is going through";
     }
     if (past) reason ||= pastChangeProblem(lesson);
+    else if (startAt !== lesson.starts_at || lengthChanges) reason ||= dailyFinishProblem(env, startAt, endAt);
     reason ||= lengthChanges ? lengthKeptReason(lesson, currentType, nextType, amountCents) : "";
     if (reason) {
       kept.push({ lesson, reason });
@@ -7140,7 +7145,7 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
   const keptReply = kept.map(({ lesson, reason }) => ({ startsAt: lesson.starts_at, reason }));
   if (!candidates.length) {
     return fail(
-      kept.length === 1 ? `This lesson stays as it was: ${kept[0].reason}.` : "None of these lessons can change. Open each one to see why.",
+      kept.length === 1 ? `This lesson stays as it was: ${kept[0].reason.replace(/\.$/, "")}.` : "None of these lessons can change. Open each one to see why.",
       409, request, env
     );
   }
@@ -8001,6 +8006,10 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
      * (11 November 2026, Dan).
      */
     const past = start <= new Date();
+    if (!past) {
+      const problem = dailyFinishProblem(env, start, endsAt);
+      if (problem) return fail(problem, 409, request, env);
+    }
     if (past && wantsRepeat) return fail("A weekly run starts today or later.", 400, request, env);
     // "Already paid" is per lesson (16 October 2026): a weekly run's lessons
     // are ticked one at a time, from each lesson.
@@ -8008,7 +8017,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     if (paid && wantsRepeat) return fail("Tick weekly lessons as paid one at a time, from each lesson.", 400, request, env);
 
     /*
-     * Her own bookings are checked for clashes only — not against her published
+     * Within the daily finish, her own bookings are checked for clashes, not against her published
      * hours or the notice window. Those exist to shape what students may choose;
      * she is the one who decides, and squeezing in a lesson outside them is a
      * normal thing for her to do. A double booking is never intended, so that
@@ -8209,6 +8218,10 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       .bind(row.lesson_type_id)
       .first();
     const endsAt = new Date(start.getTime() + lessonType.duration_minutes * 60000);
+    if (start.getTime() > Date.now() && (start.getTime() !== Date.parse(row.starts_at) || endsAt.getTime() !== Date.parse(row.ends_at))) {
+      const problem = dailyFinishProblem(env, start, endsAt);
+      if (problem) return fail(problem, 409, request, env);
+    }
 
     const clash = await env.DB.prepare(
       `SELECT reference FROM bookings

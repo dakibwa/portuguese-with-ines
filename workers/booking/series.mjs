@@ -15,7 +15,7 @@
  * change instead of drifting to 16:30 for half the year.
  */
 
-import { computeAvailability, isSlotBookable } from "./availability.mjs";
+import { computeAvailability, dailyFinishProblem, isSlotBookable } from "./availability.mjs";
 import { homeZone, addDaysToKey, dateKey, parseDateKey, zonedParts, zonedToUtc } from "./time.mjs";
 
 /**
@@ -102,12 +102,11 @@ export async function planOccurrences(env, { fromKey, minuteOfDay, count, lesson
       continue;
     }
     if (teacher) {
-      // Inês's own weekly slot: like a single lesson she adds, only her days
-      // off and her other lessons stand in its way. The slot claim refuses a
-      // clash atomically, so only the day off is checked here.
-      const problem = await teacherWeekProblem(env, occurrence, now);
+      // Her weekly slot keeps the daily finish and days off. The slot claim checks clashes.
+      const endAt = new Date(occurrence.startAt.getTime() + lessonType.duration_minutes * 60000);
+      const problem = dailyFinishProblem(env, occurrence.startAt, endAt) || await teacherWeekProblem(env, occurrence, now);
       if (problem) skipped.push({ key: occurrence.key, startAt: occurrence.startAt.toISOString(), reason: problem });
-      else bookable.push({ ...occurrence, endAt: new Date(occurrence.startAt.getTime() + lessonType.duration_minutes * 60000) });
+      else bookable.push({ ...occurrence, endAt });
       continue;
     }
     const startAt = occurrence.startAt.toISOString();

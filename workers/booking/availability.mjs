@@ -26,6 +26,21 @@ function overlaps(startA, endA, startB, endB) {
   return startA < endB && startB < endA;
 }
 
+/** The last instant a lesson starting on this teaching date may occupy. */
+function dailyFinishAt(tutor, { year, month, day }) {
+  const minute = tutor.bookings?.latestFinishMinute;
+  return minute == null ? Infinity : zonedToUtc(year, month, day, minute, tutor.place.timeZone).getTime();
+}
+
+export function dailyFinishProblem(env, startAt, endAt) {
+  const tutor = tutorOf(env);
+  const day = zonedParts(new Date(startAt), tutor.place.timeZone);
+  if (new Date(endAt).getTime() <= dailyFinishAt(tutor, day)) return "";
+  const minute = tutor.bookings.latestFinishMinute;
+  const clock = [Math.floor(minute / 60), minute % 60].map(part => String(part).padStart(2, "0")).join(":");
+  return `Lessons must finish by ${clock} ${tutor.place.city} time.`;
+}
+
 /** Bumped in the same transaction as teaching-hour and notice-setting writes. */
 export function availabilityRevisionSql() {
   return "COALESCE((SELECT value FROM settings WHERE key = 'availability_revision'), '0') = ?";
@@ -227,6 +242,7 @@ export async function computeAvailability(
   { fromKey, toKey, lessonType, now, ignoreBookingId = null, ignoreSeriesId = null, ignoreHoldsOf = null, ignoreHorizon = false, teacher = false, location = "online", dates = null }
 ) {
   const settings = await loadSettings(env);
+  const tutor = tutorOf(env);
   const duration = Number(lessonType.duration_minutes);
   const interval = settings.slotIntervalMinutes;
   // Each lesson, booked or proposed, reaches this far past its end, so two
@@ -324,9 +340,7 @@ export async function computeAvailability(
       ...(exceptionsByDate.get(key) ?? [])
     ];
 
-    // Bookable *start* ranges: first start .. last start. The last start is a
-    // start time, not a finishing time, so "last lesson at 19:00" holds for a
-    // 90-minute lesson exactly as it does for a 60-minute one.
+    // Weekly and extra ranges set possible starts. The daily finish limits the full lesson.
     const startRanges = [
       ...(rulesByWeekday.get(weekdayOf(key)) ?? []),
       ...dayExceptions
@@ -335,6 +349,7 @@ export async function computeAvailability(
     ];
 
     const { year, month, day } = parseDateKey(key);
+    const finishAt = dailyFinishAt(tutor, { year, month, day });
     const daySlots = [];
 
     for (const minute of candidateStartMinutes({ startRanges, duration, interval })) {
@@ -345,7 +360,7 @@ export async function computeAvailability(
       if (wall.year !== year || wall.month !== month || wall.day !== day || wall.hour * 60 + wall.minute !== minute) continue;
       const slotEnd = new Date(slotStart.getTime() + duration * 60000);
 
-      if (slotStart < earliest) continue;
+      if (slotStart < earliest || slotEnd.getTime() > finishAt) continue;
       if (blocked.some(span => overlaps(slotStart.getTime(), slotEnd.getTime(), span.start, span.end))) continue;
       if (busy.some((entry) => overlaps(slotStart.getTime(), slotEnd.getTime() + bufferMs, entry.start, entry.end))) continue;
 
@@ -385,7 +400,8 @@ export async function isSlotBookable(
 
   const match = (slotsByDate[key] ?? []).some((slot) => slot.startAt === start.toISOString());
   if (match) return { ok: true, endAt: new Date(start.getTime() + lessonType.duration_minutes * 60000), availabilityRevision: checkedSettings.availabilityRevision };
-  const placeProblem = onlineOnlyProblem(checkedSettings, start, new Date(start.getTime() + lessonType.duration_minutes * 60000), location);
+  const endAt = new Date(start.getTime() + lessonType.duration_minutes * 60000);
+  const placeProblem = onlineOnlyProblem(checkedSettings, start, endAt, location);
   if (placeProblem) return { ok: false, reason: placeProblem };
 
   /*
@@ -410,5 +426,7 @@ export async function isSlotBookable(
     return { ok: false, reason: "That's further ahead than booking is open. Please choose an earlier date." };
   }
 
+  const finishProblem = dailyFinishProblem(env, start, endAt);
+  if (finishProblem) return { ok: false, reason: finishProblem };
   return { ok: false, reason: "That time has just been taken or is no longer available. Please choose another." };
 }
