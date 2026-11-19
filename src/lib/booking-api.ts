@@ -1,6 +1,6 @@
 import { HOME_CLOCK, TUTOR } from "@/lib/tutor";
 import { forgetSession, readSession } from "@/lib/auth-api";
-import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, MAX_BOOKING_HORIZON_DAYS, formatMoney } from "@/lib/config";
+import { AVAILABILITY_TIMEOUT_MS, BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, MAX_BOOKING_HORIZON_DAYS, formatMoney } from "@/lib/config";
 import { BOOKING_REPLY_ERROR, isApiAmount, isApiInstant, isApiLesson, isApiRecord as isRecord } from "@/lib/api-response";
 import { wallTimeToUtc } from "@/lib/wall-time";
 
@@ -149,7 +149,7 @@ declare global {
     /** Set by the inline script on /book, before React exists. */
     __inesLessonTypes?: Promise<LessonTypesResponse | null> | null;
     /** The first calendar's free times, asked for by the same script. */
-    __inesAvailability?: { url: string; response: Promise<Response> } | null;
+    __inesAvailability?: { url: string; response: Promise<Response>; signal: AbortSignal } | null;
   }
 }
 
@@ -176,6 +176,25 @@ export function listLessonTypes() {
   return request<LessonTypesResponse>("/lesson-types").then(validateLessonTypes);
 }
 
+// The deadline belongs to the shared read, independently of any calendar that
+// stops listening. Keep it active until the body finishes downloading too.
+async function readAvailability(path: string, session: string, early: Window["__inesAvailability"]) {
+  const controller = early ? null : new AbortController();
+  const timer = controller ? setTimeout(() => controller.abort(), AVAILABILITY_TIMEOUT_MS) : undefined;
+  const signal = early?.signal ?? controller?.signal;
+  try {
+    return await request<AvailabilityResponse>(path, {
+      signal,
+      headers: session ? { Authorization: `Bearer ${session}` } : undefined
+    }, early?.response);
+  } catch (error) {
+    if (signal?.aborted) throw new BookingApiError("Checking free times took too long. Please try again.", 0);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Free times for one lesson length. Moving a lesson names it — by its manage
  * token, or for a weekly run by the series and the student's session — so the
@@ -197,11 +216,8 @@ export function fetchAvailability(
     // exactly this: the same lesson, dates and (lack of) session.
     const primed = typeof window !== "undefined" ? window.__inesAvailability : null;
     if (primed) window.__inesAvailability = null;
-    const reply = request<AvailabilityResponse>(
-      path,
-      session ? { headers: { Authorization: `Bearer ${session}` } } : undefined,
-      primed && !session && primed.url === `${BOOKING_API_BASE_URL}${path}` ? primed.response : undefined
-    ).then((data) => {
+    const early = primed && !session && primed.url === `${BOOKING_API_BASE_URL}${path}` ? primed : null;
+    const reply = readAvailability(path, session, early).then((data) => {
       const days = data.horizonDays;
       if (days !== undefined && (!Number.isInteger(days) || days < 1 || days > MAX_BOOKING_HORIZON_DAYS)) unreadableReply();
       if (!isRecord(data.slotsByDate) || !Object.values(data.slotsByDate).every((slots) =>

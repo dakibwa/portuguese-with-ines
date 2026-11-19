@@ -107,6 +107,21 @@ test("an unreadable calendar window can be retried, and old replies can omit it"
   }
 });
 
+test("a stalled availability read releases the calendar for a fresh retry", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  globalThis.fetch = (_url, { signal }) => new Promise((_resolve, reject) => {
+    signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+  });
+  forgetAvailability();
+  const availability = () => fetchAvailability("trial", day, "2026-11-05");
+  const pending = assert.rejects(availability(), /Checking free times took too long/);
+  t.mock.timers.tick(15_000);
+  await pending;
+  const slotsByDate = { [day]: [{ startAt: lesson.startAt, endAt: lesson.endAt }] };
+  answer({ slotsByDate });
+  assert.deepEqual((await availability()).slotsByDate, slotsByDate);
+});
+
 test("a managed lesson that ends at no time is unreadable", async () => {
   const managed = () => fetchBooking("fixture");
   await accepted(managed, { booking: lesson, isPast: false, sameDayFeeApplies: false });

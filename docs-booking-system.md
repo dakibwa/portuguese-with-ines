@@ -1103,6 +1103,8 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   length with its price (the trial's fixed length instead); and for weekly
   lessons 4, 6, 8 weeks or `Ongoing`. Each choice changes in place and the free
   days follow it, so duration is always settled before times are offered.
+  If a free-times request stalls for 15 seconds, the calendar offers
+  `Try again` and a link to message Inês. Retrying asks for fresh times.
   A returning signed-in student opens directly on their lessons calendar, whose
   top-right `Book a lesson` opens the same bar and calendar. After the starting
   time is chosen, the journey goes straight to confirmation while later weeks
