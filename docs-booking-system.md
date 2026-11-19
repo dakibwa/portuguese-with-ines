@@ -2845,8 +2845,8 @@ reminders, and `'porto'` as the stored key for an in-person lesson.
 
 - **Fiscal documents.** She must issue a fatura-recibo per lesson, and CIVA art.
   36.º gives 5 working days from the lesson. See
-  `Documents/Work/Português com a Inês/Billing and Booking - Operating Context
-  and Options.md` for the full position, including the unresolved IVA exemption
+  `My Drive/Português com a Inês/Billing and Booking - Operating Context
+  and Options.md` in Google Drive for the full position, including the unresolved IVA exemption
   code.
 - **Two-way Google Calendar sync**, once OAuth verification is worth doing.
 
