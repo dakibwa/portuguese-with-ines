@@ -27,7 +27,7 @@ registerHooks({
 process.env.NEXT_PUBLIC_BOOKING_API_BASE_URL = "https://booking.example.invalid";
 
 const { BOOKING_REPLY_ERROR } = await import("@/lib/api-response");
-const { cancelBooking, createBooking, fetchBooking, previewSeries, rescheduleBooking, rescheduleSeries } = await import("@/lib/booking-api");
+const { cancelBooking, createBooking, fetchAvailability, fetchBooking, forgetAvailability, previewSeries, rescheduleBooking, rescheduleSeries } = await import("@/lib/booking-api");
 const { createBookingFor, fetchBookings, fetchSchedule, saveDayOff, saveRules } = await import("@/lib/admin-api");
 const { confirmEmailChange, fetchMe, requestEmailChange } = await import("@/lib/auth-api");
 
@@ -92,6 +92,19 @@ test("her lessons with a bad date, name or payment review row are unreadable", a
   await refused(bookings, { bookings: [{ ...adminLesson, starts_at: "not-a-date" }] }); // teacher-booking
   await refused(bookings, { bookings: [{ ...adminLesson, student_name: { value: "Malformed name" } }] }); // teacher-name
   await refused(bookings, { bookings: [], manualPaymentReconciliation: [null] }); // teacher-reconciliation
+});
+
+test("an unreadable calendar window can be retried, and old replies can omit it", async () => {
+  const availability = () => fetchAvailability("single", day, "2026-11-05");
+  const slotsByDate = { [day]: [{ startAt: lesson.startAt, endAt: lesson.endAt }] };
+  for (const horizonDays of ["28", null, 0, 1.5, 366]) {
+    await refused(availability, { slotsByDate, horizonDays });
+  }
+  await accepted(availability, { slotsByDate });
+  for (const horizonDays of [1, 365]) {
+    forgetAvailability();
+    await accepted(availability, { slotsByDate, horizonDays });
+  }
 });
 
 test("a managed lesson that ends at no time is unreadable", async () => {

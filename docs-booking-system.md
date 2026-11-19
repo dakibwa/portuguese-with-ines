@@ -2052,6 +2052,9 @@ and all FAQ categories also remain usable without JavaScript.
 
 Unreadable booking API replies and invalid lesson-type or availability data
 show a booking error and the contact link while keeping the document usable.
+When availability specifies a calendar window, it must be a whole number from
+1 to 365 days. An invalid window shows the retry action. Older replies that
+omit the window use the calendar’s existing fallback.
 Lesson-type failures persist independently of later availability requests.
 A reload can recover when the API returns valid data again.
 Account and teacher API clients also reject unreadable or missing required data:

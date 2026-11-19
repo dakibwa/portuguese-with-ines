@@ -21,7 +21,8 @@ export type AvailabilityResponse = {
   minimumNoticeHours: number;
   /** The late change and no-show fee; absent from an older Worker. */
   sameDayFeeCents?: number;
-  horizonDays: number;
+  /** Older Workers omit the calendar window. */
+  horizonDays?: number;
   /** Free time Inês keeps after every lesson; absent from an older Worker. */
   bufferMinutes?: number;
   /** Whether an online lesson's current time can only stay online. */
@@ -201,6 +202,8 @@ export function fetchAvailability(
       session ? { headers: { Authorization: `Bearer ${session}` } } : undefined,
       primed && !session && primed.url === `${BOOKING_API_BASE_URL}${path}` ? primed.response : undefined
     ).then((data) => {
+      const days = data.horizonDays;
+      if (days !== undefined && (!Number.isInteger(days) || days < 1 || days > 365)) unreadableReply();
       if (!isRecord(data.slotsByDate) || !Object.values(data.slotsByDate).every((slots) =>
         Array.isArray(slots) && slots.every((slot) =>
           isRecord(slot) && typeof slot.startAt === "string" && typeof slot.endAt === "string" &&
