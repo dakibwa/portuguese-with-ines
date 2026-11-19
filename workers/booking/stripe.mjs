@@ -177,7 +177,7 @@ export async function chargeSavedCard(
  */
 export function createCardSetupSession(
   env,
-  { booking, customer = null, customerEmail = "", successUrl, cancelUrl, seriesId = null, selectionCount = null, skippedStartAts = [] }
+  { booking, student = null, customer = null, customerEmail = "", successUrl, cancelUrl, seriesId = null, selectionCount = null, skippedStartAts = [] }
 ) {
   const skipped = JSON.stringify(skippedStartAts);
   return stripeRequest(
@@ -202,6 +202,8 @@ export function createCardSetupSession(
       metadata: {
         purpose: "card_setup",
         booking_reference: booking.reference,
+        session_version: String(student?.session_version ?? 0),
+        card_setup_version: String(student?.card_setup_version ?? 0),
         ...(selectionCount ? { selection_count: selectionCount } : {}),
         ...(seriesId ? { series_id: seriesId } : {}),
         ...(skippedStartAts.length && skipped.length <= 480 ? { skipped } : {})

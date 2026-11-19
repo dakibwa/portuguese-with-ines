@@ -1725,6 +1725,89 @@ await test("selection validates count, overlapping aliases and Porto calendar we
   assert.equal(portoWeekOf("2026-09-13T23:30:00Z"), "2026-09-14", "Porto is already Monday while UTC is Sunday");
   assert.equal(portoWeekOf("2026-12-31T10:00:00Z"), portoWeekOf("2027-01-01T10:00:00Z"));
 });
+await test("a selection or weekly run spends one decision, and the sixth decision waits an hour", async () => {
+  const eight = [14, 21].flatMap(day => [9, 11, 13, 15].map(hour => `2026-09-${day}T${String(hour).padStart(2, "0")}:00:00Z`));
+  const later = [9, 11, 13, 15, 17].map(hour => `2026-09-08T${String(hour).padStart(2, "0")}:00:00Z`);
+  for (const first of [
+    selectionBody({ startAts: eight }),
+    selectionBody({ repeat: 4 }),
+    { lessonType: "single", startAt: "2026-09-14T10:00:00+01:00", repeat: 4, paymentConsent: true }
+  ]) {
+    const user = await selectionFixture();
+    const created = await call("/bookings", { user, body: first });
+    assert.equal(created.status, 201, await created.clone().text());
+    for (const startAt of later.slice(0, 4)) {
+      const added = await call("/bookings", { user, body: { lessonType: "single", startAt, paymentConsent: true } });
+      assert.equal(added.status, 201, await added.clone().text());
+    }
+    const body = { lessonType: "single", startAt: later[4], paymentConsent: true };
+    assert.equal((await call("/bookings", { user, body })).status, 429, "each preceding request counted once");
+    const startedAt = clock;
+    try {
+      clock += 3600001;
+      assert.equal((await call("/bookings", { user, body })).status, 201, "the rolling hour expires without dropping existing lessons");
+    } finally { clock = startedAt; }
+  }
+});
+
+await test("the booking budget is rechecked at every single, repeat and selection claim, including legacy rows", async () => {
+  for (const limit of ["decisions", "lessons"]) {
+    for (const shape of ["single", "repeat", "selection"]) {
+      const user = await selectionFixture();
+      const seriesId = `budget-${user}`;
+      beforeRun = sql => {
+        if (!sql.startsWith(shape === "selection" ? "WITH candidates" : "INSERT INTO bookings")) return;
+        beforeRun = null;
+        // Another completed request can consume the remaining budget after
+        // this request's read. Legacy rows have no decision markers.
+        if (limit === "lessons") db.prepare(
+          "INSERT INTO booking_series(id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES (?,?,'single',1,600,?,?)"
+        ).run(seriesId, user, new Date().toISOString(), new Date().toISOString());
+        for (let index = 0; index < (limit === "lessons" ? 26 : 5); index++) booking(`budget-${user}-${index}`, {
+          owner: user, series: limit === "lessons" ? seriesId : null,
+          start: "2026-09-01T09:00:00.000Z", end: "2026-09-01T10:00:00.000Z"
+        });
+      };
+      const body = shape === "selection" ? selectionBody()
+        : { lessonType: "single", startAt: selectedStarts[0], paymentConsent: true, ...(shape === "repeat" ? { repeat: 4 } : {}) };
+      const response = await call("/bookings", { user, body });
+      assert.equal(response.status, 429, `${limit}, ${shape}: ${await response.clone().text()}`);
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=? AND starts_at>=?").get(user, selectedStarts[0]).n, 0);
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM booking_series WHERE student_id=? AND id!=?").get(user, seriesId).n, 0, "a refused selection leaves no empty recipes");
+      if (shape === "single") {
+        const teacher = await call("/admin/bookings", { user: "teacher", body: { studentId: user, lessonType: "single", startAt: selectedStarts[0] } });
+        assert.equal(teacher.status, 201, "Inês can still deliberately place a lesson");
+      }
+    }
+  }
+});
+
+await test("parallel weekly requests reserve whole runs and release their unused budget", async () => {
+  const user = await selectionFixture();
+  let cleanupFailed = false;
+  beforeRun = (sql, values) => {
+    if (!cleanupFailed && sql === "DELETE FROM request_limits WHERE key = ?" && values[0].startsWith("booking-reserved:")) {
+      cleanupFailed = true;
+      throw new Error("Isolated reservation cleanup outage");
+    }
+  };
+  const responses = await Promise.all([
+    "2026-09-14T09:00:00Z", "2026-09-14T13:00:00Z", "2026-09-15T09:00:00Z"
+  ].map(startAt => call("/bookings", { user, body: { lessonType: "single", startAt, repeat: null, paymentConsent: true } })));
+  assert.deepEqual(responses.map(response => response.status).sort(), [201, 201, 429]);
+  for (const response of responses.filter(response => response.status === 201)) {
+    assert.equal((await response.json()).series.booked.length, 12, "an accepted run keeps every planned date");
+  }
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=?").get(user).n, 24);
+  await drain();
+  assert.ok(cleanupFailed, "a cleanup failure preserves the successful booking response and retries");
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM request_limits WHERE key LIKE 'booking-reserved:%'").get().n, 0, "completed requests release every reservation");
+  const lastTwo = await call("/bookings", { user, body: selectionBody({ startAts: ["2026-09-08T11:00:00Z", "2026-09-08T13:00:00Z"] }) });
+  assert.equal(lastTwo.status, 201, await lastTwo.clone().text());
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=?").get(user).n, 26);
+  assert.equal((await call("/bookings", { user, body: selectionBody({ startAts: ["2026-09-08T15:00:00Z"] }) })).status, 429);
+});
+
 await test("several single dates confirm together, retain individual prices and send one calendar message", async () => {
   const user = await selectionFixture();
   const chargedBefore = charges.length;
@@ -2009,6 +2092,137 @@ await test("one-off selection card setup confirms every date and rejects wrong s
   db.prepare("UPDATE bookings SET hold_expires_at='2026-09-05T10:35:00.000Z' WHERE student_id=?").run(user);
   assert.equal((await webhook(event)).status, 200);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE status='confirmed'").get().n, 2);
+});
+await test("booking card confirmation preserves newer consent, rolls back failures and makes concurrent retries harmless", async () => {
+  for (const [index, shape] of ["single", "weekly", "selection"].entries()) {
+    const user = await selectionFixture({ savedCard: false });
+    const response = await call("/bookings", { user, headers: { "CF-Connecting-IP": `198.51.100.${index + 1}` }, body: selectionBody({
+      startAts: shape === "selection" ? selectedStarts : [selectedStarts[0]], ...(shape === "weekly" ? { repeat: 4 } : {})
+    }) });
+    assert.equal(response.status, 201, await response.clone().text());
+    const opened = new URLSearchParams(checkoutRequests.at(-1).body);
+    const metadata = Object.fromEntries([...opened].filter(([key]) => key.startsWith("metadata[")).map(([key, value]) => [key.slice(9, -1), value]));
+    assert.equal(metadata.session_version, "0");
+    assert.equal(metadata.card_setup_version, "0");
+    const held = db.prepare("SELECT * FROM bookings WHERE student_id=? ORDER BY starts_at").all(user);
+    const customer = `cus_${user}`;
+    const paymentMethod = `pm_${user}`;
+    const setupId = `seti_atomic_${user}`;
+    setupIntents.set(setupId, { status: "succeeded", customer, payment_method: paymentMethod });
+    const event = { id: `evt_atomic_${user}`, type: "checkout.session.completed", livemode: false, data: { object: {
+      id: held[0].stripe_session_id, client_reference_id: held[0].id, mode: "setup", status: "complete", customer,
+      setup_intent: setupId, metadata
+    } } };
+    const card = () => ({ ...db.prepare("SELECT stripe_customer_id,stripe_payment_method,card_consent_at,session_version,card_setup_version FROM students WHERE id=?").get(user) });
+    const empty = card();
+    for (const mutation of ["expired", "cancelled", "recovered", "removed", "newer-card"]) {
+      let expectedCard = empty;
+      duringSetupRead = () => {
+        duringSetupRead = null;
+        if (mutation === "expired") db.prepare("UPDATE bookings SET hold_expires_at=? WHERE id=?").run(new Date(Date.now() - 1).toISOString(), held.at(-1).id);
+        if (mutation === "cancelled") db.prepare("UPDATE bookings SET status='cancelled' WHERE id=?").run(held.at(-1).id);
+        if (mutation === "recovered") db.prepare("UPDATE students SET session_version=session_version+1 WHERE id=?").run(user);
+        if (mutation === "removed") db.prepare("UPDATE students SET card_setup_version=card_setup_version+1 WHERE id=?").run(user);
+        if (mutation === "newer-card") db.prepare("UPDATE students SET stripe_customer_id=?,stripe_payment_method='pm_newer',card_consent_at=? WHERE id=?")
+          .run(customer, new Date().toISOString(), user);
+        expectedCard = card();
+      };
+      assert.equal((await webhook(event)).status, 409, `${shape}: ${mutation} during provider verification rejects the entire group`);
+      assert.deepEqual(card(), expectedCard, "a rejected setup never replaces a card or revives withdrawn consent");
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=? AND status='confirmed'").get(user).n, 0);
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n, 0);
+      db.prepare("UPDATE bookings SET status='pending_payment',hold_expires_at=? WHERE student_id=?").run(held[0].hold_expires_at, user);
+      db.prepare("UPDATE students SET stripe_customer_id=NULL,stripe_payment_method=NULL,card_consent_at=NULL,session_version=0,card_setup_version=0 WHERE id=?").run(user);
+    }
+    beforeRun = sql => {
+      if (sql.startsWith("UPDATE students SET stripe_customer_id = ?, stripe_payment_method = ?")) {
+        beforeRun = null;
+        throw new Error("Isolated card write failure");
+      }
+    };
+    assert.equal((await webhook(event)).status, 500);
+    assert.deepEqual(card(), empty);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=? AND status='pending_payment'").get(user).n, held.length,
+      "a failed card write rolls all held lessons back for a retry");
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM request_limits WHERE key LIKE 'booking-card-confirm:%'").get().n, 0);
+    // A concurrent delivery confirms first. An account card changed after that
+    // must survive the losing delivery, including legacy generation-zero events.
+    const legacy = structuredClone(event);
+    delete legacy.data.object.metadata.session_version;
+    delete legacy.data.object.metadata.card_setup_version;
+    duringSetupRead = async () => {
+      duringSetupRead = null;
+      assert.equal((await webhook({ ...legacy, id: `${legacy.id}_wins` })).status, 200);
+      db.prepare("UPDATE students SET stripe_payment_method='pm_newest',card_consent_at=? WHERE id=?").run(new Date().toISOString(), user);
+    };
+    assert.equal((await webhook(event)).status, 200, `${shape}: a losing duplicate only observes the successful confirmation`);
+    assert.deepEqual(card(), { ...empty, stripe_customer_id: customer, stripe_payment_method: "pm_newest", card_consent_at: new Date().toISOString() });
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=? AND status='confirmed' AND payment_status='scheduled'").get(user).n, held.length);
+    await drain();
+    const sent = db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n;
+    assert.equal(sent, 1, "one confirmation is sent for the committed group");
+    assert.equal((await webhook(event)).status, 200);
+    assert.equal((await webhook({ ...legacy, id: `${legacy.id}_late` })).status, 200);
+    await drain();
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n, sent);
+    assert.equal(card().stripe_payment_method, "pm_newest");
+  }
+});
+await test("card setup retries recover a committed booking's missing confirmation without repeating charges", async () => {
+  const user = await selectionFixture({ savedCard: false });
+  assert.equal((await call("/bookings", { user, headers: { "CF-Connecting-IP": "198.51.100.77" },
+    body: selectionBody({ startAts: [selectedStarts[0]] }) })).status, 201);
+  const event = selectionEvent(user, { count: 1, id: "evt_confirmation_retry" });
+  delete event.data.object.metadata.selection_count;
+  const held = db.prepare("SELECT * FROM bookings WHERE student_id=?").get(user);
+  const chargeCount = charges.length;
+  const prepare = DB.prepare;
+  try {
+    // The transaction commits, then its first follow-up read is lost.
+    beforeRun = sql => {
+      if (!sql.startsWith("UPDATE students SET stripe_customer_id = ?, stripe_payment_method = ?")) return;
+      beforeRun = null;
+      DB.prepare = () => { DB.prepare = prepare; throw new Error("Isolated post-commit read failure"); };
+    };
+    assert.equal((await webhook(event)).status, 500);
+    assert.equal(db.prepare("SELECT status FROM bookings WHERE id=?").get(held.id).status, "confirmed");
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n, 0);
+
+    // Losing the queue write must leave the Stripe event retryable too.
+    beforeRun = sql => {
+      if (!sql.startsWith("INSERT INTO email_log")) return;
+      beforeRun = null;
+      throw new Error("Isolated notification queue outage");
+    };
+    assert.equal((await webhook(event)).status, 503);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM stripe_events WHERE id=?").get(event.id).n, 0);
+
+    for (const [state, email, welcome] of [["welcome", held.student_email, 1], ["no-email", `no-email:${user}`, 0]]) {
+      db.prepare("UPDATE students SET email=?,awaiting_welcome=? WHERE id=?").run(email, welcome, user);
+      db.prepare("UPDATE bookings SET student_email=? WHERE id=?").run(email, held.id);
+      assert.equal((await webhook({ ...event, id: `${event.id}_${state}` })).status, 200);
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n, 0, `${state} legitimately has no queued email`);
+    }
+    db.prepare("UPDATE students SET email=?,awaiting_welcome=0 WHERE id=?").run(held.student_email, user);
+    db.prepare("UPDATE bookings SET student_email=? WHERE id=?").run(held.student_email, held.id);
+
+    captureEmail(); emailUnavailable = true;
+    assert.equal((await webhook(event)).status, 503);
+    assert.equal(db.prepare("SELECT status FROM email_log WHERE booking_id=?").get(held.id).status, "failed");
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM stripe_events WHERE id=?").get(event.id).n, 0);
+    emailUnavailable = false;
+    assert.equal((await webhook(event)).status, 200);
+    assert.equal(sentEmails.length, 1);
+    assert.equal(db.prepare("SELECT kind FROM email_log WHERE booking_id=?").get(held.id).kind, "student_booked");
+    assert.equal((await webhook({ ...event, id: `${event.id}_duplicate` })).status, 200);
+    assert.equal(sentEmails.length, 1);
+    assert.equal(charges.length, chargeCount);
+
+    db.prepare("DELETE FROM email_log").run();
+    db.prepare("UPDATE bookings SET sequence=sequence+1,starts_at='2026-10-26T15:00:00.000Z',ends_at='2026-10-26T16:00:00.000Z' WHERE id=?").run(held.id);
+    assert.equal((await webhook({ ...event, id: `${event.id}_after_move` })).status, 200);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n, 0, "a later move owns its own notification");
+  } finally { DB.prepare = prepare; beforeRun = null; emailUnavailable = false; releaseEmail(); }
 });
 await test("failed checkout cleans the entire held selection and both weekly recipes", async () => {
   const user = await selectionFixture({ savedCard: false });

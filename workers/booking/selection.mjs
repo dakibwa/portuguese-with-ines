@@ -1,5 +1,5 @@
 import { homeZone, addDaysToKey, dateKey } from "./time.mjs";
-import { lessonPriceSnapshotSql } from "./rates.mjs";
+import { bookingBudget, prepareBookingMarkers, lessonPriceSnapshotSql } from "./rates.mjs";
 import { availabilityRevisionSql } from "./availability.mjs";
 import { currentTutor } from "./tutor.mjs";
 import { studentSessionSql } from "./auth.mjs";
@@ -69,6 +69,10 @@ export async function claimSelection(env, { rows, series, now, bufferMinutes = 0
     `INSERT INTO booking_series (${SERIES_COLUMNS.join(", ")}) SELECT ${SERIES_COLUMNS.map(() => "?").join(", ")}
      WHERE ${guards}`
   ).bind(...SERIES_COLUMNS.map((column) => entry[column] ?? null), ...guardValues));
+  // The new empty recipes belong to this decision, so the limit must not
+  // count them as earlier decisions while its rows are being claimed.
+  if (series.length) statements.push(prepareBookingMarkers(env, { series: series.map(entry => entry.id), now }));
+  const budget = bookingBudget(rows[0].student_id, now, rows.length);
   const claimIndex = statements.length;
   statements.push(env.DB.prepare(
     `WITH candidates AS MATERIALIZED (SELECT value FROM json_each(?1)),
@@ -78,14 +82,15 @@ export async function claimSelection(env, { rows, series, now, bufferMinutes = 0
            WHERE (occupied.status = 'confirmed' OR (occupied.status = 'pending_payment' AND occupied.hold_expires_at > ?2))
              AND occupied.starts_at < json_extract(proposed.value, '$.guard_end')
              AND occupied.ends_at > json_extract(proposed.value, '$.guard_start')
-         ) AND ${guards}
+         ) AND ${guards} AND ${budget.sql}
            AND NOT EXISTS (SELECT 1 FROM candidates WHERE json_extract(value, '$.starts_at') < ?) AS available
        )
      INSERT INTO bookings (${BOOKING_COLUMNS.join(", ")})
      SELECT ${BOOKING_COLUMNS.map((column) => `json_extract(value, '$.${column}')`).join(", ")}
      FROM candidates WHERE (SELECT available FROM free)`
-  ).bind(JSON.stringify(candidates), now.toISOString(), ...guardValues,
+  ).bind(JSON.stringify(candidates), now.toISOString(), ...guardValues, ...budget.values,
     new Date(Date.now() + minimumNoticeHours * 3600000).toISOString()));
+  statements.push(prepareBookingMarkers(env, { rows: rows.map(row => row.id), now }));
   // If the whole claim lost a race, remove only this request's empty recipes
   // before committing. A SQL error rolls the entire D1 batch back.
   for (const entry of series) statements.push(env.DB.prepare(

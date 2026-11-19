@@ -134,3 +134,47 @@ export async function takeRateLimit(env, key, limit, seconds = 900, now = Date.n
   ).bind(key, window, limit).run();
   return (result?.meta?.changes ?? 0) > 0;
 }
+// A decision can contain several dates or two weekly recipes. Mark its first
+// booking once, and keep legacy rows/recipes counting as they did before these
+// markers existed. All joins use the existing request_limits primary key.
+const RECENT_BOOKING_USAGE = `SELECT
+  (SELECT COALESCE(SUM(COALESCE(decision.attempts, CASE WHEN b.series_id IS NULL THEN 1 ELSE 0 END)), 0)
+   FROM bookings b LEFT JOIN request_limits decision ON decision.key = 'booking:' || b.id
+   WHERE b.student_id = ? AND b.created_at > ?)
+  + (SELECT COUNT(*) FROM booking_series s WHERE s.student_id = ? AND s.created_at > ?
+     AND NOT EXISTS (SELECT 1 FROM request_limits WHERE key = 'booking-series:' || s.id)) AS acts,
+  (SELECT COUNT(*) FROM bookings WHERE student_id = ? AND created_at > ?)
+  + (SELECT COALESCE(SUM(reservation.attempts), 0) FROM bookings anchor
+     JOIN request_limits reservation ON reservation.key = 'booking-reserved:' || anchor.id
+     WHERE anchor.student_id = ? AND anchor.created_at > ?) AS lessons`;
+
+function bookingUsageValues(studentId, now) {
+  const since = new Date(now.getTime() - 3600000).toISOString();
+  return [studentId, since, studentId, since, studentId, since, studentId, since];
+}
+
+export async function recentBookingUsage(env, studentId, now) {
+  return env.DB.prepare(RECENT_BOOKING_USAGE).bind(...bookingUsageValues(studentId, now)).first();
+}
+
+/** Rechecked inside the write, including space reserved by another new run. */
+export function bookingBudget(studentId, now, lessons = 1) {
+  return {
+    sql: `EXISTS (SELECT 1 FROM (${RECENT_BOOKING_USAGE}) WHERE acts < 5 AND lessons + ? <= 26)`,
+    values: [...bookingUsageValues(studentId, now), lessons]
+  };
+}
+
+/** Written in the same transaction as the rows they describe. */
+export function prepareBookingMarkers(env, { rows = [], series = [], now, reserve = 0 }) {
+  const stamp = Math.floor(now.getTime() / 1000);
+  return env.DB.prepare(
+    `INSERT INTO request_limits (key, window, attempts)
+     SELECT 'booking:' || id, ?, CASE WHEN id = ? THEN 1 ELSE 0 END
+       FROM bookings WHERE id IN (SELECT value FROM json_each(?))
+     UNION ALL SELECT 'booking-series:' || id, ?, 0
+       FROM booking_series WHERE id IN (SELECT value FROM json_each(?))
+     UNION ALL SELECT 'booking-reserved:' || id, ?, ?
+       FROM bookings WHERE id = ? AND ? > 0`
+  ).bind(stamp, rows[0] ?? null, JSON.stringify(rows), stamp, JSON.stringify(series), stamp, reserve, rows[0] ?? null, reserve);
+}

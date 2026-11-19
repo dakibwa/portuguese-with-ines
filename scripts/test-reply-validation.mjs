@@ -18,7 +18,7 @@ registerHooks({
   resolve(specifier, context, next) {
     if (specifier.startsWith("@/")) {
       const url = new URL(`${specifier.slice(2)}.ts`, src);
-      if (existsSync(url)) return { url: url.href, shortCircuit: true };
+      if (existsSync(url)) return { url: url.href, format: "module-typescript", shortCircuit: true };
     }
     const resolved = next(specifier, context);
     return resolved.url.endsWith(".json") ? { ...resolved, importAttributes: { type: "json" } } : resolved;
