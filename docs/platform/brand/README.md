@@ -62,7 +62,7 @@ Made 9 Nov 2026 after Dan rejected the first, royal-blue brand page (<https://cl
 
 | Path | What it is |
 |---|---|
-| `draft/tokens.json` | Colour (two themes), type, spacing, radius, shadow, easing and duration, each with a usage note; laid out for the Design System artifact type (lists, not maps). |
+| `draft/tokens.json` | Colour (two themes), type, spacing, radius, shadow, easing and duration, each with a usage note; laid out as lists, not maps, the shape `design/system/make/site.mjs` reads. |
 | `draft/platform.css` | The first platform stylesheet: ch- classes for buttons, fields, chips, sign-up steps, cards and setting rows, lesson rows and pills, notices, the milestone message with the hat tip, the paper marks, the price card, an email and the "Site by" line. Written, not yet rendered or checked. |
 | `draft/logo/` | `icon.svg` (master tile), `favicon.svg` (heavier, for 16–32px), `mark.svg` and `mark-night.svg` (no tile, for paper), `wordmark.svg` / `-night`, `lockup.svg` / `-night`, `seal.svg` (round printer's mark with ring words), `icon-maskable.svg`, `icon-512.png`, `icon-192.png`, `apple-touch-icon.png`, `icon-maskable-512.png`, `shared-link.png` (1200 × 630 ruled page). The wordmark, lockups, seal and shared-link picture say "chapeau" and must be redrawn with the chosen name. |
 | `draft/tools/gen-logos.mjs` | Draws every SVG above from the fonts (outlined, so no file depends on a font). `NAME=vowel` sets the wordmark and seal. Instructions at the top of the file. |
@@ -82,5 +82,5 @@ Both scripts reproduce the committed files exactly. Fonts are not committed: dow
 1. Dan picks a name (or a direction to widen the search).
 2. Trademark search for it (EU and US, classes 41 and 42) and buy the domain.
 3. Redraw the wordmark, lockups, seal and shared-link picture with `NAME=<word>`, and rename the ch- class prefix.
-4. Build and publish a Design System artifact for the platform at the Portudo bar, from `draft/` (type: <https://claude.ai/artifact/5M7UeXXcx16TP3vzVFNDzd>): brand book, Surfaces page (home, looks, pricing, sign-up, dashboard, emails, the tutor's footer line), a Name page, component cards rendered at desktop and phone width in both themes, and a cover.
+4. Build the platform's design system at the Portudo bar, from `draft/`, as plain files in this repository in the layout `design/system/project/` uses (README.md and further pages, tokens.json, components/<Name>/README.md and preview.html, assets/<Group>/, fonts/), and look at it with `node design/system/make/site.mjs --system <its folder> --out <a folder>`; never as a Claude Design page. It holds a brand book, Surfaces page (home, looks, pricing, sign-up, dashboard, emails, the tutor's footer line), a Name page, component cards rendered at desktop and phone width in both themes, and a cover.
 5. Tell the build work: the platform name, domain, tutor subdomain pattern, sender address and "Site by" line are meant to stay single config values until the name is final.
