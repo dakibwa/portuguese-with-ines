@@ -1608,9 +1608,11 @@ while validation runs. Inês's explicit calendar additions retain their override
 weeks ahead, and the calendar shows that window four weeks at a time rather
 than as one long scroll.
 
-- The front end asks for a window wider than the horizon and lets the Worker
-  clamp it: a fixed window shorter than the horizon would draw weeks of empty
-  cells saying "no times free" — a lie rather than a gap.
+- The calendar asks for the maximum supported 365 days. The Worker returns free
+  times through the configured horizon. A request with no end date gets the
+  same full window.
+- When a free time falls in the final partial week on the student's clock,
+  the pager includes that week. An empty trailing week stays hidden.
 - The calendar pages through the window four Monday-to-Sunday weeks at a time.
   A repeating series may already own lessons beyond the window. The lessons
   view keeps paging until its last booked lesson, `Later weeks` counts what

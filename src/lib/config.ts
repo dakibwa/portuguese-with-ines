@@ -17,6 +17,9 @@ export const NO_SHOW_WINDOW_HOURS_AFTER = 0;
 /** The tutor's teaching timezone. Every advertised time on the site is on it. */
 export const BOOKING_TIME_ZONE = TUTOR_TIME_ZONE;
 
+/** Maximum calendar window accepted by the booking Worker. */
+export const MAX_BOOKING_HORIZON_DAYS = 365;
+
 /** Used only while the API response is absent or from an older Worker. */
 export const BOOKING_HORIZON_DAYS_FALLBACK = TUTOR.defaults.bookingHorizonDays;
 

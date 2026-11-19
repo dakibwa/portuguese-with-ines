@@ -1,6 +1,6 @@
 import { HOME_CLOCK, TUTOR } from "@/lib/tutor";
 import { forgetSession, readSession } from "@/lib/auth-api";
-import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, formatMoney } from "@/lib/config";
+import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, MAX_BOOKING_HORIZON_DAYS, formatMoney } from "@/lib/config";
 import { BOOKING_REPLY_ERROR, isApiAmount, isApiInstant, isApiLesson, isApiRecord as isRecord } from "@/lib/api-response";
 import { wallTimeToUtc } from "@/lib/wall-time";
 
@@ -203,7 +203,7 @@ export function fetchAvailability(
       primed && !session && primed.url === `${BOOKING_API_BASE_URL}${path}` ? primed.response : undefined
     ).then((data) => {
       const days = data.horizonDays;
-      if (days !== undefined && (!Number.isInteger(days) || days < 1 || days > 365)) unreadableReply();
+      if (days !== undefined && (!Number.isInteger(days) || days < 1 || days > MAX_BOOKING_HORIZON_DAYS)) unreadableReply();
       if (!isRecord(data.slotsByDate) || !Object.values(data.slotsByDate).every((slots) =>
         Array.isArray(slots) && slots.every((slot) =>
           isRecord(slot) && typeof slot.startAt === "string" && typeof slot.endAt === "string" &&

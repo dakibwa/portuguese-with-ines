@@ -92,6 +92,7 @@ import { formatEuros } from "./money.mjs";
 import { bookingSelection, claimSelection } from "./selection.mjs";
 import { calendarOwnsTeacherInvites, calendarConnectionStatus, startCalendarConnection, finishCalendarConnection, prepareMeeting, meetingUrl, markMeetingNotified, syncPendingMeetings } from "./meeting-service.mjs";
 
+const MAX_BOOKING_HORIZON_DAYS = 365;
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" };
 
 function corsHeaders(request, env) {
@@ -3155,10 +3156,8 @@ async function handleAvailability(request, env, url, teacher = false) {
 
   const now = new Date();
   const fromKey = url.searchParams.get("from") || dateKey(now, homeZone());
-  // Generous, because computeAvailability clamps to the booking horizon anyway.
-  // A hard-coded default narrower than the horizon silently truncates the
-  // answer for any caller that does not pass an explicit range.
-  const toKey = url.searchParams.get("to") || addDaysToKey(fromKey, 140);
+  // With no explicit end date, return the full window allowed by the settings.
+  const toKey = url.searchParams.get("to") || addDaysToKey(fromKey, MAX_BOOKING_HORIZON_DAYS);
   if (!parseDateKey(fromKey) || !parseDateKey(toKey)) return fail("Invalid date range.", 400, request, env);
 
   // A lesson being changed may reuse the time it occupies, so moving it by half
@@ -8459,7 +8458,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     // but cannot make existing consent authorize a higher fee or earlier lock.
     const ranges = {
       minimum_notice_hours: [0, 14],
-      booking_horizon_days: [1, 365],
+      booking_horizon_days: [1, MAX_BOOKING_HORIZON_DAYS],
       slot_interval_minutes: [5, 240],
       lesson_buffer_minutes: [0, 120],
       same_day_change_fee_cents: [0, 500]

@@ -3,7 +3,7 @@ import "../workspace.css";
 import { pageMetadata } from "@/lib/page-metadata";
 import { preconnect } from "react-dom";
 import { BookingFlow } from "@/components/BookingFlow";
-import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE } from "@/lib/config";
+import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, MAX_BOOKING_HORIZON_DAYS } from "@/lib/config";
 
 export const metadata: Metadata = pageMetadata({
   title: "Booking | Português com a Inês",
@@ -45,7 +45,7 @@ const primeBooking = BOOKING_API_BASE_URL
     `if(q.get("view")==="lessons"||["manage","token","emailToken","card","signin"].some(function(k){return q.has(k)}))return;` +
     `var l=q.get("lesson"),t=l==="single"||l==="long"?l:r?"single":"trial";` +
     `var d=new Intl.DateTimeFormat("en-CA",{timeZone:z,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()),p=d.split("-");` +
-    `var u=b+"/availability?"+new URLSearchParams({lessonType:t,from:d,to:new Date(Date.UTC(+p[0],p[1]-1,+p[2]+140)).toISOString().slice(0,10)});` +
+    `var u=b+"/availability?"+new URLSearchParams({lessonType:t,from:d,to:new Date(Date.UTC(+p[0],p[1]-1,+p[2]+${MAX_BOOKING_HORIZON_DAYS})).toISOString().slice(0,10)});` +
     `var a=fetch(u,{headers:h});a.catch(function(){});window.__inesAvailability={url:u,response:a}` +
     `})(${JSON.stringify(BOOKING_API_BASE_URL)},${JSON.stringify(BOOKING_TIME_ZONE)})}catch(e){}`
   : "";

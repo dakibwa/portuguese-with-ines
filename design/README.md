@@ -1399,8 +1399,9 @@ left and the places on the right, beside the corner splat; it shows `Booked
 lesson` only when there is a booked lesson to point to. A new booking pages
 through the whole twelve-week booking window; the lessons view pages from this
 week through the same window, or to the last booked lesson when that is later.
-The inclusive 84-day API boundary must not add a thirteenth week: a partial row
-beyond the window is not shown. The mobile calendar must keep all seven columns
+The usual 84-day window has twelve calendar rows. If a free lesson falls in
+the final partial week, the pager also reaches that week on the lesson’s clock.
+An empty trailing week stays hidden. The mobile calendar must keep all seven columns
 and its legend inside the card after resize or orientation changes.
 
 Choosing a free day keeps the four weeks in view on wide screens, the day
