@@ -1,0 +1,22 @@
+{
+  "product": "site",
+  "paint": { "ground": "paper", "surface": "paper-light", "ink": "ink", "soft": "lavender-ink", "rule": "rule", "shadow": "shadow-dialog" },
+  "rule": ["blue-deep", "lavender", "coral"],
+  "colours": [
+    ["paper, sheet and ink", "^(paper|paper-light|raised|sheet|ink|lavender-ink)$"],
+    ["blue, lilac and coral", "^(blue|blue-deep|lavender|lavender-soft|lilac-on-blue|coral|coral-action|coral-pressed|lilac-pressed|warning-ink)$"],
+    ["washes, rules and edges", ""],
+    ["legacy names for the blue", "^green"]
+  ],
+  "samples": {
+    "display-hero": "Portuguese Lessons",
+    "display-price": "€25",
+    "button-label": "Book a lesson",
+    "nav-label": "Approach",
+    "eyebrow-label": "Next lesson",
+    "legend-label": "Sign-in email"
+  },
+  "sample": "One to one, at your pace. Online or in person.",
+  "assets": { "Logos": "logos", "Splats": "tiles", "Fields": "shots", "Email": "tiles", "Screens": "shots" },
+  "onDark": "wordmark-cream|banner"
+}

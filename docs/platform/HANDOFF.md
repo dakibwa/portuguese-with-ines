@@ -56,7 +56,7 @@ All of these were decided on 9 November 2026.
   [systems-map.html](./systems-map.html). Its eleven numbered findings are the
   rules the code still fixes. "Known gaps" below is the same list, by build step.
 - **Design system**, Inês's site and the bar for the templates:
-  [artifact](https://claude.ai/artifact/XrweSPkR5KgKC8mF5xYhcY), and
+  the files in [design/system/project/](../../design/system/project/), and
   [design/README.md](../../design/README.md).
 - **The 10 templates**: [templates.md](./templates.md) and the concepts in
   [templates/](./templates/). Dan still has to pick which layouts to keep, so

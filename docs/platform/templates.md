@@ -108,4 +108,4 @@ These mechanics are specific to the preview, not to the real build.
 3. Build the shared booking and schedule components with the `--bk-*`, `--btn-*` and `--r-*` tokens, so that Inês's current look is exactly Atelier + Porto.
 4. Build the other layouts one at a time as real pages that read the record. Check each at 1280 and 390 against its concept.
 5. Give each layout a small live render for the onboarding swipe.
-6. When the real components land, mirror them into the design system (https://claude.ai/artifact/XrweSPkR5KgKC8mF5xYhcY), or say in the PR that it is behind (see AGENTS.md).
+6. When the real components land, add them to the design system in `design/system/project/`, or say in the PR that it is behind (see AGENTS.md).

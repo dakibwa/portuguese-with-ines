@@ -1,0 +1,3 @@
+# the design system drawn as a page (make/site.mjs): a view of project/ that
+# holds nothing of its own, so it is built where it is wanted and never committed
+page/
