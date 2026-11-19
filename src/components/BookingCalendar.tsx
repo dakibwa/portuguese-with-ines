@@ -452,7 +452,6 @@ type Confirmation = {
   location: "online" | "porto";
   reference: string;
   startAt: string;
-  manageUrl: string;
   manageToken: string;
   email: string;
   series?: SeriesOutcome;
@@ -2438,7 +2437,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           location: result.booking.location,
           reference: result.booking.reference,
           startAt: result.booking.startAt,
-          manageUrl: result.manageUrl ?? "/book/?view=lessons",
           manageToken: result.manageToken ?? "",
           email: result.booking.studentEmail,
           series: result.series,
@@ -3568,18 +3566,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             </button>
             {/* One lesson can be changed straight from here. Several are each
                 on the calendar, where every one opens on its own. */}
-            {several ? null : (
+            {several || !confirmation.manageToken ? null : (
               <button
                 className="button button--outline"
                 onClick={() => {
-                  if (confirmation.manageToken) {
-                    transitionBooking(() => {
-                      setConfirmation(null);
-                      void openManaged(confirmation.manageToken, confirmation.series?.id ?? null);
-                    });
-                  } else {
-                    window.location.assign(confirmation.manageUrl);
-                  }
+                  transitionBooking(() => {
+                    setConfirmation(null);
+                    void openManaged(confirmation.manageToken, confirmation.series?.id ?? null);
+                  });
                 }}
                 type="button"
               >
@@ -4706,7 +4700,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 </div>
               ))}
             </div>
-            <div className="unified-calendar__legend" aria-label="Calendar key">
+            <div className="unified-calendar__legend" role="group" aria-label="Calendar key">
               {/* Only once there is a booked lesson to point to: a first visit
                   has nothing booked, so the key would explain nothing. */}
               {calendarBookings.length ? (

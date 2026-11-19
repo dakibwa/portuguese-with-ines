@@ -298,6 +298,7 @@ export function LessonDetails({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
+    const returnContainer = afterChangeFocusRef.current;
     if (inline) {
       // In place: focus moves to the named details, and back to the lesson
       // that opened them (or, once something changed and the lessons
@@ -311,12 +312,11 @@ export function LessonDetails({
         queueMicrotask(() => {
           const active = document.activeElement;
           if (active && active !== document.body && !panel?.contains(active)) return;
-          const container = afterChangeFocusRef.current;
           // Hiding the original opener can blur it before this effect mounts.
           // Find that same lesson after React reveals its compact row again.
-          const opener = changed.current ? null : Array.from(container?.querySelectorAll<HTMLElement>("[data-lesson-id]") ?? [])
+          const opener = changed.current ? null : Array.from(returnContainer?.querySelectorAll<HTMLElement>("[data-lesson-id]") ?? [])
             .find(element => element.dataset.lessonId === booking.id);
-          const target = changed.current ? container : opener ?? (previous?.isConnected && previous !== document.body ? previous : container);
+          const target = changed.current ? returnContainer : opener ?? (previous?.isConnected && previous !== document.body ? previous : returnContainer);
           target?.focus({ preventScroll: true });
         });
       };
@@ -329,7 +329,7 @@ export function LessonDetails({
       releaseScroll();
       // Successful actions reload the timetable, removing its opener. Keep
       // keyboard position at the stable week heading throughout that reload.
-      restoreDialogFocus(changed.current ? afterChangeFocusRef.current : previous);
+      restoreDialogFocus(changed.current ? returnContainer : previous);
     };
   }, [afterChangeFocusRef, booking.id, inline]);
 

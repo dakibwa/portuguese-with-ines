@@ -86,7 +86,7 @@ import { ExpressionProblem, expressionsRequest } from "./expressions.mjs";
 import { approvedTranslations, pendingTranslationCount, submitTranslation, translationsMissing, translationsReview } from "./expression-translations.mjs";
 import { HomeworkProblem, HOMEWORK_PHOTO_BODY_LIMIT, teacherHomework, studentHomework, homeworkReturns, notifyHomeworkSubmissions, studentNotes, saveStudentPlan } from "./homework.mjs";
 import { closedExpressions, expressionsOpenToStudents, pickExpression, studentExpressions } from "./student-expressions.mjs";
-import { findRecurringCode, studentRates, studentLessonType, lessonPriceSnapshot, lessonPriceSnapshotSql, studentTypePriceSql, priceForMove, teacherRate, withDerived, rateLimitAddress, takeRateLimit } from "./rates.mjs";
+import { findRecurringCode, studentRates, studentLessonType, lessonPriceSnapshot, lessonPriceSnapshotSql, studentTypePriceSql, priceForMove, teacherRate, withDerived, rateLimitAddress, takeRateLimit, recentBookingUsage, bookingBudget, prepareBookingMarkers } from "./rates.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
 import { formatEuros } from "./money.mjs";
 import { bookingSelection, claimSelection } from "./selection.mjs";
@@ -954,7 +954,7 @@ async function sameStudentSession(request, env, student) {
   return current?.id === student.id && (current.session_version ?? 0) === (student.session_version ?? 0);
 }
 
-function prepareSlotClaim(env, { columns, values, startAt, endAt, studentId = null, bufferMinutes = 0, seriesSnapshot = null, standingCardStudent = null, sessionIdentity = null, priceSnapshot = null, authorization = null, availabilityRevision = null, minimumNoticeHours = null }) {
+function prepareSlotClaim(env, { columns, values, startAt, endAt, studentId = null, bufferMinutes = 0, seriesSnapshot = null, standingCardStudent = null, sessionIdentity = null, priceSnapshot = null, authorization = null, availabilityRevision = null, minimumNoticeHours = null, budget = null, reservationId = null }) {
   const placeholders = columns.map(() => "?").join(", ");
   const seriesId = values[columns.indexOf("series_id")] ?? null;
   // A pending setup reserves its slot for everyone, including its owner.
@@ -977,7 +977,9 @@ function prepareSlotClaim(env, { columns, values, startAt, endAt, studentId = nu
      ${priceSnapshot ? `AND ${lessonPriceSnapshotSql()}` : ""}
      ${authorization ? `AND (${authorization.sql})` : ""}
      ${availabilityRevision !== null ? `AND ${availabilityRevisionSql()}` : ""}
-     ${minimumNoticeHours !== null ? "AND ? >= ?" : ""}`
+     ${minimumNoticeHours !== null ? "AND ? >= ?" : ""}
+     ${budget ? `AND ${budget.sql}` : ""}
+     ${reservationId ? "AND EXISTS (SELECT 1 FROM request_limits WHERE key = ? AND attempts > 0)" : ""}`
   )
     .bind(
       ...values,
@@ -995,12 +997,18 @@ function prepareSlotClaim(env, { columns, values, startAt, endAt, studentId = nu
       ...(priceSnapshot ?? []),
       ...(authorization?.values ?? []),
       ...(availabilityRevision !== null ? [availabilityRevision] : []),
-      ...(minimumNoticeHours !== null ? [startAt, new Date(Date.now() + minimumNoticeHours * 3600000).toISOString()] : [])
+      ...(minimumNoticeHours !== null ? [startAt, new Date(Date.now() + minimumNoticeHours * 3600000).toISOString()] : []),
+      ...(budget?.values ?? []),
+      ...(reservationId ? [`booking-reserved:${reservationId}`] : [])
     );
 }
 
 async function claimSlot(env, options) {
-  const result = await prepareSlotClaim(env, options).run();
+  const claim = prepareSlotClaim(env, options);
+  const id = options.values[options.columns.indexOf("id")];
+  const result = options.decisionAt
+    ? (await env.DB.batch([claim, prepareBookingMarkers(env, { rows: [id], now: options.decisionAt, reserve: options.reserve ?? 0 })]))[0]
+    : await claim.run();
 
   return (result?.meta?.changes ?? 0) > 0;
 }
@@ -3271,20 +3279,7 @@ async function handleCreate(request, env, ctx) {
     }
   }
 
-  // Cheap abuse guard: a real student does not book six lessons in a minute,
-  // and without this one account can fill her whole calendar.
-  // Counts booking *acts*, not rows. A twelve-week series writes twelve rows
-  // for one decision, so its occurrences are excluded here and the series
-  // itself is counted once — otherwise booking a term locks the student out of
-  // their own calendar for an hour.
-  const sinceIso = new Date(now.getTime() - 3600000).toISOString();
-  const recent = await env.DB.prepare(
-    `SELECT (SELECT COUNT(*) FROM bookings WHERE student_id = ?1 AND created_at > ?2 AND series_id IS NULL)
-          + (SELECT COUNT(*) FROM booking_series WHERE student_id = ?1 AND created_at > ?2) AS acts,
-            (SELECT COUNT(*) FROM bookings WHERE student_id = ?1 AND created_at > ?2) AS lessons`
-  )
-    .bind(student.id, sinceIso)
-    .first();
+  const recent = await recentBookingUsage(env, student.id, now);
 
   /*
    * Two bounds, because one act can write twelve rows. Counting only acts let a
@@ -3340,6 +3335,19 @@ async function handleCreate(request, env, ctx) {
     });
   }
 
+  const repeatSlot = wantsRepeat ? slotOf(body.startAt) : null;
+  const repeatPlan = wantsRepeat ? await planOccurrences(env, {
+    fromKey: repeatSlot.dateKey, minuteOfDay: repeatSlot.minuteOfDay,
+    count: repeatWeeks ?? OPEN_ENDED_HORIZON_WEEKS, lessonType, now, location
+  }) : null;
+  if (repeatPlan && !repeatPlan.bookable.some(occurrence => occurrence.startAt.toISOString() === body.startAt)) {
+    return fail("That starting time has just been taken. Please choose again.", 409, request, env);
+  }
+  const plannedLessons = repeatPlan?.bookable.length ?? 1;
+  if (recent.lessons + plannedLessons > 26) {
+    return fail("That's several bookings in a short time. Please wait an hour before adding more.", 429, request, env);
+  }
+
   const id = crypto.randomUUID();
   const reference = bookingReference(tutorOf(env).bookings.referencePrefix);
   const startsAt = new Date(body.startAt).toISOString();
@@ -3383,172 +3391,55 @@ async function handleCreate(request, env, ctx) {
     endAt: endsAt,
     studentId: student.id,
     bufferMinutes: settings.lessonBufferMinutes,
-    sessionIdentity, priceSnapshot, availabilityRevision: check.availabilityRevision, minimumNoticeHours: settings.minimumNoticeHours
+    sessionIdentity, priceSnapshot, availabilityRevision: check.availabilityRevision, minimumNoticeHours: settings.minimumNoticeHours,
+    budget: bookingBudget(student.id, now, plannedLessons), decisionAt: now, reserve: plannedLessons - 1
   });
 
   if (!claimed) {
     if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
+    const usage = await recentBookingUsage(env, student.id, now);
+    if (usage.acts >= 5 || usage.lessons + plannedLessons > 26) {
+      return fail("That's several bookings in a short time. Please wait an hour before adding more.", 429, request, env);
+    }
     return fail("That time or your lesson price has changed. Please review before confirming.", 409, request, env);
   }
 
-  // Keep the account's timezone in step with the browser it was booked from.
-  if (timezone !== student.timezone) {
-    await env.DB.prepare(`UPDATE students SET timezone = ? WHERE id = ? AND ${studentSessionSql()}`)
-      .bind(timezone, student.id, ...sessionIdentity).run();
-  }
-
-  const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
-  const token = await createManageToken(id, env.BOOKING_TOKEN_SECRET);
-  const manageUrl = studentManageUrl(env, token);
-
-  // A first-time payer authenticates and saves a card, but no money is taken.
-  // The held booking confirms only when Stripe's setup webhook proves that
-  // reusable payment method exists. A repeat is handled as one hold below.
-  if (needsCardSetup && !wantsRepeat) {
-    try {
-      if (!await sameStudentSession(request, env, student)) {
-        await env.DB.prepare("DELETE FROM bookings WHERE id = ? AND status = 'pending_payment' AND stripe_session_id IS NULL").bind(id).run();
-        return fail("Please sign in again.", 401, request, env);
-      }
-      const session = await createCardSetupSession(env, {
-        booking: row,
-        customer: student.stripe_customer_id ?? null,
-        customerEmail: student.email,
-        successUrl: `${studentManageUrl(env, token)}&card=saved`,
-        cancelUrl: siteUrl(env, "/book/?cancelled=1")
-      });
-
-      await env.DB.prepare("UPDATE bookings SET stripe_session_id = ? WHERE id = ?").bind(session.id, id).run();
-      if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
-
-      // Hosted checkout answers with a URL to send the student to; embedded
-      // answers with a client secret the page mounts Stripe's form from.
-      return json(
-        {
-          booking: publicBooking(row, lessonType, settings),
-          ...(session.url ? { checkoutUrl: session.url } : { checkoutClientSecret: session.client_secret })
-        },
-        201,
-        request,
-        env
-      );
-    } catch (error) {
-      // Never leave a dead hold behind when checkout could not even be created.
-      await env.DB.prepare("DELETE FROM bookings WHERE id = ?").bind(id).run();
-      console.error("stripe-setup", String(error?.message ?? error));
-      return fail("We couldn't save the card just now. Please try again in a moment.", 502, request, env);
-    }
-  }
-
-  // A repeat is created only once the first lesson is real, so a failure part
-  // way through leaves a booked lesson rather than a series pointing at nothing.
-  if (wantsRepeat) {
-    const slot = slotOf(startsAt);
-    const seriesId = crypto.randomUUID();
-
-    const recipe = await env.DB.prepare(
-      `INSERT INTO booking_series (id, student_id, lesson_type_id, location, notes, weekday, minute_of_day,
-         occurrences, status, filled_to, automatic_payment, payment_consent_at, payment_consent_version,
-         created_at, updated_at)
-       SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ? WHERE ${studentSessionSql()}
-         AND ${lessonPriceSnapshotSql()} AND ${availabilityRevisionSql()}`
-    )
-      .bind(
-        seriesId,
-        student.id,
-        lessonType.id,
-        location,
-        notes,
-        slot.weekday,
-        slot.minuteOfDay,
-        repeatWeeks,
-        slot.dateKey,
-        postpay ? 1 : 0,
-        postpay ? timestamp : null,
-        postpay ? PAYMENT_CONSENT_VERSION : null,
-        timestamp,
-        timestamp,
-        ...sessionIdentity,
-        ...priceSnapshot,
-        check.availabilityRevision
-      )
-      .run();
-    if (!(recipe?.meta?.changes > 0)) {
-      if (needsCardSetup) {
-        await env.DB.prepare("DELETE FROM bookings WHERE id = ? AND status = 'pending_payment' AND stripe_session_id IS NULL").bind(id).run();
-      }
-      const accepted = needsCardSetup ? null : await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
-      if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
-      if (accepted) ctx.waitUntil(notify(env, { event: "booked", row: accepted, lessonType, settings, manageUrl }));
-      return fail(needsCardSetup
-        ? "The availability or your lesson price has changed. Nothing has been booked; please review before confirming."
-        : "Your first lesson is booked, but availability or your lesson price changed before the weekly run was added. Please review your lessons before booking again.", 409, request, env);
+  try {
+    // Keep the account's timezone in step with the browser it was booked from.
+    if (timezone !== student.timezone) {
+      await env.DB.prepare(`UPDATE students SET timezone = ? WHERE id = ? AND ${studentSessionSql()}`)
+        .bind(timezone, student.id, ...sessionIdentity).run();
     }
 
-    await env.DB.prepare("UPDATE bookings SET series_id = ? WHERE id = ?").bind(seriesId, id).run();
-    const series = await env.DB.prepare("SELECT * FROM booking_series WHERE id = ?").bind(seriesId).first();
+    const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
+    const token = await createManageToken(id, env.BOOKING_TOKEN_SECRET);
+    const manageUrl = studentManageUrl(env, token);
 
-    // The lesson just booked is the first occurrence, so the rest start a week on.
-    const remaining = (repeatWeeks ?? OPEN_ENDED_HORIZON_WEEKS) - 1;
-    const filled =
-      remaining > 0
-        ? await fillSeries(env, {
-            series,
-            student,
-            lessonType,
-            fromKey: addDaysToKey(slot.dateKey, 7),
-            count: remaining,
-            now,
-            // A new card setup holds the run until Stripe confirms it. A card
-            // already on file schedules every occurrence immediately.
-            paymentState: needsCardSetup ? "hold" : postpay ? "scheduled" : "none",
-            holdExpiresAt: needsCardSetup ? holdExpiresAt : null,
-            sessionIdentity, priceSnapshot, availabilityRevision: check.availabilityRevision
-          })
-        : { rows: [], skipped: [] };
-
-    const first = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
-    const allRows = [first, ...filled.rows];
-
-    const seriesPayload = {
-      id: seriesId,
-      weeks: repeatWeeks,
-      openEnded: repeatWeeks === null,
-      booked: allRows.map((occurrence) => occurrence.starts_at),
-      skipped: filled.skipped.map((occurrence) => occurrence.startAt)
-    };
-
-    if (needsCardSetup) {
+    // A first-time payer authenticates and saves a card, but no money is taken.
+    // The held booking confirms only when Stripe's setup webhook proves that
+    // reusable payment method exists. A repeat is handled as one hold below.
+    if (needsCardSetup && !wantsRepeat) {
       try {
         if (!await sameStudentSession(request, env, student)) {
-          await env.DB.batch([
-            env.DB.prepare("DELETE FROM bookings WHERE (series_id = ? OR id = ?) AND status = 'pending_payment' AND stripe_session_id IS NULL").bind(seriesId, id),
-            env.DB.prepare("DELETE FROM booking_series WHERE id = ? AND NOT EXISTS (SELECT 1 FROM bookings WHERE series_id = ?)").bind(seriesId, seriesId)
-          ]);
+          await env.DB.prepare("DELETE FROM bookings WHERE id = ? AND status = 'pending_payment' AND stripe_session_id IS NULL").bind(id).run();
           return fail("Please sign in again.", 401, request, env);
         }
         const session = await createCardSetupSession(env, {
-          booking: first,
+          booking: row, student,
           customer: student.stripe_customer_id ?? null,
           customerEmail: student.email,
-          seriesId,
-          successUrl: `${manageUrl}&view=lessons&card=saved`,
-          cancelUrl: siteUrl(env, "/book/?cancelled=1"),
-          skippedStartAts: filled.skipped.map((occurrence) => occurrence.startAt)
+          successUrl: `${studentManageUrl(env, token)}&card=saved`,
+          cancelUrl: siteUrl(env, "/book/?cancelled=1")
         });
 
-        await env.DB.prepare("UPDATE bookings SET stripe_session_id = ? WHERE series_id = ? OR id = ?")
-          .bind(session.id, seriesId, id)
-          .run();
+        await env.DB.prepare("UPDATE bookings SET stripe_session_id = ? WHERE id = ?").bind(session.id, id).run();
         if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
 
-        // Emails wait for the webhook; the run is held until its card is saved.
+        // Hosted checkout answers with a URL to send the student to; embedded
+        // answers with a client secret the page mounts Stripe's form from.
         return json(
           {
-            booking: publicBooking(first, lessonType, settings),
-            manageUrl,
-            manageToken: token,
-            series: seriesPayload,
+            booking: publicBooking(row, lessonType, settings),
             ...(session.url ? { checkoutUrl: session.url } : { checkoutClientSecret: session.client_secret })
           },
           201,
@@ -3556,47 +3447,186 @@ async function handleCreate(request, env, ctx) {
           env
         );
       } catch (error) {
-        // Never leave a run of dead holds behind when checkout couldn't start.
-        await env.DB.prepare("DELETE FROM bookings WHERE series_id = ? OR id = ?").bind(seriesId, id).run();
-        await env.DB.prepare("DELETE FROM booking_series WHERE id = ?").bind(seriesId).run();
-        console.error("stripe-series-setup", String(error?.message ?? error));
+        // Never leave a dead hold behind when checkout could not even be created.
+        await env.DB.prepare("DELETE FROM bookings WHERE id = ?").bind(id).run();
+        console.error("stripe-setup", String(error?.message ?? error));
         return fail("We couldn't save the card just now. Please try again in a moment.", 502, request, env);
       }
     }
 
-    const manageUrls = {};
-    for (const occurrence of allRows) {
-      const occurrenceToken = await createManageToken(occurrence.id, env.BOOKING_TOKEN_SECRET);
-      manageUrls[occurrence.id] = studentManageUrl(env, occurrenceToken);
-    }
-    if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
+    // A repeat is created only once the first lesson is real, so a failure part
+    // way through leaves a booked lesson rather than a series pointing at nothing.
+    if (wantsRepeat) {
+      const slot = slotOf(startsAt);
+      const seriesId = crypto.randomUUID();
 
-    ctx.waitUntil(
-      notifySeries(env, { rows: allRows, lessonType, settings, series, manageUrls, skipped: filled.skipped })
-    );
+      const recipeClaim = env.DB.prepare(
+        `INSERT INTO booking_series (id, student_id, lesson_type_id, location, notes, weekday, minute_of_day,
+           occurrences, status, filled_to, automatic_payment, payment_consent_at, payment_consent_version,
+           created_at, updated_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ? WHERE ${studentSessionSql()}
+           AND ${lessonPriceSnapshotSql()} AND ${availabilityRevisionSql()}`
+      )
+        .bind(
+          seriesId,
+          student.id,
+          lessonType.id,
+          location,
+          notes,
+          slot.weekday,
+          slot.minuteOfDay,
+          repeatWeeks,
+          slot.dateKey,
+          postpay ? 1 : 0,
+          postpay ? timestamp : null,
+          postpay ? PAYMENT_CONSENT_VERSION : null,
+          timestamp,
+          timestamp,
+          ...sessionIdentity,
+          ...priceSnapshot,
+          check.availabilityRevision
+        );
+      const [recipe] = await env.DB.batch([recipeClaim, prepareBookingMarkers(env, { series: [seriesId], now })]);
+      if (!(recipe?.meta?.changes > 0)) {
+        if (needsCardSetup) {
+          await env.DB.prepare("DELETE FROM bookings WHERE id = ? AND status = 'pending_payment' AND stripe_session_id IS NULL").bind(id).run();
+        }
+        const accepted = needsCardSetup ? null : await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
+        if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
+        if (accepted) ctx.waitUntil(notify(env, { event: "booked", row: accepted, lessonType, settings, manageUrl }));
+        return fail(needsCardSetup
+          ? "The availability or your lesson price has changed. Nothing has been booked; please review before confirming."
+          : "Your first lesson is booked, but availability or your lesson price changed before the weekly run was added. Please review your lessons before booking again.", 409, request, env);
+      }
+
+      await env.DB.prepare("UPDATE bookings SET series_id = ? WHERE id = ?").bind(seriesId, id).run();
+      const series = await env.DB.prepare("SELECT * FROM booking_series WHERE id = ?").bind(seriesId).first();
+
+      // The lesson just booked is the first occurrence, so the rest start a week on.
+      const remaining = (repeatWeeks ?? OPEN_ENDED_HORIZON_WEEKS) - 1;
+      const filled =
+        remaining > 0
+          ? await fillSeries(env, {
+              series,
+              student,
+              lessonType,
+              fromKey: addDaysToKey(slot.dateKey, 7),
+              count: remaining,
+              plan: { bookable: repeatPlan.bookable.filter(occurrence => occurrence.key !== repeatSlot.dateKey), skipped: repeatPlan.skipped },
+              reservationId: id,
+              now,
+              // A new card setup holds the run until Stripe confirms it. A card
+              // already on file schedules every occurrence immediately.
+              paymentState: needsCardSetup ? "hold" : postpay ? "scheduled" : "none",
+              holdExpiresAt: needsCardSetup ? holdExpiresAt : null,
+              sessionIdentity, priceSnapshot, availabilityRevision: check.availabilityRevision
+            })
+          : { rows: [], skipped: [] };
+
+      const first = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
+      const allRows = [first, ...filled.rows];
+
+      const seriesPayload = {
+        id: seriesId,
+        weeks: repeatWeeks,
+        openEnded: repeatWeeks === null,
+        booked: allRows.map((occurrence) => occurrence.starts_at),
+        skipped: filled.skipped.map((occurrence) => occurrence.startAt)
+      };
+
+      if (needsCardSetup) {
+        try {
+          if (!await sameStudentSession(request, env, student)) {
+            await env.DB.batch([
+              env.DB.prepare("DELETE FROM bookings WHERE (series_id = ? OR id = ?) AND status = 'pending_payment' AND stripe_session_id IS NULL").bind(seriesId, id),
+              env.DB.prepare("DELETE FROM booking_series WHERE id = ? AND NOT EXISTS (SELECT 1 FROM bookings WHERE series_id = ?)").bind(seriesId, seriesId)
+            ]);
+            return fail("Please sign in again.", 401, request, env);
+          }
+          const session = await createCardSetupSession(env, {
+            booking: first, student,
+            customer: student.stripe_customer_id ?? null,
+            customerEmail: student.email,
+            seriesId,
+            successUrl: `${manageUrl}&view=lessons&card=saved`,
+            cancelUrl: siteUrl(env, "/book/?cancelled=1"),
+            skippedStartAts: filled.skipped.map((occurrence) => occurrence.startAt)
+          });
+
+          await env.DB.prepare("UPDATE bookings SET stripe_session_id = ? WHERE series_id = ? OR id = ?")
+            .bind(session.id, seriesId, id)
+            .run();
+          if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
+
+          // Emails wait for the webhook; the run is held until its card is saved.
+          return json(
+            {
+              booking: publicBooking(first, lessonType, settings),
+              manageUrl,
+              manageToken: token,
+              series: seriesPayload,
+              ...(session.url ? { checkoutUrl: session.url } : { checkoutClientSecret: session.client_secret })
+            },
+            201,
+            request,
+            env
+          );
+        } catch (error) {
+          // Never leave a run of dead holds behind when checkout couldn't start.
+          await env.DB.prepare("DELETE FROM bookings WHERE series_id = ? OR id = ?").bind(seriesId, id).run();
+          await env.DB.prepare("DELETE FROM booking_series WHERE id = ?").bind(seriesId).run();
+          console.error("stripe-series-setup", String(error?.message ?? error));
+          return fail("We couldn't save the card just now. Please try again in a moment.", 502, request, env);
+        }
+      }
+
+      const manageUrls = {};
+      for (const occurrence of allRows) {
+        const occurrenceToken = await createManageToken(occurrence.id, env.BOOKING_TOKEN_SECRET);
+        manageUrls[occurrence.id] = studentManageUrl(env, occurrenceToken);
+      }
+      if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
+
+      ctx.waitUntil(
+        notifySeries(env, { rows: allRows, lessonType, settings, series, manageUrls, skipped: filled.skipped })
+      );
+
+      return json(
+        {
+          booking: publicBooking(first, lessonType, settings),
+          manageUrl,
+          manageToken: token,
+          series: seriesPayload
+        },
+        201,
+        request,
+        env
+      );
+    }
+
+    if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
+    ctx.waitUntil(notify(env, { event: "booked", row, lessonType, settings, manageUrl }));
 
     return json(
-      {
-        booking: publicBooking(first, lessonType, settings),
-        manageUrl,
-        manageToken: token,
-        series: seriesPayload
-      },
+      { booking: publicBooking(row, lessonType, settings), manageUrl, manageToken: token },
       201,
       request,
       env
     );
+  } finally {
+    if (wantsRepeat) {
+      const releaseReservation = () => env.DB.prepare("DELETE FROM request_limits WHERE key = ?").bind(`booking-reserved:${id}`).run();
+      try { await releaseReservation(); }
+      catch (error) {
+        // A booked run keeps its success response when housekeeping is delayed.
+        // Retry once in the background; the rolling hour bounds any stale space.
+        console.error("booking-budget-release", id, String(error?.message ?? error));
+        ctx.waitUntil(Promise.resolve().then(releaseReservation).catch(error => {
+          console.error("booking-budget-release-retry", id, String(error?.message ?? error));
+        }));
+      }
+    }
   }
-
-  if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
-  ctx.waitUntil(notify(env, { event: "booked", row, lessonType, settings, manageUrl }));
-
-  return json(
-    { booking: publicBooking(row, lessonType, settings), manageUrl, manageToken: token },
-    201,
-    request,
-    env
-  );
 }
 
 /** Reserve a selection through one card setup and one combined confirmation. */
@@ -3661,6 +3691,10 @@ async function handleCreateSelection(request, env, ctx, {
   }
   if (!await claimSelection(env, { rows: plannedRows, series, now, bufferMinutes: settings.lessonBufferMinutes, sessionIdentity, priceSnapshot, availabilityRevision, minimumNoticeHours: settings.minimumNoticeHours })) {
     if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
+    const usage = await recentBookingUsage(env, student.id, now);
+    if (usage.acts >= 5 || usage.lessons + plannedRows.length > 26) {
+      return fail("That's several bookings in a short time. Please wait an hour before adding more.", 429, request, env);
+    }
     return fail("A selected time or your lesson price has changed. Nothing has been booked; please review before confirming.", 409, request, env);
   }
   const ids = JSON.stringify(plannedRows.map((row) => row.id));
@@ -3682,7 +3716,7 @@ async function handleCreateSelection(request, env, ctx, {
         return fail("Please sign in again.", 401, request, env);
       }
       const session = await createCardSetupSession(env, {
-        booking: first, customer: student.stripe_customer_id ?? null, customerEmail: student.email,
+        booking: first, student, customer: student.stripe_customer_id ?? null, customerEmail: student.email,
         selectionCount: rows.length,
         successUrl: `${payload.manageUrl}&view=lessons&card=saved`, cancelUrl: siteUrl(env, "/book/?cancelled=1"),
         skippedStartAts: selection.skipped
@@ -3757,7 +3791,7 @@ const LESSON_CLAIM_COLUMNS = [
   "payment_consent_version", "added_by_teacher"
 ];
 
-async function insertOccurrence(env, { series, key, student, lessonType, timezone, location, notes, startAt, endAt, now, paymentState = "none", holdExpiresAt = null, paymentConsentAt = null, paymentConsentVersion = null, bufferMinutes = 0, teacher = false, sessionIdentity = null, priceSnapshot = null, authorization = null, availabilityRevision = null, minimumNoticeHours = null }) {
+async function insertOccurrence(env, { series, key, student, lessonType, timezone, location, notes, startAt, endAt, now, paymentState = "none", holdExpiresAt = null, paymentConsentAt = null, paymentConsentVersion = null, bufferMinutes = 0, teacher = false, sessionIdentity = null, priceSnapshot = null, authorization = null, availabilityRevision = null, minimumNoticeHours = null, reservationId = null }) {
   const id = crypto.randomUUID();
   const timestamp = now.toISOString();
   const startsAt = new Date(startAt).toISOString();
@@ -3798,12 +3832,16 @@ async function insertOccurrence(env, { series, key, student, lessonType, timezon
     studentId: student.id,
     bufferMinutes,
     seriesSnapshot: series,
-    sessionIdentity, priceSnapshot, authorization, availabilityRevision, minimumNoticeHours
+    sessionIdentity, priceSnapshot, authorization, availabilityRevision, minimumNoticeHours, reservationId
   });
 
   // Commit the occurrence and bookmark together. Stale jobs may neither add
   // an old appointment nor overwrite the bookmark of a moved/extended recipe.
-  const [claimed, advanced] = await env.DB.batch([claim, prepareSeriesBookmark(env, series, key, now, sessionIdentity, priceSnapshot, authorization, availabilityRevision)]);
+  const statements = [claim, prepareSeriesBookmark(env, series, key, now, sessionIdentity, priceSnapshot, authorization, availabilityRevision)];
+  if (reservationId) statements.push(env.DB.prepare(
+    "UPDATE request_limits SET attempts = attempts - 1 WHERE key = ? AND attempts > 0 AND EXISTS (SELECT 1 FROM bookings WHERE id = ?)"
+  ).bind(`booking-reserved:${reservationId}`, id));
+  const [claimed, advanced] = await env.DB.batch(statements);
   if (!(advanced?.meta?.changes > 0)) return { current: false, id: null };
   // A competing lesson only skips this week; the current recipe still advances.
   if (!(claimed?.meta?.changes > 0)) return { current: true, id: null };
@@ -3837,7 +3875,7 @@ async function placedByTeacher(env, seriesId) {
   }
 }
 
-async function fillSeries(env, { series, student, lessonType, fromKey, count, now, paymentState = "none", holdExpiresAt = null, sessionIdentity = null, priceSnapshot = null, authorization = null, availabilityRevision = null }) {
+async function fillSeries(env, { series, student, lessonType, fromKey, count, now, paymentState = "none", holdExpiresAt = null, sessionIdentity = null, priceSnapshot = null, authorization = null, availabilityRevision = null, plan = null, reservationId = null }) {
   // New bookings retain the quote already accepted. A nightly extension takes
   // a fresh price, then binds it to both its occurrence and its bookmark.
   if (!priceSnapshot) {
@@ -3854,7 +3892,7 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
   const checkedSettings = await loadSettings(env);
   const { lessonBufferMinutes } = checkedSettings;
   availabilityRevision ??= checkedSettings.availabilityRevision;
-  const { bookable, skipped } = await planOccurrences(env, {
+  const { bookable, skipped } = plan ?? await planOccurrences(env, {
     fromKey,
     minuteOfDay: series.minute_of_day,
     location: series.location,
@@ -3896,7 +3934,7 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
       // she adds does.
       bufferMinutes: hers ? 0 : lessonBufferMinutes,
       teacher,
-      sessionIdentity, priceSnapshot, authorization, availabilityRevision, minimumNoticeHours: hers ? null : checkedSettings.minimumNoticeHours
+      sessionIdentity, priceSnapshot, authorization, availabilityRevision, minimumNoticeHours: hers ? null : checkedSettings.minimumNoticeHours, reservationId
     });
 
     if (!current) break;
@@ -5332,7 +5370,7 @@ async function handleStripeWebhook(request, env, ctx) {
     if (session.metadata?.series_id && row.series_id !== session.metadata.series_id) {
       return new Response("Session does not match booking.", { status: 400 });
     }
-    response = await confirmCardSetup(env, ctx, session, row);
+    response = await confirmCardSetup(env, session, row);
   } else {
     const sameDayFee = purpose === "same-day-fee-due";
     const expectedAmount = sameDayFee
@@ -5410,140 +5448,105 @@ async function recordStripeEvent(env, event, response) {
   return response;
 }
 
-/** Confirm held lessons after Stripe has authenticated and saved a card. */
-async function confirmCardSetup(env, ctx, session, row) {
-  if (session.metadata?.selection_count) return confirmSelectionCardSetup(env, ctx, session, row);
-  if (row.status === "confirmed" && row.payment_status !== "pending") return new Response("Already confirmed.", { status: 200 });
-  if (row.status !== "pending_payment" || !row.hold_expires_at || new Date(row.hold_expires_at) <= new Date()) {
-    return new Response("That booking hold has expired. Please choose a new time.", { status: 409 });
-  }
-  const { refusal, customer, paymentMethod } = await savedSetupCard(env, session, "retrieve-setup-intent", row.reference);
-  if (refusal) return refusal;
-
-  await env.DB.prepare(
-    "UPDATE students SET stripe_customer_id = ?, stripe_payment_method = ? WHERE id = ?"
-  )
-    .bind(customer, paymentMethod, row.student_id)
-    .run();
-
+/**
+ * Confirm the exact held group and save its card in one transaction. A setup
+ * opened before account recovery/card removal cannot confirm. If another card
+ * has been saved meanwhile, this setup must not put these lessons on it or
+ * replace it. A repeated delivery may only observe the earlier confirmation.
+ */
+async function claimHeldCardSetup(env, session, rows, { customer, paymentMethod }) {
+  const marker = `booking-card-confirm:${crypto.randomUUID()}`;
+  const studentId = rows[0].student_id;
   const now = new Date().toISOString();
-  const seriesId = session.metadata?.series_id;
-  if (seriesId) {
-    const series = await env.DB.prepare("SELECT * FROM booking_series WHERE id = ?").bind(seriesId).first();
-    if (!series || series.student_id !== row.student_id) return new Response("Unknown series.", { status: 409 });
-
-    await env.DB.prepare(
-      `UPDATE bookings SET status = 'confirmed', payment_status = 'scheduled', hold_expires_at = NULL, updated_at = ?
-       WHERE series_id = ? AND stripe_session_id = ? AND status = 'pending_payment' AND payment_status = 'pending' AND hold_expires_at > ?`
-    )
-      .bind(now, seriesId, session.id, now)
-      .run();
-    await env.DB.prepare("UPDATE booking_series SET automatic_payment = 1, updated_at = ? WHERE id = ?")
-      .bind(now, seriesId)
-      .run();
-
-    const { results: rows } = await env.DB.prepare(
-      "SELECT * FROM bookings WHERE series_id = ? AND status = 'confirmed' ORDER BY starts_at"
-    )
-      .bind(seriesId)
-      .all();
-    if (!rows?.length) return new Response("Series could not be confirmed.", { status: 409 });
-
-    const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?")
-      .bind(series.lesson_type_id)
-      .first();
-    const settings = await loadSettings(env);
-    let skipped = [];
-    try {
-      skipped = JSON.parse(session.metadata.skipped ?? "[]").map((startAt) => ({ startAt }));
-    } catch {
-      skipped = [];
-    }
-    const manageUrls = {};
-    for (const occurrence of rows) {
-      const token = await createManageToken(occurrence.id, env.BOOKING_TOKEN_SECRET);
-      manageUrls[occurrence.id] = studentManageUrl(env, token);
-    }
-    ctx.waitUntil(notifySeries(env, { rows, lessonType, settings, series, manageUrls, skipped }));
-    return new Response("ok", { status: 200 });
-  }
-
-  await env.DB.prepare(
-    `UPDATE bookings SET status = 'confirmed', payment_status = 'scheduled', hold_expires_at = NULL, updated_at = ?
-     WHERE id = ? AND stripe_session_id = ? AND status = 'pending_payment' AND payment_status = 'pending' AND hold_expires_at > ?`
-  )
-    .bind(now, row.id, session.id, now)
-    .run();
-  const confirmed = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first();
-  if (confirmed?.status !== "confirmed" || confirmed?.payment_status !== "scheduled") {
-    return new Response("Booking could not be confirmed.", { status: 409 });
-  }
-
-  const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?")
-    .bind(confirmed.lesson_type_id)
-    .first();
-  const settings = await loadSettings(env);
-  const token = await createManageToken(confirmed.id, env.BOOKING_TOKEN_SECRET);
-  ctx.waitUntil(
-    notify(env, {
-      event: "booked",
-      row: confirmed,
-      lessonType,
-      settings,
-      manageUrl: studentManageUrl(env, token)
-    })
-  );
-  return new Response("ok", { status: 200 });
-}
-
-/** A shared setup must confirm every held lesson together, exactly once. */
-async function confirmSelectionCardSetup(env, ctx, session, anchor) {
-  const expected = Number(session.metadata.selection_count);
-  if (!Number.isInteger(expected) || expected < 2 || expected > 24) return new Response("Invalid selection.", { status: 400 });
-  const loadRows = async () => (await env.DB.prepare(
-    "SELECT * FROM bookings WHERE stripe_session_id = ? AND student_id = ? ORDER BY starts_at"
-  ).bind(session.id, anchor.student_id).all()).results;
-  const rows = await loadRows();
-  if (rows.length !== expected || !rows.some((row) => row.id === anchor.id)) return new Response("Selection does not match checkout.", { status: 409 });
-  if (rows.every((row) => row.status === "confirmed" && row.payment_status !== "pending")) return new Response("Already confirmed.", { status: 200 });
-  const now = new Date().toISOString();
-  if (rows.some((row) => row.status !== "pending_payment" || row.payment_status !== "pending" || !row.hold_expires_at || row.hold_expires_at <= now)) {
-    return new Response("That booking hold has expired. Please choose your times again.", { status: 409 });
-  }
-  const { refusal, customer, paymentMethod } = await savedSetupCard(env, session, "retrieve-selection-setup", anchor.reference);
-  if (refusal) return refusal;
-  const confirmedAt = new Date().toISOString();
+  const versions = [String(session.metadata?.session_version ?? "0"), String(session.metadata?.card_setup_version ?? "0")];
   const [claimed] = await env.DB.batch([
     env.DB.prepare(
       `WITH eligible AS MATERIALIZED (
          SELECT (SELECT COUNT(*) FROM bookings pending WHERE pending.stripe_session_id = ?2 AND pending.student_id = ?3) = ?4
            AND NOT EXISTS (SELECT 1 FROM bookings invalid WHERE invalid.stripe_session_id = ?2 AND invalid.student_id = ?3
-             AND (invalid.status != 'pending_payment' OR invalid.payment_status != 'pending' OR invalid.hold_expires_at IS NULL OR invalid.hold_expires_at <= ?1)) AS ready
+             AND (invalid.status != 'pending_payment' OR invalid.payment_status != 'pending' OR invalid.hold_expires_at IS NULL OR invalid.hold_expires_at <= ?1
+               OR (invalid.series_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM booking_series s
+                 WHERE s.id = invalid.series_id AND s.student_id = ?3 AND s.status = 'active'))))
+           AND EXISTS (SELECT 1 FROM students WHERE id = ?3 AND session_version = ?5 AND card_setup_version = ?6
+             AND (((stripe_customer_id IS NULL OR stripe_customer_id = ?7) AND stripe_payment_method IS NULL AND card_consent_at IS NULL)
+               OR (stripe_customer_id = ?7 AND stripe_payment_method = ?8))) AS ready
        )
        UPDATE bookings SET status = 'confirmed', payment_status = 'scheduled', hold_expires_at = NULL, updated_at = ?1
        WHERE stripe_session_id = ?2 AND student_id = ?3 AND (SELECT ready FROM eligible)`
-    ).bind(confirmedAt, session.id, anchor.student_id, expected),
-    env.DB.prepare(
-      `UPDATE students SET stripe_customer_id = ?, stripe_payment_method = ? WHERE id = ?
-       AND (SELECT COUNT(*) FROM bookings WHERE stripe_session_id = ? AND student_id = students.id AND status = 'confirmed' AND payment_status = 'scheduled') = ?`
-    ).bind(customer, paymentMethod, anchor.student_id, session.id, expected)
+    ).bind(now, session.id, studentId, rows.length, ...versions, customer, paymentMethod),
+    env.DB.prepare("INSERT INTO request_limits (key, window, attempts) SELECT ?, ?, 1 WHERE changes() = ?")
+      .bind(marker, Math.floor(Date.now() / 1000), rows.length),
+    env.DB.prepare(`UPDATE students SET stripe_customer_id = ?, stripe_payment_method = ? WHERE id = ?
+      AND EXISTS (SELECT 1 FROM request_limits WHERE key = ?)`)
+      .bind(customer, paymentMethod, studentId, marker),
+    env.DB.prepare(`UPDATE booking_series SET automatic_payment = 1, updated_at = ? WHERE student_id = ?
+      AND id IN (SELECT series_id FROM bookings WHERE stripe_session_id = ? AND student_id = ?)
+      AND EXISTS (SELECT 1 FROM request_limits WHERE key = ?)`)
+      .bind(now, studentId, session.id, studentId, marker),
+    env.DB.prepare("DELETE FROM request_limits WHERE key = ?").bind(marker)
   ]);
-  // A concurrent webhook can win the transition. Only its request sends mail.
-  if (claimed.meta.changes !== expected) {
-    const current = await loadRows();
-    return current.length === expected && current.every((row) => row.status === "confirmed" && row.payment_status !== "pending")
-      ? new Response("Already confirmed.", { status: 200 })
-      : new Response("The selected lessons could not be confirmed.", { status: 409 });
+  return claimed.meta.changes === rows.length;
+}
+
+/** Confirm held lessons after Stripe has authenticated and saved a card. */
+async function confirmCardSetup(env, session, anchor) {
+  const selection = session.metadata?.selection_count;
+  const expected = selection === undefined ? null : Number(selection);
+  if (expected !== null && (!Number.isInteger(expected) || expected < 2 || expected > 24)) {
+    return new Response("Invalid selection.", { status: 400 });
   }
-  const confirmed = await loadRows();
+  const loadRows = async () => (await env.DB.prepare(
+    "SELECT * FROM bookings WHERE stripe_session_id = ? AND student_id = ? ORDER BY starts_at"
+  ).bind(session.id, anchor.student_id).all()).results ?? [];
+  const rows = await loadRows();
+  if (!rows.length || (expected !== null && rows.length !== expected) || !rows.some(row => row.id === anchor.id)) {
+    return new Response("Selection does not match checkout.", { status: 409 });
+  }
+  let confirmed = rows;
+  if (!rows.every(row => row.status === "confirmed" && row.payment_status !== "pending")) {
+    const now = new Date().toISOString();
+    if (rows.some(row => row.status !== "pending_payment" || row.payment_status !== "pending" || !row.hold_expires_at || row.hold_expires_at <= now)) {
+      return new Response("That booking hold has expired. Please choose your times again.", { status: 409 });
+    }
+    const card = await savedSetupCard(env, session, "retrieve-booking-setup", anchor.reference);
+    if (card.refusal) return card.refusal;
+    const claimed = await claimHeldCardSetup(env, session, rows, card);
+    confirmed = await loadRows();
+    if (!claimed && (confirmed.length !== rows.length || confirmed.some(row => row.status !== "confirmed" || row.payment_status === "pending"))) {
+      return new Response("Your card, account or held lessons changed. Please choose your times again.", { status: 409 });
+    }
+  }
+  // A failure after the booking commit must let Stripe retry its confirmation
+  // email. Its existing dedupe key and lifecycle guard handle repeated delivery.
+  // A later move or cancellation owns its own message, rather than a fresh
+  // booking confirmation carrying that later lesson's details.
+  if (confirmed.length !== rows.length || confirmed.some(row => row.status !== "confirmed" || row.sequence !== 0)) {
+    return new Response("Booking has since changed.", { status: 200 });
+  }
   const { results: series } = await env.DB.prepare(
     "SELECT * FROM booking_series WHERE id IN (SELECT DISTINCT series_id FROM bookings WHERE stripe_session_id = ? AND student_id = ?)"
   ).bind(session.id, anchor.student_id).all();
   const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(anchor.lesson_type_id).first();
   const settings = await loadSettings(env);
   let skipped = [];
-  try { skipped = JSON.parse(session.metadata.skipped ?? "[]").map((startAt) => ({ startAt })); } catch { /* Optional display detail. */ }
-  ctx.waitUntil(notifySelection(env, { rows: confirmed, lessonType, settings, series, skipped }));
+  try { skipped = JSON.parse(session.metadata.skipped ?? "[]").map(startAt => ({ startAt })); } catch { /* Optional display detail. */ }
+  let notifications;
+  if (expected !== null) {
+    notifications = await notifySelection(env, { rows: confirmed, lessonType, settings, series, skipped });
+  } else if (session.metadata?.series_id) {
+    const manageUrls = {};
+    for (const row of confirmed) manageUrls[row.id] = studentManageUrl(env, await createManageToken(row.id, env.BOOKING_TOKEN_SECRET));
+    notifications = await notifySeries(env, { rows: confirmed, lessonType, settings, series: series[0], manageUrls, skipped });
+  } else {
+    notifications = await notify(env, { event: "booked", row: confirmed[0], lessonType, settings,
+      manageUrl: studentManageUrl(env, await createManageToken(anchor.id, env.BOOKING_TOKEN_SECRET)) });
+  }
+  // A successful booking can outlive a transient database or mail outage.
+  // Keep the webhook retryable until its notification is safely accounted for.
+  // Held/no-email notices are intentional successes from the existing notifier.
+  if (notifications.some(result => result.status === "rejected" || !result.value.ok)) {
+    return new Response("Booking confirmed; its notification will be retried.", { status: 503 });
+  }
   return new Response("ok", { status: 200 });
 }
 

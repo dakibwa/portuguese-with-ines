@@ -318,7 +318,7 @@ jobs:
         run: |
           # localhost, not 127.0.0.1: the browser sends the host it was given as
           # the Origin, and the Worker's allow-list carries localhost:3000.
-          python3 -m http.server 3000 --bind 127.0.0.1 --directory out > /dev/null 2>&1 &
+          python3 scripts/serve-qa.py > /dev/null 2>&1 &
           SERVER_PID=$!
           trap 'kill $SERVER_PID' EXIT
           for _ in $(seq 1 20); do

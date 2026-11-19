@@ -8,32 +8,23 @@
 // Run with: node --test scripts/test-reply-validation.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
-import { registerHooks, stripTypeScriptTypes } from "node:module";
-import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
+import { registerHooks } from "node:module";
 
 // The modules are the site's TypeScript, importing each other as "@/lib/…"
-// and the tutor's record as JSON: resolve and transform them as Next does.
+// and the tutor's record as JSON. Node reads the TypeScript directly.
 const src = new URL("../src/", import.meta.url);
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier.startsWith("@/")) {
-      for (const extension of [".ts", ".tsx"]) {
-        const url = new URL(`${specifier.slice(2)}${extension}`, src);
-        if (existsSync(fileURLToPath(url))) return { url: url.href, shortCircuit: true };
-      }
+      const url = new URL(`${specifier.slice(2)}.ts`, src);
+      if (existsSync(url)) return { url: url.href, format: "module-typescript", shortCircuit: true };
     }
     const resolved = next(specifier, context);
     return resolved.url.endsWith(".json") ? { ...resolved, importAttributes: { type: "json" } } : resolved;
-  },
-  load(url, context, next) {
-    if (!url.endsWith(".ts")) return next(url, context);
-    const source = stripTypeScriptTypes(readFileSync(fileURLToPath(url), "utf8"), { mode: "transform" });
-    return { format: "module", source, shortCircuit: true };
   }
 });
 process.env.NEXT_PUBLIC_BOOKING_API_BASE_URL = "https://booking.example.invalid";
-process.removeAllListeners("warning");
 
 const { BOOKING_REPLY_ERROR } = await import("@/lib/api-response");
 const { cancelBooking, createBooking, fetchBooking, previewSeries, rescheduleBooking, rescheduleSeries } = await import("@/lib/booking-api");
@@ -118,6 +109,10 @@ test("a weekly preview never invents a skipped date or books from a missing list
 
 test("a booking, cancellation or move is only reported done with a readable acknowledgment", async () => {
   const create = () => createBooking("session", booking);
+  answer({ booking: lesson, manageUrl: "/booking/?token=old-link" });
+  assert.equal((await create()).manageToken, "old-link");
+  answer({ booking: lesson, manageUrl: "https://unrelated.example/booking/?token=other" });
+  assert.equal((await create()).manageToken, undefined);
   await accepted(create, { booking: lesson, series: { id: "weekly", weeks: 4, openEnded: false, booked: [lesson.startAt], skipped: [] } });
   await refused(create, { booking: { ...lesson, startAt: "not-a-date" } }); // create-date
   await refused(create, { booking: lesson, series: { id: "weekly", weeks: 4, openEnded: false, booked: [lesson.startAt], skipped: [null] } }); // create-series

@@ -2,6 +2,7 @@
 
 import { TUTOR_NAME } from "@/lib/tutor";
 import { useEffect, useState } from "react";
+import { publicAssetPath } from "@/lib/paths";
 import { AssetMark } from "@/components/BrandMarks";
 import { BookingCalendar } from "@/components/BookingCalendar";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -9,6 +10,17 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { BOOKING_CONFIGURED, CONTACT_WHATSAPP_URL } from "@/lib/config";
 
 type BookingView = "book" | "lessons" | "manage";
+
+// The legacy lesson links render this same header. Select its title before
+// first paint on every entry, even when browser storage is unavailable.
+const markAccount = `(() => {
+  const params = new URLSearchParams(location.search);
+  let signedIn = false;
+  try { signedIn = Boolean(localStorage.getItem("ines-student-session")); } catch {}
+  const accountLink = location.pathname.endsWith("/my-lessons/") || params.get("view") === "lessons" ||
+    ["manage", "token", "emailToken", "card", "signin"].some(key => params.has(key));
+  if (signedIn || accountLink) document.documentElement.setAttribute("data-booking-account", "");
+})();`;
 
 /**
  * Booking, the learner's calendar and lesson management are one surface.
@@ -23,8 +35,9 @@ export function BookingFlow({ initialView = "book" }: { initialView?: BookingVie
     const token = params.get("manage") || params.get("token") || "";
     setManageToken(token);
 
-    if (window.location.pathname === "/book/") return;
-    const target = new URL("/book/", window.location.origin);
+    const bookingPath = publicAssetPath("/book/");
+    if (window.location.pathname === bookingPath) return;
+    const target = new URL(bookingPath, window.location.origin);
     target.search = params.toString();
     if (token) {
       target.searchParams.set("manage", token);
@@ -33,11 +46,13 @@ export function BookingFlow({ initialView = "book" }: { initialView?: BookingVie
     else if (initialView === "lessons" || params.has("emailToken")) target.searchParams.set("view", "lessons");
     const emailToken = params.get("emailToken");
     if (emailToken) target.searchParams.set("emailToken", emailToken);
-    window.history.replaceState({}, "", `${target.pathname}${target.search}`);
+    target.hash = window.location.hash;
+    window.history.replaceState(window.history.state, "", target);
   }, [initialView]);
 
   return (
     <>
+      <script dangerouslySetInnerHTML={{ __html: markAccount }} />
       {/* One bar for everyone (11 November 2026, Dan): a visitor without an
           account is here to book, and it reads `Book a Lesson` with their
           `Sign in`; a student, or a lesson's own link, is here for their

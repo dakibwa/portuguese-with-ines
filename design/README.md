@@ -2197,10 +2197,12 @@ sign-in has no `Create an account`.
 
 One bar of tabs holds `Students`, `Timetable`, `Receipts`, `Expressions` and
 `Profile`, set as a student's places are, in small capitals tracked wide
-(0.7 rem, a little closer on a phone so `Expressions` fits its third at
-320 px): every bar of places on the site speaks in one voice. On a phone her tab
-labels stay readable rather than shrinking to fit; her tabs keep one 1.25 rem
-gutter. Moving between her tabs, the panel slides in from the side of the tab
+(0.7 rem from 390 px, tracked a little closer on a phone): every bar of
+places on the site speaks in one voice. Below 390 px the labels reduce to
+0.6 rem at 320 px so `Expressions` and the Students attention count stay
+inside their thirds; the controls remain 44 px tall and all five tabs stay
+visible. Her tabs keep one 1.25 rem gutter. Moving between her tabs, the panel
+slides in from the side of the tab
 chosen, at the pace the account's places slide, and with reduced motion simply
 appears.
 

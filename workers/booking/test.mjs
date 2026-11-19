@@ -710,6 +710,7 @@ await test("card setup saves for off-session use and never creates a charge", as
       { STRIPE_SECRET_KEY: "rk_test_example", STRIPE_UI_MODE: "embedded" },
       {
         booking: { id: "booking_setup", reference: "PT-SET123" },
+        student: { session_version: 2, card_setup_version: 3 },
         customerEmail: "student@example.com",
         successUrl: "https://portuguesewithines.com/book/?card=saved",
         cancelUrl: "https://portuguesewithines.com/book/?cancelled=1"
@@ -721,6 +722,8 @@ await test("card setup saves for off-session use and never creates a charge", as
 
   const body = new URLSearchParams(request.options.body);
   assert.equal(body.get("mode"), "setup");
+  assert.equal(body.get("metadata[session_version]"), "2");
+  assert.equal(body.get("metadata[card_setup_version]"), "3");
   assert.equal(body.get("customer_creation"), "always");
   assert.equal(body.get("customer_email"), "student@example.com");
   assert.equal(body.has("customer"), false);

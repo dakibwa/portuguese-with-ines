@@ -1223,6 +1223,16 @@ The second weekly time can span two weeks on the student's displayed clock;
 the calendar exposes every local date in that Porto week rather than hiding
 valid starts behind the first time's local week.
 
+A student can make five booking decisions and add 26 lessons in a rolling
+hour. A selection or weekly run counts once. The final SQLite claim rechecks
+both limits, so simultaneous requests share the same budget. A single weekly
+run reserves its planned remaining rows while they are filled and releases
+unused space on completion or failure. Existing unmarked bookings and recipes
+still count. Decision markers and temporary reservations use `request_limits`
+and its existing daily cleanup. These limits govern new student bookings;
+teacher additions and the nightly continuation of an existing run retain their
+own permission and availability checks.
+
 The two recurring times use separate existing `booking_series` recipes. One
 D1 transaction inserts all planned lesson rows after an atomic overlap check,
 or leaves no selection or empty recipes behind if another booking wins the
@@ -2117,6 +2127,17 @@ Stripe configured:
   no longer complete; a lapsed hold goes regardless. A completed setup, or one
   Stripe cannot answer for, keeps its hold for the webhook. Should a released
   session's completion still arrive, it finds no booking and confirms nothing;
+- booking card setup records the account and card-setup generations when it
+  opens. Recovery or card removal retires that setup. Its signed completion
+  confirms the entire held group and saves the matching card in one database
+  transaction. Expired or cancelled holds and a different card saved meanwhile
+  decline the completion without changing the card, consent or held group.
+  The student must choose their times again. Existing generation-zero setups
+  remain supported, and duplicate deliveries preserve later card changes and
+  send one confirmation for the successful claim. Stripe can retry an
+  interrupted confirmation even after the booking commits. The Worker records
+  the event after the existing notification system reports success or an
+  intentional skip. A later lesson change has its own notice.
 - the webhook signature is verified before the payload is trusted for anything,
   and events are recorded so each is handled exactly once;
 - Checkout creation, saved-card charges and refunds use a stable booking-based
