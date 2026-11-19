@@ -97,7 +97,7 @@ request only competes with the fonts for no gain.
 - Git owns the website, route behaviour, release history, and production assets.
 - **Her print and business material is not in this repository.** Branding,
   business cards, Square booking tiles, visual concepts and the superseded-work
-  archive live in Google Drive, in `My Drive/Português com a Inês`,
+  archive live in Google Drive, in `My Drive/Oh Life! Studios/Clients/Português com a Inês`,
   which has a `README.md` pointing back here. That folder is outside Git;
   this repository is backed up by GitHub. The split exists because Git
   repositories never live inside `Documents`, not because the work is
