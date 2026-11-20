@@ -19,9 +19,10 @@
    Open OUT/index.html. The page is a view: change the files, then run this
    again; never edit the page, and never commit it.
 
-   THE SAME FILE SERVES EVERY REPOSITORY. Its home is dakibwa/features; a
-   copy elsewhere is changed here first and copied again. It has no
-   dependencies and reads nothing but the system's folder:
+   THE SAME FILE SERVES EVERY REPOSITORY. Its home is
+   dakibwa/design-system-page: change it there first, then copy it into each
+   repository again, unchanged. It has no dependencies and reads nothing but
+   the system's folder:
 
      README.md                       the brand book; other *.md are its pages
      tokens.json                     {color:{themes,tokens}, type:{fonts,families,groups},
@@ -33,9 +34,13 @@
      components/bundle.css, bundle.js, lib/*.js    loaded into every preview when present
      assets/<Group>/                 pictures, and a README.md
      fonts/                          the faces tokens.json names
-     page.json                       optional: how this page presents the system (below) */
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, cpSync, rmSync } from 'node:fs';
-import { basename, dirname, join, relative, resolve } from 'node:path';
+     page.json                       optional: how this page presents the system (below)
+
+   Any of these may be a link to a file kept elsewhere in the same repository, so a
+   logo or a stylesheet the product already serves is never kept twice. */
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, cpSync, rmSync, lstatSync, mkdtempSync, realpathSync, renameSync } from 'node:fs';
+import { basename, dirname, join, relative, resolve, sep, isAbsolute } from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 
@@ -43,18 +48,72 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const named = k => { const i = args.indexOf(k); return i < 0 ? null : args.splice(i, 2)[1]; };
 const SYSTEM = named('--system'), OUTARG = named('--out') || args[0];
-let OUT, P, SOURCE;
-if (!SYSTEM && existsSync(join(HERE, 'build.mjs'))) {
-  // this repository builds its system from the product: the build writes OUT/project/ and OUT/tokens.css
-  OUT = resolve(OUTARG || join(HERE, '..', 'page')); P = join(OUT, 'project'); SOURCE = join(HERE, '..', 'project');
+const native = !SYSTEM && existsSync(join(HERE, 'build.mjs'));
+const SOURCE = realpathSync(resolve(SYSTEM || join(HERE, '..', 'project')));
+if (!existsSync(join(SOURCE, 'tokens.json')) && !existsSync(join(SOURCE, 'README.md'))) throw new Error(`no design system in ${SOURCE}`);
+const target = resolve(OUTARG || (native ? join(HERE, '..', 'page') : join(dirname(SOURCE), basename(SOURCE) + '-page')));
+
+// Resolve existing parents too, so an alias cannot put the output inside its source.
+function canonical(dir) {
+  return lstatSync(dir, { throwIfNoEntry: false }) ? realpathSync(dir) : join(canonical(dirname(dir)), basename(dir));
+}
+function contains(parent, child) {
+  const path = relative(parent, child);
+  return path !== '..' && !path.startsWith('..' + sep) && !isAbsolute(path);
+}
+const destination = canonical(target);
+if (contains(SOURCE, destination) || contains(destination, SOURCE)) throw new Error('choose an output folder separate from the source');
+if (lstatSync(target, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error('choose a real output directory');
+
+// A receipt covers names, types and contents, including empty folders. An edited page or
+// an unrelated file added anywhere in an old output makes the whole rebuild leave it alone.
+const receipt = '.design-system-page.sha256';
+function fingerprint(dir) {
+  const hash = createHash('sha256');
+  function visit(folder) {
+    for (const name of readdirSync(folder).sort()) {
+      if (folder === dir && name === receipt) continue;
+      const file = join(folder, name), stat = lstatSync(file);
+      const key = relative(dir, file);
+      if (stat.isDirectory()) {
+        hash.update(JSON.stringify([key, 'dir']));
+        visit(file);
+      } else if (stat.isFile()) {
+        hash.update(JSON.stringify([key, stat.size]));
+        hash.update(readFileSync(file));
+      } else throw new Error(`unexpected file type in design system: ${file}`);
+    }
+  }
+  visit(dir);
+  return hash.digest('hex');
+}
+
+mkdirSync(dirname(target), { recursive: true });
+const scratch = mkdtempSync(join(dirname(target), '.design-page-'));
+const OUT = join(scratch, 'new'), P = join(OUT, 'project');
+mkdirSync(OUT);
+const previous = join(scratch, 'previous');
+// If publishing or recovery fails, retain any previous folder until its owner can recover it.
+process.on('exit', () => {
+  if (!existsSync(previous)) rmSync(scratch, { recursive: true, force: true });
+  else console.error(`previous output kept at ${previous}`);
+});
+if (native) {
   execFileSync(process.execPath, [join(HERE, 'build.mjs'), OUT], { stdio: 'inherit' });
 } else {
-  SOURCE = resolve(SYSTEM || join(HERE, '..', 'project'));
-  if (!existsSync(join(SOURCE, 'tokens.json')) && !existsSync(join(SOURCE, 'README.md'))) throw new Error(`no design system in ${SOURCE}: it holds neither README.md nor tokens.json`);
-  OUT = resolve(OUTARG || join(dirname(SOURCE), basename(SOURCE) + '-page')); P = join(OUT, 'project');
-  if (!relative(SOURCE, OUT).startsWith('..')) throw new Error('the page cannot be drawn inside the system it draws: name another --out');
-  rmSync(P, { recursive: true, force: true }); mkdirSync(OUT, { recursive: true });
-  cpSync(SOURCE, P, { recursive: true });
+  // A link stands in for a file the repository already keeps elsewhere (a logo its site serves,
+  // its stylesheet), so the system holds one copy; the page gets the file itself. A link that
+  // breaks, leaves the repository (the system, outside one) or loops stops the draw.
+  let home = SOURCE;
+  try { home = realpathSync(execFileSync('git', ['-C', SOURCE, 'rev-parse', '--show-toplevel'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()); } catch {}
+  cpSync(SOURCE, P, { recursive: true, dereference: true, filter: file => {
+    if (!lstatSync(file).isSymbolicLink()) return true;
+    let real;
+    try { real = realpathSync(file); } catch { throw new Error(`broken link in design system: ${file}`); }
+    if (!contains(home, real)) throw new Error(`link in design system leads outside its repository: ${file}`);
+    if (contains(real, realpathSync(dirname(file)))) throw new Error(`link in design system leads to a folder that holds it: ${file}`);
+    return true;
+  } });
 }
 const has = (...p) => existsSync(join(P, ...p));
 const read = (...p) => readFileSync(join(P, ...p), 'utf8');
@@ -259,7 +318,7 @@ function family([key, fam]) {
   const head = `<h3>${esc(key.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase())}</h3>${fam.note ? `<p>${inline(fam.note)}</p>` : ''}`;
   if (/shadow|elevation/i.test(key)) return head + `<div class="shadows">${fam.tokens.map(t => themes.map(th => `<figure data-theme="${th}"><div style="box-shadow:${esc(valueIn(t, th))}"></div><figcaption>${esc(t.name)}${themes.length > 1 ? ', ' + esc(themeName[th]) : ''}</figcaption></figure>`).join('')).join('')}</div>${fam.tokens.map(t => `<p><b>${esc(t.name)}</b> ${inline(t.usage || '')}</p>`).join('')}`;
   if (/eas|curve/i.test(key)) return head + `<div class="curves">${fam.tokens.map(t => `<article class="curve" style="--ease:${esc(valueIn(t, first))}">${curve(valueIn(t, first))}<span class="run"><i></i></span><h4>${esc(t.name)}</h4><p><code>${esc(valueIn(t, first))}</code></p><p>${inline(t.usage || '')}</p></article>`).join('')}</div><p class="note">point at a curve to run it.</p>`;
-  if (/dur|time|delay/i.test(key)) { const longest = Math.max(1, ...fam.tokens.map(t => px(valueIn(t, first)))); return head + fam.tokens.map(t => row(t, `<i style="width:${px(valueIn(t, first)) / longest * 320}px"></i>`)).join(''); }
+  if (/dur|time|delay/i.test(key)) { const longest = Math.max(1, ...fam.tokens.map(t => px(valueIn(t, first)))); return head + fam.tokens.map(t => row(t, `<i style="width:calc(min(320px, 100%) * ${(px(valueIn(t, first)) / longest).toFixed(4)})"></i>`)).join(''); }
   if (/radius|corner/i.test(key)) return head + fam.tokens.map(t => row(t, `<i class="corner" style="border-radius:${esc(valueIn(t, first))}"></i>`)).join('');
   if (/spac|gap|size|inset|pad/i.test(key) && !/font/i.test(key)) return head + fam.tokens.map(t => row(t, `<i style="width:${Math.min(480, px(valueIn(t, first)) * 4)}px"></i>`)).join('') + '<p class="note">each bar is drawn four times its size.</p>';
   if (/font|text/i.test(key)) return head + fam.tokens.map(t => row(t, `<span class="glyph" style="font-size:${esc(valueIn(t, first))}">Aa</span>`)).join('');
@@ -274,12 +333,20 @@ const name = esc(tokens.name || title(book) || basename(SOURCE));
 let root = '', commit = '';
 try { root = execFileSync('git', ['-C', SOURCE, 'rev-parse', '--show-toplevel'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   commit = execFileSync('git', ['-C', SOURCE, 'log', '-1', '--format=%h, %cd', '--date=format:%-d %b %Y'], { encoding: 'utf8' }).trim(); } catch {}
+// the repository's own name: its remote's, else the folder that holds its .git, so a worktree's folder never stands in for it
+let repo = '';
+if (root) {
+  const git = (...a) => { try { return execFileSync('git', ['-C', SOURCE, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return ''; } };
+  const branch = git('symbolic-ref', '--short', '-q', 'HEAD'), remote = git('remote', 'get-url', (branch && git('config', '--get', `branch.${branch}.remote`)) || 'origin');
+  const common = git('rev-parse', '--path-format=absolute', '--git-common-dir');
+  repo = remote.replace(/\/+$/, '').replace(/\.git$/, '').split(/[/:]/).pop() || (basename(common) === '.git' ? basename(dirname(common)) : '') || basename(root);
+}
 const where = root ? relative(root, SOURCE) + '/' : SOURCE + '/', tool = root && !relative(root, HERE).startsWith('..') ? relative(root, fileURLToPath(import.meta.url)) : 'site.mjs';
 const thing = esc(page.product || 'product');
 const views = [
   { id: 'cover', name: 'cover', part: '', html: `${cover ? `<div class="hero"><div class="fit" style="--w:${cover.width};--h:${cover.height}"><iframe title="cover" src="project/components/Cover/card.html#${first}" width="${cover.width}" height="${cover.height}" scrolling="no" tabindex="-1"></iframe></div></div>` : `<h1>${name}</h1>`}
     ${lead(book) ? `<p class="lede">${inline(lead(book))}</p>` : ''}
-    <ul class="facts"><li><b>one design system.</b> it is the files under <code>${esc(where)}</code>${root ? ` in the ${esc(basename(root))} repository` : ''}. this page is drawn from them and holds nothing of its own.</li>
+    <ul class="facts"><li><b>one design system.</b> it is the files under <code>${esc(where)}</code>${repo ? ` in the ${esc(repo)} repository` : ''}. this page is drawn from them and holds nothing of its own.</li>
     <li><b>open to anyone.</b> a person opens this file in a browser. an assistant reads the files themselves.</li>
     <li><b>the ${thing} wins.</b> where this page and the ${thing} disagree, the ${thing} is right and the page is out of date: draw it again with <code>${esc(tool)}</code>.</li></ul>` },
   ...(book ? [{ id: 'brand-book', name: 'brand book', part: 'the book', html: md(book, { skipTitle: true, ids: 'book-' }) }] : []),
@@ -335,7 +402,7 @@ main{padding:34px clamp(18px,4vw,56px) 80px;min-width:0}
 table{border-collapse:collapse;font-size:14px;line-height:1.42}
 th,td{text-align:left;vertical-align:top;padding:9px 16px 9px 0;border-top:1px solid var(--pg-rule)}
 th{font-weight:700;border-top:0;white-space:nowrap}td:first-child{white-space:nowrap}td{min-width:9ch}
-.hero{background:var(--pg-surface);box-shadow:var(--pg-shadow)}
+.hero{width:fit-content;max-width:100%;background:var(--pg-surface);box-shadow:var(--pg-shadow)}
 .fit{width:calc(var(--w) * 1px);max-width:100%;height:calc(var(--h) * 1px);overflow:hidden}
 .fit iframe{display:block;border:0;transform-origin:0 0;background:var(--pg-ground)}
 .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:22px 20px}
@@ -343,8 +410,8 @@ th{font-weight:700;border-top:0;white-space:nowrap}td:first-child{white-space:no
 .swatch h4{margin-top:9px}.swatch p{margin:0 0 5px;font-size:13px;line-height:1.42;color:var(--pg-soft)}
 .swatch .values{display:flex;flex-wrap:wrap;gap:2px 12px;color:var(--pg-ink)}
 .specimen{padding:16px 0 12px;border-top:1px solid var(--pg-rule)}.specimen .say{margin-bottom:10px}.specimen p{margin:0;font-size:13px;color:var(--pg-soft)}
-.measure{display:flex;gap:18px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--pg-rule)}
-.measure>i{flex:none;display:block;height:22px;background:var(--pg-ink);min-width:2px}.measure>div{min-width:0}.measure p{margin:0;font-size:13px;color:var(--pg-soft)}
+.measure{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--pg-rule)}
+.measure>i{flex:none;display:block;height:22px;background:var(--pg-ink);min-width:2px;max-width:100%}.measure>div{flex:1 1 16ch;min-width:0;overflow-wrap:anywhere}.measure p{margin:0;font-size:13px;color:var(--pg-soft)}
 .measure>i.corner{width:64px;height:44px;background:none;border:2px solid var(--pg-ink)}.measure .glyph{flex:none;width:96px;line-height:1;overflow:hidden}
 .shadows{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:14px}
 .shadows figure{margin:0;padding:34px 34px 14px;background:var(--pg-ground);color:var(--pg-ink);border:1px solid var(--pg-rule)}
@@ -431,4 +498,29 @@ ${views.map(v => `<section class="view" id="view-${v.id}" data-id="${v.id}" data
 </html>
 `;
 writeFileSync(join(OUT, 'index.html'), html);
-console.log(`design system page: ${views.length} views, ${cards.length} components, ${assetGroups.reduce((n, a) => n + a.files.length, 0)} pictures -> ${join(OUT, 'index.html')}`);
+const digest = fingerprint(OUT);
+writeFileSync(join(OUT, receipt), digest + '\n');
+function checkOutput(dir) {
+  if (!lstatSync(dir).isDirectory()) throw new Error(`choose an empty output directory: ${target}`);
+  if (!readdirSync(dir).length) return;
+  const marker = join(dir, receipt);
+  const stat = lstatSync(marker, { throwIfNoEntry: false });
+  // Adopt an older, unmarked page only when every generated byte already matches.
+  const expected = !stat ? digest : stat.isFile() ? readFileSync(marker, 'utf8').trim() : null;
+  if (fingerprint(dir) !== expected) throw new Error(`output contains other or edited files: choose a fresh --out folder (${target})`);
+}
+const existing = lstatSync(target, { throwIfNoEntry: false });
+if (existing) {
+  checkOutput(target);
+  renameSync(target, previous);
+}
+try {
+  // Check the folder we actually moved, in case another writer changed it since our check.
+  if (existing) checkOutput(previous);
+  renameSync(OUT, target);
+} catch (error) {
+  if (existing && !existsSync(target)) renameSync(previous, target);
+  throw error;
+}
+if (existing) rmSync(previous, { recursive: true });
+console.log(`design system page: ${views.length} views, ${cards.length} components, ${assetGroups.reduce((n, a) => n + a.files.length, 0)} pictures -> ${join(target, 'index.html')}`);

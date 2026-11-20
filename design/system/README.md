@@ -52,7 +52,7 @@ and this folder is out of date.
 - `project/page.json` says only how the page presents this system: what it
   wears, the colour headings, the samples, how each group of pictures lays out.
 - `make/site.mjs` draws the page. It is the same file in every one of Dan's
-  repositories; its home is `dakibwa/features`. Change it there first and copy
+  repositories; its home is `dakibwa/design-system-page`. Change it there first and copy
   it here unchanged.
 
 ## Where it came from
