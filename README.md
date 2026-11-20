@@ -450,9 +450,9 @@ Previews never deploy the booking Worker or run D1 commands or migrations.
 Previews are for public page layout and copy review only. The existing live
 booking service rejects preview origins, so booking, sign-in and payment
 journeys are unavailable in these previews. Do not use them to test students,
-bookings or payments. Changes in those areas need Dan's approval and a separately
-authorized verification route.
-Review the preview before approving a merge; merging still publishes production.
+bookings or payments: check changes in those areas with `npm run test:booking`
+and the release's live booking probe (`AGENTS.md`).
+Look at the preview before merging; merging still publishes production.
 
 This needs two repository secrets, under Settings → Secrets and variables →
 Actions. Without them the publish job fails loudly rather than skipping, because
