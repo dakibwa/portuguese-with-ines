@@ -28,6 +28,7 @@
                      "value"  no variable: type the value ("in": where it is typed)
                      "never"  code or data makes it ("from": path#symbol;
                               "via": the component to use to show it)
+                   a token whose value is {other} is written as that token is.
                    a type style is not a class unless "selector" says so.
      README.md     opens with: Signature, How it is written, Where things are,
                    Rules, Who wins, Before you finish. Then the brand book.
@@ -118,6 +119,9 @@ for (const { fam, t, write } of all) {
   if (seen.has(t.name)) warn('token-write', at, `a second token called ${t.name}`);
   seen.add(t.name);
   if (t.retired && !tokenNames.has(t.retired)) error('retired', at, `"retired" names ${t.retired}, which is not a token`);
+  // an alias ({other}) is written as the token it names, and needs no "write" of its own
+  const aliases = valuesOf(t).filter(v => typeof v === 'string').map(v => /^\{(.+)\}$/.exec(v)?.[1]);
+  if (!write && aliases.length && aliases.every(Boolean)) { for (const n of aliases) if (!tokenNames.has(n)) error('token-write', at, `is {${n}}, which is not a token`); continue; }
   if (!write) { unwritten++; continue; }
   if (write === 'var') {
     if (!haveStyles) continue;

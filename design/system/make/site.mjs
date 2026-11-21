@@ -54,6 +54,7 @@
                      "value"  no variable: type the value ("in": where it is typed)
                      "never"  code or data makes it ("from": path#symbol;
                               "via": the component to use to show it)
+                   a token whose value is {other} is written as that token is.
                    a type style is not a class unless "selector" says so.
      README.md     opens with: Signature, How it is written, Where things are,
                    Rules, Who wins, Before you finish. Then the brand book.
