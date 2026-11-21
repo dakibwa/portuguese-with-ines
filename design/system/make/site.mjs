@@ -27,17 +27,43 @@
      README.md                       the brand book; other *.md are its pages
      tokens.json                     {color:{themes,tokens}, type:{fonts,families,groups},
                                       <family>:{tokens}} with {name,value,usage} entries
-     tokens.css                      optional; compiled from tokens.json when absent
+     tokens.css                      optional; compiled from tokens.json when absent. A
+                                      "format": 2 system is always compiled, and a preview
+                                      gets only its "var" tokens and no type-style classes
      components/<Name>/preview.html  line 1 `<!-- @dsCard group="…" height=… width=… subtitle="…" -->`,
                                       then a small document of real markup
-     components/<Name>/README.md     its rules
+     components/<Name>/README.md     its card
      components/bundle.css, bundle.js, lib/*.js    loaded into every preview when present
      assets/<Group>/                 pictures, and a README.md
      fonts/                          the faces tokens.json names
      page.json                       optional: how this page presents the system (below)
 
    Any of these may be a link to a file kept elsewhere in the same repository, so a
-   logo or a stylesheet the product already serves is never kept twice. */
+   logo or a stylesheet the product already serves is never kept twice.
+
+   A system is read by agents more than by people (Dan, 20 Nov 2026: "the system is
+   for agents remember not me"). check.mjs, beside this file, says whether what an
+   agent would copy from it is true of the product's code.
+
+   THE FORMAT, IN SHORT (full text: dakibwa/design-system-page, design/README.md)
+     tokens.json   "format": 2 once the system follows this.
+                   "source": {"styles": [...]}  the product's own stylesheets:
+                   a variable or class exists only if one of them defines it.
+                   each token, or its family: "write":
+                     "var"    type var(--name); the stylesheet defines --name
+                     "value"  no variable: type the value ("in": where it is typed)
+                     "never"  code or data makes it ("from": path#symbol;
+                              "via": the component to use to show it)
+                   a type style is not a class unless "selector" says so.
+     README.md     opens with: Signature, How it is written, Where things are,
+                   Rules, Who wins, Before you finish. Then the brand book.
+     components/<Name>/README.md   Write, Parts, States, Tokens, Rules, Source.
+     components/<Name>/preview.html   the product's markup lies between
+                   <!-- product --> and <!-- /product -->; ds- classes are the frame.
+     a rule        "- **id** sentence."  then, optionally,
+                   "  - check: forbid|require `pattern` in `glob`"
+     who wins      Dan's latest word; then the code on what exists; then this
+                   folder on what is meant; other documents are background. */
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, cpSync, rmSync, lstatSync, mkdtempSync, realpathSync, renameSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep, isAbsolute } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -198,7 +224,8 @@ function md(src, { level = 2, skipTitle = false, ids = '' } = {}) {
   return out;
 }
 const title = src => (/^#\s+(.*)$/m.exec(src) || [, ''])[1];
-const lead = src => (/^(?![#|>`\s-])(\S.*)$/m.exec(src.replace(/^#.*$/m, '')) || [, ''])[1];
+// the first paragraph, however many lines it is wrapped over
+const lead = src => ((/^(?![#|>`\s-])(\S[\s\S]*?)(?=\n\s*\n|\n[#|>`-]|(?![\s\S]))/m.exec(src.replace(/^#.*$/m, '')) || [, ''])[1]).replace(/\s*\n\s*/g, ' ');
 
 /* ---- tokens ---- */
 const colours = tokens.color?.tokens ?? [];
@@ -217,21 +244,31 @@ function paint(name, theme, seen = new Set()) {
 }
 const families = Object.entries(tokens).filter(([k, v]) => k !== 'color' && k !== 'type' && v && Array.isArray(v.tokens) && v.tokens.length);
 const asVar = v => /^\{(.+)\}$/.test(v) ? `var(--${v.slice(1, -1)})` : v;
-// tokens.json as the stylesheet a preview expects, where the system keeps none of its own
-function compile() {
-  const themed = [...colours, ...families.flatMap(([, f]) => f.tokens.filter(t => typeof t.value !== 'string'))];
-  const plain = families.flatMap(([, f]) => f.tokens.filter(t => typeof t.value === 'string'));
+// how a token is typed in the product (format 2): its own "write", else its family's
+const format2 = tokens.format === 2;
+const familyOf = new Map([...colours.map(t => [t, tokens.color]), ...families.flatMap(([, f]) => f.tokens.map(t => [t, f]))]);
+const writeOf = t => t.write || familyOf.get(t)?.write || '';
+const how = t => ({ var: 'variable', value: 'typed', never: 'from code' })[writeOf(t)] || '';
+const howTag = t => how(t) ? ` <small class="how">${how(t)}</small>` : '';
+// tokens.json as the stylesheet a preview expects, where the system keeps none of its own. A format 2
+// system gives its previews only what the product has: its "var" tokens and no class for a type style.
+function compile(every = false) {
+  const real = t => every || !format2 || writeOf(t) === 'var';
+  const themed = [...colours, ...families.flatMap(([, f]) => f.tokens.filter(t => typeof t.value !== 'string'))].filter(real);
+  const plain = families.flatMap(([, f]) => f.tokens.filter(t => typeof t.value === 'string')).filter(real);
   let css = `/* ${tokens.name || 'design system'} — generated from tokens.json */\n`;
   themes.forEach((id, n) => { css += `${n ? '' : ':root, '}[data-theme="${id}"] {\n${themed.map(t => `  --${t.name}: ${asVar(valueIn(t, id))};`).join('\n')}\n}\n`; });
   css += `:root {\n${plain.map(t => `  --${t.name}: ${asVar(t.value)};`).join('\n')}${Object.entries(tokens.type?.families ?? {}).map(([k, v]) => `\n  --font-${k}: ${v};`).join('')}\n}\n`;
-  for (const g of tokens.type?.groups ?? []) for (const s of g.styles ?? [])
+  if (!format2) for (const g of tokens.type?.groups ?? []) for (const s of g.styles ?? [])
     css += `.${s.name} { font-family: ${tokens.type.families?.[s.family ?? g.family] ?? 'inherit'}; font-size: ${s.fontSize}; line-height: ${s.lineHeight}; font-weight: ${s.fontWeight};${s.letterSpacing ? ` letter-spacing: ${s.letterSpacing};` : ''} }\n`;
   for (const f of tokens.type?.fonts ?? []) if (f.file) css += `@font-face { font-family: "${f.family}"; src: url("${f.file}"); font-weight: ${f.weight ?? 400}; font-style: ${f.style ?? 'normal'}; font-display: block; }\n`;
   return css;
 }
 // the tokens a preview loads, its faces found from the page's own folder
-const compiled = existsSync(join(OUT, 'tokens.css')) && !SYSTEM ? readFileSync(join(OUT, 'tokens.css'), 'utf8') : has('tokens.css') ? read('tokens.css') : compile();
+const compiled = format2 ? compile() : existsSync(join(OUT, 'tokens.css')) && !SYSTEM ? readFileSync(join(OUT, 'tokens.css'), 'utf8') : has('tokens.css') ? read('tokens.css') : compile();
 writeFileSync(join(OUT, 'page-tokens.css'), compiled.replace(/url\((["']?)fonts\//g, 'url($1project/fonts/'));
+// the Cover is this page's own cover, drawn from the tokens, not a piece of the product: it gets them all
+if (format2) writeFileSync(join(OUT, 'page-cover-tokens.css'), compile(true).replace(/url\((["']?)fonts\//g, 'url($1project/fonts/'));
 
 /* ---- what the page itself wears: the system's own grounds, ink and face ---- */
 const pick = (key, ...guesses) => [page.paint?.[key], ...guesses].find(n => n && byName[n]);
@@ -259,7 +296,7 @@ const cards = !has('components') ? [] : readdirSync(join(P, 'components')).filte
      the ground comes from the card's own address, so one file serves each: card.html#light */
   const doc = src.replace(/^<!--.*?-->\n/, '').replace(/<html\b([^>]*)>/i, (_, a) => `<html${a.replace(/\sdata-theme="[^"]*"/, '')} data-theme="${first}">`)
     .replace(/<\/head>/i, `<script>(function(t){document.documentElement.dataset.theme=${JSON.stringify(themes)}.includes(t)?t:${JSON.stringify(first)}})(location.hash.slice(1));addEventListener('hashchange',function(){location.reload()})</script>`
-      + `<link rel="stylesheet" href="../../../page-tokens.css">${has('components', 'bundle.css') ? '<link rel="stylesheet" href="../bundle.css">' : ''}${loads}</head>`);
+      + `<link rel="stylesheet" href="../../../${format2 && name === 'Cover' ? 'page-cover-tokens.css' : 'page-tokens.css'}">${has('components', 'bundle.css') ? '<link rel="stylesheet" href="../bundle.css">' : ''}${loads}</head>`);
   writeFileSync(join(P, 'components', name, 'card.html'), doc);
   return card;
 });
@@ -292,7 +329,7 @@ function gallery({ group, files }) {
 
 /* ---- the token views ---- */
 const swatch = t => `<article class="swatch"><div class="chips">${themes.map(th => `<i style="background:${esc(paint(t.name, th) || 'transparent')}" title="${esc(themeName[th])}: ${esc(valueIn(t, th))}"></i>`).join('')}</div>
-  <h4>${esc(t.name)}</h4><p class="values">${themes.map(th => `<span>${themes.length > 1 ? esc(themeName[th]) + ' ' : ''}<code>${esc(valueIn(t, th))}</code></span>`).join('')}</p><p>${inline(t.usage || '')}</p></article>`;
+  <h4>${esc(t.name)}${howTag(t)}</h4><p class="values">${themes.map(th => `<span>${themes.length > 1 ? esc(themeName[th]) + ' ' : ''}<code>${esc(valueIn(t, th))}</code></span>`).join('')}</p><p>${inline(t.usage || '')}</p></article>`;
 // colours under the headings page.json gives them; a heading with no pattern takes the rest
 const sets = (page.colours?.length ? page.colours : [['', '']]).map(([heading, pattern]) => ({ heading, test: pattern ? new RegExp(pattern) : null }));
 const taken = t => sets.some(s => s.test?.test(t.name));
@@ -302,7 +339,7 @@ const colourView = `${themes.length > 1 ? `<p>every colour on its grounds, in th
 }).join('');
 const typeView = (tokens.type?.groups ?? []).map(g => `<h3>${esc(String(g.name).toLowerCase())}</h3>` + (g.styles ?? []).map(s =>
   `<article class="specimen"><div class="say" style="font-family:${esc(tokens.type.families?.[s.family ?? g.family] ?? 'inherit')};font-size:${esc(s.fontSize)};line-height:${esc(s.lineHeight)};font-weight:${esc(s.fontWeight)};letter-spacing:${esc(s.letterSpacing || 'normal')}">${esc(page.samples?.[s.name] || page.sample || 'The quick brown fox jumps over the lazy dog')}</div>
-   <p><b>${esc(s.name)}</b> ${esc(s.fontSize)} / ${esc(s.lineHeight)}, weight ${esc(s.fontWeight)}${s.letterSpacing ? ', ' + esc(s.letterSpacing) : ''}</p></article>`).join('')).join('')
+   <p><b>${esc(s.name)}</b>${s.selector ? ' <code>' + esc([].concat(s.selector).join(', ')) + '</code>' : ''} ${esc(s.fontSize)} / ${esc(s.lineHeight)}, weight ${esc(s.fontWeight)}${s.letterSpacing ? ', ' + esc(s.letterSpacing) : ''}</p></article>`).join('')).join('')
   + (Object.keys(tokens.type?.families ?? {}).length ? `<h3>the faces</h3>${Object.entries(tokens.type.families).map(([k, v]) => `<p><b>${esc(k)}</b> <code>${esc(v)}</code></p>`).join('')}` : '');
 const px = v => parseFloat(v) || 0;
 // a curve drawn on a square a little taller than the motion, so a bounce shows its overshoot
@@ -312,12 +349,12 @@ function curve(value) {
   const [x1, y1, x2, y2] = m[1].split(',').map(Number), X = x => 10 + x * 80, Y = y => 110 - y * 80;
   return `<svg viewBox="0 0 100 130" aria-hidden="true"><path class="box" d="M10 30H90V110H10Z"/><path class="line" d="M${X(0)} ${Y(0)}C${X(x1)} ${Y(y1)} ${X(x2)} ${Y(y2)} ${X(1)} ${Y(1)}"/></svg>`;
 }
-const row = (t, mark) => `<article class="measure">${mark}<div><h4>${esc(t.name)} <code>${esc(typeof t.value === 'string' ? t.value : valueIn(t, first))}</code></h4><p>${inline(t.usage || '')}</p></div></article>`;
+const row = (t, mark) => `<article class="measure">${mark}<div><h4>${esc(t.name)}${howTag(t)} <code>${esc(typeof t.value === 'string' ? t.value : valueIn(t, first))}</code></h4><p>${inline(t.usage || '')}</p></div></article>`;
 // a family of tokens drawn as what it measures, by its name
 function family([key, fam]) {
   const head = `<h3>${esc(key.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase())}</h3>${fam.note ? `<p>${inline(fam.note)}</p>` : ''}`;
   if (/shadow|elevation/i.test(key)) return head + `<div class="shadows">${fam.tokens.map(t => themes.map(th => `<figure data-theme="${th}"><div style="box-shadow:${esc(valueIn(t, th))}"></div><figcaption>${esc(t.name)}${themes.length > 1 ? ', ' + esc(themeName[th]) : ''}</figcaption></figure>`).join('')).join('')}</div>${fam.tokens.map(t => `<p><b>${esc(t.name)}</b> ${inline(t.usage || '')}</p>`).join('')}`;
-  if (/eas|curve/i.test(key)) return head + `<div class="curves">${fam.tokens.map(t => `<article class="curve" style="--ease:${esc(valueIn(t, first))}">${curve(valueIn(t, first))}<span class="run"><i></i></span><h4>${esc(t.name)}</h4><p><code>${esc(valueIn(t, first))}</code></p><p>${inline(t.usage || '')}</p></article>`).join('')}</div><p class="note">point at a curve to run it.</p>`;
+  if (/eas|curve/i.test(key)) return head + `<div class="curves">${fam.tokens.map(t => `<article class="curve" style="--ease:${esc(valueIn(t, first))}">${curve(valueIn(t, first))}<span class="run"><i></i></span><h4>${esc(t.name)}${howTag(t)}</h4><p><code>${esc(valueIn(t, first))}</code></p><p>${inline(t.usage || '')}</p></article>`).join('')}</div><p class="note">point at a curve to run it.</p>`;
   if (/dur|time|delay/i.test(key)) { const longest = Math.max(1, ...fam.tokens.map(t => px(valueIn(t, first)))); return head + fam.tokens.map(t => row(t, `<i style="width:calc(min(320px, 100%) * ${(px(valueIn(t, first)) / longest).toFixed(4)})"></i>`)).join(''); }
   if (/radius|corner/i.test(key)) return head + fam.tokens.map(t => row(t, `<i class="corner" style="border-radius:${esc(valueIn(t, first))}"></i>`)).join('');
   if (/spac|gap|size|inset|pad/i.test(key) && !/font/i.test(key)) return head + fam.tokens.map(t => row(t, `<i style="width:${Math.min(480, px(valueIn(t, first)) * 4)}px"></i>`)).join('') + '<p class="note">each bar is drawn four times its size.</p>';
@@ -349,7 +386,7 @@ const views = [
     <ul class="facts"><li><b>one design system.</b> it is the files under <code>${esc(where)}</code>${repo ? ` in the ${esc(repo)} repository` : ''}. this page is drawn from them and holds nothing of its own.</li>
     <li><b>open to anyone.</b> a person opens this file in a browser. an assistant reads the files themselves.</li>
     <li><b>the ${thing} wins.</b> where this page and the ${thing} disagree, the ${thing} is right and the page is out of date: draw it again with <code>${esc(tool)}</code>.</li></ul>` },
-  ...(book ? [{ id: 'brand-book', name: 'brand book', part: 'the book', html: md(book, { skipTitle: true, ids: 'book-' }) }] : []),
+  ...(book ? [{ id: 'brand-book', name: 'brand book', part: 'the book', html: md(book, { skipTitle: true, ids: 'brand-book-' }) }] : []),
   ...pages.map(p => ({ id: p.id, name: (title(p.src) || p.id.replace(/-/g, ' ')).toLowerCase(), part: 'the book', html: md(p.src, { skipTitle: true, ids: p.id + '-' }) })),
   ...(colours.length ? [{ id: 'colour', name: 'colour', part: 'tokens', html: colourView }] : []),
   ...(typeView ? [{ id: 'type', name: 'type', part: 'tokens', html: typeView }] : []),
@@ -391,7 +428,7 @@ main{padding:34px clamp(18px,4vw,56px) 80px;min-width:0}
 .view>h1.quiet{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 .view h2{margin:42px 0 12px;font-size:23px;line-height:1.1;font-weight:900;letter-spacing:-.04em}
 .view h3{margin:32px 0 12px;font-size:17px;font-weight:700}
-.view h4{margin:0 0 3px;font-size:15px;font-weight:700}
+.view h4{margin:0 0 3px;font-size:15px;font-weight:700}.view h4 .how{font-size:12px;font-weight:400;color:var(--pg-soft)}
 .view h5,.view h6{margin:18px 0 6px;font-size:14px;font-weight:700}
 .view p,.view li{max-width:76ch}
 .view p{margin:0 0 12px}.view ul,.view ol{margin:0 0 14px;padding-left:20px}.view li{margin:0 0 7px}
