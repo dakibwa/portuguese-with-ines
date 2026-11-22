@@ -1,10 +1,10 @@
 # PhoneStudentCard
 
-A student's card opened on a phone: checks, contact and price as dabs, the four actions two by two, then the upcoming lessons.
+A student's card opened on a phone: the checks, Invite and Add a lesson, then details, price and plan stacked over the lessons.
 
 **Markup:** as StudentProfile, under `student-card-wide`.
 
-- The actions wrap two to a row with their icons; the lesson row's Homework button shares the date's row.
+- What sits beside the lessons on a wide card stacks above them; the actions keep their own row.
 
 ## Write
 

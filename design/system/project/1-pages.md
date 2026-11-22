@@ -41,7 +41,6 @@ Her workspace, not a page of the site: one slim blue banner (76px, 64px on a pho
 
 - **Students:** find, add, and her students in groups (Needs you, To do, Waiting on them, All set, Dormant), each card with three checks and one next button; a card opens to invite them on WhatsApp or to their profile. Cards: Students, StudentInvite, StudentProfile, PhoneStudentCard.
 - **Timetable:** the week in hours, her weekly hours, a lesson opened to join, mark paid or no-show, move or cancel. Cards: Timetable, ScheduleLessonDialog, PhoneTimetable.
-- **Time off:** days and hours off, and what is coming up. Card: TimeOff.
 - **Receipts:** the month's payments and what needs a receipt. Card: Receipts.
 - **Expressions:** her collection and the translations to check. Card: ScheduleExpressions.
 - **Profile:** her own sign-in. Card: ScheduleProfile.

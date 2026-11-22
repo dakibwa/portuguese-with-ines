@@ -94,7 +94,7 @@ Português com a Inês is Inês's site for one-to-one Portuguese lessons in Port
 
 ## About this reference
 
-Built from the live site (https://portuguesewithines.com, `dakibwa/portuguese-with-ines`): the tokens from the site's stylesheets, which the checker compares them with; the cards and screens from the running pages at `e530e0c` (9 Nov 2026), and the cards the workspace changes since then had left behind re-cut on 22 Nov 2026. `components/bundle.css` loads exact copies of the site's five stylesheets and its two fonts, so markup written with these class names looks exactly like the site; `make/assets.mjs` makes the copies. The page after this one, Pages, says what each page is for. The same rules at more length, with their history, are in `design/README.md`: background, which this folder outranks (Who wins).
+Built from the live site (https://portuguesewithines.com, `dakibwa/portuguese-with-ines`): the tokens from the site's stylesheets, which the checker compares them with; the cards and screens from the running pages, the workspace's cards and most screens re-cut on 22 Nov 2026 (`assets/Screens/README.md` lists the older ones). `components/bundle.css` loads exact copies of the site's five stylesheets and its two fonts, so markup written with these class names looks exactly like the site; `make/assets.mjs` makes the copies. The page after this one, Pages, says what each page is for. The same rules at more length, with their history, are in `design/README.md`: background, which this folder outranks (Who wins).
 
 ## How pages are built
 
@@ -219,7 +219,7 @@ The wordmark is Inês's own lettering of "Português com a Inês" (Wordmark): on
 - **Splats:** the eight V2 marks students choose from, the FAQ question mark, and three generated marks (`relaxed-practical-blob.webp` for booking, `conversation-` and `build-confidence-splat-generated-v2.webp`).
 - **Fields:** the large painted fields that stay still under the page (the Approach fan, the Lessons open-centre splat, each with its phone crop) and `paper-grain.svg`.
 - **Email:** the banner, the four dabs and Meet's mark that the transactional emails draw with.
-- **Screens:** twenty-five screens from the running site at main@e530e0c: the public pages, the booking journey, Your lessons and Inês's schedule, at 1280px and 390px wide.
+- **Screens:** twenty-four screens of the running site: the public pages, booking, Your lessons and Inês's schedule, at 1280px and 390px wide. `assets/Screens/README.md` says which are from 22 Nov 2026 and which nine are older.
 - `public/visuals/` holds only what the site uses. Never keep contact sheets, rejected generations or alternate exports there, and never cut new assets from the business cards or the sticker sheet without a deliberate review.
 
 ## Emails
