@@ -14,7 +14,9 @@
          here: builds the system with build.mjs, which stands beside this
          file, into OUT (design/system/page/ unless named) and draws it
      node site.mjs --system DIR [--out OUT]
-         anywhere: draws the system kept in DIR (OUT is DIR-page/ unless named)
+         anywhere: draws the system kept in DIR (OUT is DIR-page/ unless named;
+         page/ beside it for a system kept in design/system/project, which
+         git ignores there)
 
    Open OUT/index.html. The page is a view: change the files, then run this
    again; never edit the page, and never commit it.
@@ -78,7 +80,8 @@ const SYSTEM = named('--system'), OUTARG = named('--out') || args[0];
 const native = !SYSTEM && existsSync(join(HERE, 'build.mjs'));
 const SOURCE = realpathSync(resolve(SYSTEM || join(HERE, '..', 'project')));
 if (!existsSync(join(SOURCE, 'tokens.json')) && !existsSync(join(SOURCE, 'README.md'))) throw new Error(`no design system in ${SOURCE}`);
-const target = resolve(OUTARG || (native ? join(HERE, '..', 'page') : join(dirname(SOURCE), basename(SOURCE) + '-page')));
+// in the shared layout the page goes in design/system/page, which git ignores there
+const target = resolve(OUTARG || (native ? join(HERE, '..', 'page') : join(dirname(SOURCE), basename(SOURCE) === 'project' ? 'page' : basename(SOURCE) + '-page')));
 
 // Resolve existing parents too, so an alias cannot put the output inside its source.
 function canonical(dir) {

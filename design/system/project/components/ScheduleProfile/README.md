@@ -6,3 +6,11 @@ Inês's Profile tab: her name, sign-in email and password, each with one small a
 
 - One `sheet` card at the hint sizes; rows part with a 1px `rule-soft`.
 - Errors here use `warning-ink`.
+
+## Write
+
+Drawn by `TeacherAccountProfile` (`src/components/teacher/TeacherAccountProfile.tsx`) on Inês’s Profile tab: change it there.
+
+## Source
+
+- `src/components/teacher/TeacherAccountProfile.tsx#TeacherAccountProfile`

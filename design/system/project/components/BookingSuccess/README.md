@@ -7,3 +7,11 @@ You're booked in: the lessons, where the confirmation went, Join Google Meet, th
 - The confirmed lesson's own mark lands once in the card's corner, cropped at its edge, a little larger and slower than the small marks: the one celebration on the site.
 - `Join Google Meet` is the raised cream pill with Meet's mark, never an underlined line.
 - The fee facts repeat the confirm step's words exactly.
+
+## Write
+
+Drawn once, by `BookingCalendar` in `src/components/BookingCalendar.tsx`: change it there, and never write a second copy.
+
+## Source
+
+- `src/components/BookingCalendar.tsx`, find `booking-success`

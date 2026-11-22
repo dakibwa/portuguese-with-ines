@@ -9,3 +9,16 @@ Questions before booking: a lilac banner with the FAQ splat, an index of seven g
 - Answers are calm, friendly and easy to scan: the question answered directly in a few plain sentences, practical detail kept, internal processes left out, no sales language.
 - Without JavaScript every group stays readable.
 - The closing actions are compact: coral Message on WhatsApp and outline Book a lesson.
+
+## Write
+
+```tsx
+<FaqSections indexMark={<AssetMark asset="/visuals/v2-splats/faq-answers-splat-v2.svg" className="faq-index__answer-index" lands />} sections={faqSections} />
+```
+
+In `src/app/faq/page.tsx`, inside `<main className="faq-page">`; the questions are the `faqSections` list on that page.
+
+## Source
+
+- `src/components/FaqSections.tsx#FaqSections`
+- `src/app/faq/page.tsx`, find `const faqSections`

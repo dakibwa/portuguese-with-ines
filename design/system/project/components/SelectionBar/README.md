@@ -8,3 +8,11 @@ A chosen time waiting to be confirmed: its lesson's mark, the date and time in f
 - The long date shows where it fits, the short one (`Wed 16 Sept, 10:00`) on a phone.
 - The clock is named once, after the time: the place chosen's (`Porto time` in Porto, the student's own online).
 - At the confirm step each row gains an outline `Change`; `Add another lesson` follows as a dashed row with a plus.
+
+## Write
+
+Drawn once, by `BookingCalendar` in `src/components/BookingCalendar.tsx`: change it there, and never write a second copy.
+
+## Source
+
+- `src/components/BookingCalendar.tsx`, find `booking-selection-summary`

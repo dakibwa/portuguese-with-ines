@@ -1,0 +1,3968 @@
+/* A copy of src/app/globals.css, made by design/system/make/assets.mjs. Do not edit it. */
+:root {
+  /* One brand blue, shared by the footer, wordmark and interface. */
+  --blue: var(--blue-deep);
+  --blue-deep: #203e82;
+  --green: var(--blue);
+  --green-deep: var(--blue-deep);
+  --lavender: #aaa4e6;
+  /* Light enough to clear 4.5:1 against the blue booking panel. */
+  --lavender-soft: #dcd8f5;
+  /*
+   * Deeper again. It was tuned to clear AA on cream, which it does, but the
+   * same colour is used inside the sign-in card where the ground is lighter —
+   * "I've forgotten my password" measured 4.38:1 there, just under. This clears
+   * both, and every other place the token is used along with them.
+   */
+  --lavender-ink: #554f91;
+  --paper: #f5ecd9;
+  --paper-light: #fbf4e5;
+  /* The dab of paint in the FAQ mark, used as a bullet wherever facts are listed. */
+  --payment-dab: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='176.6 175.5 101.8 101.8'%3E%3Cpath d='M269 184c7.478 8.42 7.768 18.218 7.195 28.954C275.431 220.962 271.9 227.64 266 233a443 443 0 0 1-5.125 4c-6.43 5.051-8.478 8.967-10.25 16.875-1.782 7.614-4.93 13.575-11.437 18.125-6.639 3.667-13.932 3.546-21.188 2-3.062-1.625-3.062-1.625-6-4l-1.645-1.328c-4.029-3.602-6.361-7.39-8.855-12.172-3.637-6.948-8.545-11.995-14.309-17.262-5.077-4.722-7.73-8.614-8.629-15.675.644-5.239 2.181-9.452 6.107-13.124 4.939-3.733 9.812-6.127 15.581-8.314 8.051-3.217 14.746-6.974 21.75-12.125 12.942-9.323 32.845-18.774 47-6'/%3E%3C/svg%3E");
+  --coral: #ef5d3c;
+  --coral-action: #b43a26;
+  /*
+   * Text ink is a shade deeper than the --blue-deep fill: #203e82 body copy on
+   * the lavender panels measured 4.42:1, just under AA. This clears it at
+   * 5.4:1 and is indistinguishable on cream.
+   */
+  --ink: #1a3169;
+  --rule: rgba(139, 130, 211, 0.72);
+  --rule-soft: rgba(139, 130, 211, 0.38);
+  /*
+   * Booking in one hand, from the palette above: every card is the same warm
+   * sheet, and what sits on it to be pressed or read (the next lesson, a free
+   * day, a time, a control's track) is raised in the paper cream of the lesson
+   * cards and dialogs, without an outline of its own. Blue marks where you are
+   * and what you have chosen; coral is booking and the lessons booked.
+   *
+   * The sheet is --lavender laid thinly over the page, the booking panels'
+   * wash from before, chosen back by Dan over a solid lilac: warm, with the
+   * paper's grain still showing. Coral text on it clears AA (4.63:1). A booked
+   * day is --coral 15% over --paper-light, and a weekly one --lavender 50%,
+   * each the lightest that keeps its own text above 4.5:1.
+   */
+  --sheet: rgba(170, 164, 230, 0.13);
+  --raised: var(--paper-light);
+  --booked: #f9ddcc;
+  --weekly: #d2cce6;
+  /* Time that can only be booked online (10 November 2026, Dan: "a different
+     colour on the timetable if it's online only"). One soft sky blue with one
+     meaning, on Inês's timetable and month and on a student's booking
+     calendar, always beside the globe so it never rests on colour alone. */
+  --online-only: #cfe4f6;
+  /* Calendar marks are drawn, never an underline or a dot, and each is in
+     its key (10 November 2026, Dan: "distinct ways of showing it while being
+     simple"; a first crosshatch was "a bit strong"). A day off is hatched one
+     way, as it always was; a day with a lesson booked takes a finer, fainter
+     hatch leaning the other way, so each reads alone and a day that is both
+     shows both. The light one is for a day already filled in a deep colour. */
+  --hatch-booked: repeating-linear-gradient(45deg, transparent 0 6px, rgba(32, 62, 130, 0.15) 6px 7px);
+  --hatch-booked-light: repeating-linear-gradient(45deg, transparent 0 6px, rgba(251, 244, 229, 0.26) 6px 7px);
+  /*
+   * The colours the design system lists as "set in code" (9 November 2026),
+   * named once here so every button, menu and dialog draws from the same
+   * value rather than its own copy of it.
+   */
+  --coral-pressed: #95301f;
+  --lilac-pressed: #cdc8f1;
+  /* Words that warn, where coral would miss 4.5:1 on a pale wash. */
+  --warning-ink: #a73523;
+  /* A control's edge that must be seen: 3.1:1 on paper. */
+  --outline-edge: rgba(26, 49, 105, 0.55);
+  --outline-light-edge: rgba(245, 236, 217, 0.62);
+  --hover-wash: rgba(170, 164, 230, 0.2);
+  /* Second lines on blue: 4.6:1 on --blue-deep. */
+  --lilac-on-blue: rgba(220, 216, 245, 0.72);
+  --shadow-dialog: 0 24px 65px rgba(26, 49, 105, 0.26);
+  --shadow-menu: 0 14px 30px rgba(17, 31, 72, 0.3);
+  --shadow-lift-coral: 0 12px 22px -14px rgba(149, 48, 31, 0.75);
+  --shadow-lift-blue: 0 12px 22px -14px rgba(26, 49, 105, 0.7);
+  --shadow-lift-lilac: 0 12px 22px -14px rgba(85, 79, 145, 0.6);
+  --shadow-raised: 0 1px 2px rgba(26, 49, 105, 0.25);
+  /*
+   * "Thumbprint" — one hand, scaled to each thing it lands on rather than ten
+   * unrelated shapes. Every corner differs from its neighbours the way her
+   * splats and lettering do, and opposite corners are mirrored on the second
+   * button token so two buttons in one card are never the same drawing
+   * twice. Chosen from the specimen sheet; the smaller the element, the gentler
+   * the hand, because a radius that reads as character on a button reads as
+   * damage on a 40px chip.
+   */
+  --squiggle-card: 57px 23px 52px 29px / 26px 55px 25px 49px;
+  --squiggle-panel: 48px 20px 44px 24px / 22px 46px 21px 42px;
+  --squiggle-button: 44px 18px 40px 22px / 20px 42px 19px 38px;
+  --squiggle-button-alt: 20px 42px 19px 38px / 44px 18px 40px 22px;
+  /* Where a pointer settles, a button's cut shifts a little and settles, as
+     wet ink does: the same hand, never a new shape. */
+  --squiggle-button-shift: 38px 24px 46px 16px / 24px 36px 23px 44px;
+  --squiggle-button-alt-shift: 24px 36px 23px 44px / 38px 24px 46px 16px;
+  --squiggle-tile: 37px 15px 34px 19px / 17px 36px 16px 32px;
+  --squiggle-tabs: 35px 14px 32px 18px / 16px 34px 15px 30px;
+  --squiggle-field: 33px 13px 30px 16px / 15px 31px 14px 28px;
+  --squiggle-thumb: 27px 11px 25px 14px / 12px 26px 12px 24px;
+  --squiggle-pill: 27px 11px 25px 14px / 12px 26px 12px 24px;
+  --squiggle-chip: 26px 10px 23px 13px / 12px 24px 11px 22px;
+  --display: var(--font-beth-ellen), cursive;
+  --body: var(--font-montserrat), Arial, sans-serif;
+  --ui: var(--font-montserrat), Arial, sans-serif;
+  --page-pad: clamp(1.5rem, 4.4vw, 5rem);
+  /* One inset for every booking card, so cards side by side (the lesson bar,
+     the calendar, its times, an account card) start their content on one
+     line; and one for every dialog, the student's and Inês's alike. */
+  --pad-card: clamp(1rem, 2.4vw, 1.5rem);
+  --pad-dialog: clamp(1.25rem, 4vw, 1.7rem);
+  /* The design system's twelve spacing steps (9 November 2026), named so new
+     work picks a step rather than a value of its own; older rules move onto
+     them as they are touched. */
+  --gap-hair: 0.3rem;
+  --gap-label: 0.35rem;
+  --gap-chip: 0.4rem;
+  --gap-row: 0.5rem;
+  --gap-pair: 0.6rem;
+  --gap-actions: 0.65rem;
+  --gap-list: 0.75rem;
+  --gap-card: 0.85rem;
+  --gap-block: 1rem;
+  --gap-panel: 1.25rem;
+  --gap-wide: 1.5rem;
+  --gap-section: 2rem;
+  --header-height: 108px;
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-route: 240ms;
+  --motion-surface: 190ms;
+  --motion-dialog: 260ms;
+  --motion-land: 900ms;
+  --motion-page: 620ms;
+  /* Decelerates hard and long: things arrive quickly, then take their time. */
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* A change of size or place starts gently and settles gently, so a long
+     one carries what it moves rather than flinging it. */
+  --motion-ease-in-out: cubic-bezier(0.45, 0, 0.2, 1);
+  /* A pen's steady pace, easing only as it lifts: for what is drawn, the
+     rules under the headings. */
+  --motion-pen: cubic-bezier(0.61, 1, 0.88, 1);
+  /*
+   * Springs, sampled from a damped oscillator. The soft one gives about 4% and
+   * settles, for things that land or travel; the firm one barely gives, for
+   * controls answering a press. Browsers without linear() keep the curves
+   * beside them, which approximate each spring's sweep.
+   */
+  --motion-spring: cubic-bezier(0.3, 1.25, 0.5, 1);
+  --motion-spring-firm: cubic-bezier(0.25, 1.05, 0.5, 1);
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --motion-spring: linear(0, 0.036, 0.125, 0.243, 0.372, 0.5, 0.618, 0.722, 0.809, 0.88, 0.934, 0.975, 1.003, 1.022, 1.033, 1.038, 1.038, 1.036, 1.032, 1.028, 1.023, 1.018, 1.013, 1.01, 1.006, 1.004, 1);
+    --motion-spring-firm: linear(0, 0.04, 0.133, 0.252, 0.376, 0.495, 0.602, 0.694, 0.77, 0.832, 0.881, 0.918, 0.946, 0.967, 0.981, 0.991, 0.997, 1.001, 1.004, 1.005, 1.005, 1.005, 1.004, 1.004, 1.003, 1.003, 1);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+  scroll-behavior: smooth;
+}
+
+body {
+  /*
+   * Every dialog is a booking card lifted off the page: the same sheet over
+   * the same paper, with no gradient of its own (13 October 2026, Dan: "make
+   * it consistent with the original site"). What sits in it to be pressed or
+   * typed in is raised in cream, as it is on the page. Set here because the
+   * paper's grain is given to body.
+   */
+  --dialog-surface: linear-gradient(var(--sheet), var(--sheet)), var(--paper-texture), var(--paper);
+  margin: 0;
+  min-width: 320px;
+  background-color: var(--paper);
+  background-image: var(--paper-texture);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 18px;
+  line-height: 1.42;
+  text-rendering: optimizeLegibility;
+}
+
+body::selection {
+  background: var(--lavender);
+  color: var(--green-deep);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea {
+  color: inherit;
+  font: inherit;
+}
+
+button,
+summary,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+/* Akibwa project view is intentionally external to Inês's visual system. It
+ * appears only when the portfolio sends a visitor here, stays across the
+ * site's client-side navigation, and preserves the whole Portuguese site
+ * untouched below the green rule. */
+.akibwa-project-banner {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  display: none;
+  width: 100%;
+  background: #faf8f3;
+  color: #101217;
+  font-family: "Avenir Next", "Inter", "Helvetica Neue", Arial, sans-serif;
+}
+
+.akibwa-project-banner::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  background: #1b947d;
+  content: "";
+}
+
+html[data-akibwa-project="true"] .akibwa-project-banner {
+  display: block;
+}
+
+.akibwa-project-banner__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+  align-items: center;
+  width: min(calc(100% - 48px), 1310px);
+  min-height: 104px;
+  margin: 0 auto;
+  padding: 12px 0 15px;
+  gap: clamp(34px, 5vw, 78px);
+}
+
+.akibwa-project-banner__identity {
+  margin: 0;
+  color: #030405;
+  font-size: clamp(2.15rem, 3.8vw, 3.45rem);
+  font-weight: 540;
+  line-height: 0.92;
+  letter-spacing: -0.06em;
+  white-space: nowrap;
+}
+
+.akibwa-project-banner__name-stack {
+  display: inline-grid;
+  white-space: nowrap;
+}
+
+.akibwa-project-banner__name {
+  position: relative;
+  grid-area: 1 / 1;
+  justify-self: start;
+  width: max-content;
+  padding-bottom: 0.1em;
+  font-weight: 660;
+}
+
+.akibwa-project-banner__name::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 0.1em;
+  border-radius: 0.05em;
+  background: currentColor;
+  content: "";
+  opacity: 0.5;
+}
+
+.akibwa-project-banner__name--daniel {
+  color: #236bb8;
+  animation: akibwa-name-daniel 8.4s ease infinite;
+}
+
+.akibwa-project-banner__name--akibwa {
+  color: #99451f;
+  animation: akibwa-name-akibwa 8.4s ease infinite;
+}
+
+@keyframes akibwa-name-daniel {
+  0%,
+  47% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  49%,
+  98% {
+    opacity: 0;
+    transform: translateY(0.04em);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes akibwa-name-akibwa {
+  0%,
+  47% {
+    opacity: 0;
+    transform: translateY(0.04em);
+  }
+
+  49%,
+  98% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(0.04em);
+  }
+}
+
+.akibwa-project-banner__copy {
+  display: grid;
+  justify-items: start;
+  min-width: 0;
+  gap: 10px;
+}
+
+.akibwa-project-banner__lede {
+  margin: 0;
+  color: #101217;
+  font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  font-size: clamp(1.18rem, 2vw, 1.72rem);
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  white-space: nowrap;
+}
+
+.akibwa-project-banner__nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  color: #596169;
+  font-size: clamp(0.7rem, 0.88vw, 0.82rem);
+  font-weight: 680;
+  line-height: 1.2;
+  gap: 0.35em 1em;
+}
+
+.akibwa-project-banner__nav a {
+  text-decoration-color: transparent;
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.28em;
+  transition: color 120ms ease, text-decoration-color 120ms ease;
+}
+
+.akibwa-project-banner__nav a:nth-child(1) {
+  color: #303438;
+}
+
+.akibwa-project-banner__nav a:nth-child(2) {
+  color: #247366;
+}
+
+.akibwa-project-banner__nav a:nth-child(3) {
+  color: #9e3b50;
+}
+
+.akibwa-project-banner__nav a:nth-child(4) {
+  color: #087997;
+}
+
+.akibwa-project-banner__nav a:hover,
+.akibwa-project-banner__nav a:focus-visible {
+  color: #101217;
+  text-decoration-color: currentColor;
+}
+
+.akibwa-project-banner__nav a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+
+@media (max-width: 800px) {
+  .akibwa-project-banner__inner {
+    grid-template-columns: 1fr;
+    min-height: 132px;
+    padding: 10px 0 14px;
+    gap: 7px;
+  }
+
+  .akibwa-project-banner__identity {
+    font-size: clamp(2rem, 10vw, 2.8rem);
+  }
+
+  .akibwa-project-banner__copy {
+    gap: 7px;
+  }
+
+  .akibwa-project-banner__lede {
+    font-size: 1.05rem;
+  }
+
+  .akibwa-project-banner__nav {
+    font-size: 0.7rem;
+    gap: 0.3em 0.78em;
+  }
+}
+
+@media (max-width: 420px) {
+  .akibwa-project-banner__inner {
+    width: min(calc(100% - 32px), 1310px);
+  }
+
+  .akibwa-project-banner__identity {
+    font-size: 2rem;
+  }
+
+  .akibwa-project-banner__lede {
+    font-size: 0.95rem;
+  }
+
+}
+
+@media (max-height: 560px) and (orientation: landscape) {
+  .akibwa-project-banner__inner {
+    grid-template-columns: auto minmax(0, 1fr);
+    min-height: 58px;
+    padding: 8px 0 10px;
+    gap: 18px;
+  }
+
+  .akibwa-project-banner__identity {
+    font-size: 1.7rem;
+  }
+
+  .akibwa-project-banner__copy {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .akibwa-project-banner__lede {
+    display: block;
+    font-size: clamp(0.78rem, 2vw, 0.95rem);
+    line-height: 1;
+    white-space: normal;
+  }
+
+  .akibwa-project-banner__nav {
+    flex-wrap: nowrap;
+    font-size: 0.62rem;
+    white-space: nowrap;
+    gap: 0.72em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .akibwa-project-banner__name--daniel {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+
+  .akibwa-project-banner__name--akibwa {
+    opacity: 0;
+    transform: none;
+    animation: none;
+  }
+}
+
+/*
+ * The coral ring alone drops to 2.2:1 on the blue hero and 1.5:1 on the
+ * lavender panels. The cream and deep-blue halos keep at least one ring above
+ * 3:1 on every surface colour the site uses, while coral stays the identity.
+ */
+:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 5px;
+  box-shadow:
+    0 0 0 2px var(--paper-light),
+    0 0 0 5px var(--blue-deep);
+}
+
+.skip-link {
+  position: absolute;
+  top: 0.75rem;
+  left: var(--page-pad);
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.6rem 1.4rem;
+  background: var(--blue-deep);
+  color: var(--paper-light);
+  font-family: var(--ui);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  transform: translateY(-160%);
+  transition: transform 140ms ease-out;
+}
+
+/* A skip link is only ever reached by keyboard, so :focus is the right hook. */
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skip-link {
+    transition: none;
+  }
+}
+
+/* A column the height of the window, so a short page (the first booking step)
+   ends on its footer rather than on a strip of paper beneath it. */
+.route-fade {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+}
+
+.route-fade > main {
+  flex: 1 0 auto;
+}
+
+/*
+ * Pages turn into one another. Every navigation runs as a view transition
+ * (template.tsx): the page being left lifts away quickly and the new one
+ * settles in, while the header holds still and the nav's coral moves to the
+ * new destination. On wider screens the pages sit in a row along the
+ * nav, so a later page arrives from the right and an earlier one from the left
+ * (PageTurn); on phones every page settles in place. Nothing waits for
+ * the motion: the new page is live, and clickable, from its first frame.
+ * A full page load into Booking crossfades the same way between documents.
+ * With reduced motion that turn would animate nothing, so a full load is left
+ * as an ordinary load: the browser never holds the new page back for it.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+    types: document;
+  }
+}
+
+.site-header {
+  view-transition-name: site-header;
+}
+
+.akibwa-project-banner {
+  view-transition-name: portfolio-banner;
+}
+
+/* Hidden on wide screens, so only a phone's menu ever takes part. */
+.nav-mobile {
+  view-transition-name: site-menu;
+}
+
+::view-transition {
+  pointer-events: none;
+}
+
+/* The header and the portfolio banner above it hold still: the new one is
+   simply there, so a page left scrolled down does not drag either into view. */
+::view-transition-group(site-header),
+::view-transition-group(portfolio-banner) {
+  z-index: 3;
+  animation: none;
+}
+
+::view-transition-old(site-header),
+::view-transition-old(portfolio-banner) {
+  display: none;
+}
+
+::view-transition-new(site-header),
+::view-transition-new(portfolio-banner) {
+  animation: none;
+}
+
+/* A phone menu open over the page recedes with it, above the page being left
+   rather than vanishing beneath it, and beneath the page arriving. */
+::view-transition-group(site-menu) {
+  z-index: 1;
+  animation: none;
+}
+
+::view-transition-group(.page-in) {
+  z-index: 2;
+}
+
+::view-transition-old(site-menu) {
+  --page-blur: 3px;
+  animation: page-recede 200ms var(--motion-ease-out) both;
+}
+
+::view-transition-new(site-menu) {
+  display: none;
+}
+
+/* The page being left drops out of focus and away almost at once... */
+@keyframes page-recede {
+  to {
+    opacity: 0;
+    filter: blur(var(--page-blur));
+    scale: 0.985;
+  }
+}
+
+/* ...and the new one pulls into focus as it settles. */
+@keyframes page-focus {
+  from {
+    opacity: 0;
+    filter: blur(var(--page-blur));
+  }
+}
+
+@keyframes page-drift-out {
+  to {
+    translate: var(--page-out);
+  }
+}
+
+@keyframes page-drift-in {
+  from {
+    translate: var(--page-in);
+  }
+}
+
+/* The old page is all but gone before the new one shows, so two pages never
+   print over each other; for a breath the paper shows between them. */
+::view-transition-old(.page-out) {
+  --page-blur: 8px;
+  --page-out: 0 -12px;
+  animation:
+    page-recede 220ms var(--motion-ease-out) both,
+    page-drift-out 420ms var(--motion-ease-out) both;
+}
+
+::view-transition-new(.page-in) {
+  --page-blur: 10px;
+  --page-in: 0 20px;
+  animation:
+    page-focus 420ms var(--motion-ease-out) 90ms both,
+    page-drift-in var(--motion-page) var(--motion-ease-out) both;
+}
+
+@media (min-width: 821px) {
+  :root[data-page-turn="forward"]::view-transition-old(.page-out) {
+    --page-out: -32px 0;
+  }
+
+  :root[data-page-turn="forward"]::view-transition-new(.page-in) {
+    --page-in: 48px 0;
+  }
+
+  :root[data-page-turn="back"]::view-transition-old(.page-out) {
+    --page-out: 32px 0;
+  }
+
+  :root[data-page-turn="back"]::view-transition-new(.page-in) {
+    --page-in: -48px 0;
+  }
+}
+
+/* A full page load, as into Booking, has no page of its own to move, so the
+   whole page recedes and focuses in the same way, around the still header. */
+html:active-view-transition-type(document)::view-transition-old(root) {
+  --page-blur: 8px;
+  animation: page-recede 220ms var(--motion-ease-out) both;
+}
+
+html:active-view-transition-type(document)::view-transition-new(root) {
+  --page-blur: 10px;
+  animation: page-focus 420ms var(--motion-ease-out) 90ms both;
+}
+
+/* A phone keeps a lighter blur, so the turn holds its frame rate. */
+@media (max-width: 820px) {
+  ::view-transition-old(.page-out),
+  ::view-transition-new(.page-in) {
+    --page-blur: 3px;
+  }
+
+  /* Its own rule: a browser that cannot read this selector drops only it. */
+  html:active-view-transition-type(document)::view-transition-old(root),
+  html:active-view-transition-type(document)::view-transition-new(root) {
+    --page-blur: 3px;
+  }
+}
+
+/* Without view transitions, the arriving page dissolves in instead. */
+@supports not (view-transition-name: none) {
+  .route-fade {
+    animation: route-fade-in var(--motion-route) var(--motion-ease) both;
+  }
+}
+
+@keyframes route-fade-in {
+  from {
+    opacity: 0.28;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --motion-route: 190ms;
+    --motion-surface: 180ms;
+    --motion-land: 820ms;
+    --motion-page: 520ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .route-fade {
+    animation: none;
+  }
+
+  /* The new page is simply there. Important, because the turn's own rules
+     name their pseudo-elements more specifically than any wildcard can. */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/*
+ * One artwork, three masks: the lettering, and the two circumflexes over its
+ * ê (the chapéu, the "hat"), each cut out by a small window round it. At rest
+ * they print as one wordmark. The windows are in the artwork's own pixels
+ * (760 × 236): x 404–442, y 22–48 for Português and x 647–686, y 136–162 for
+ * Inês, both clear of every other stroke, placed as percentages where
+ * position = start / (1 − size).
+ */
+.brand-wordmark {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 760 / 236;
+}
+
+/* No more specific than the layers' own rules below, which must win. */
+.brand-wordmark > * {
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  -webkit-mask-image: var(--wordmark-image);
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-image: var(--wordmark-image);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+
+.brand-wordmark__letters {
+  -webkit-mask-image: var(--wordmark-image), linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+  -webkit-mask-position: center, 56.033% 10.526%, 89.861% 65.072%;
+  -webkit-mask-size: contain, 5.132% 11.441%, 5.263% 11.441%;
+  -webkit-mask-composite: source-out, source-over;
+  mask-image: var(--wordmark-image), linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+  mask-position: center, 56.033% 10.526%, 89.861% 65.072%;
+  mask-size: contain, 5.132% 11.441%, 5.263% 11.441%;
+  mask-composite: subtract, add;
+}
+
+.brand-wordmark__hat {
+  -webkit-mask-image: var(--wordmark-image), linear-gradient(#000 0 0);
+  -webkit-mask-composite: source-in;
+  mask-image: var(--wordmark-image), linear-gradient(#000 0 0);
+  mask-composite: intersect;
+}
+
+.brand-wordmark__hat--portugues {
+  -webkit-mask-position: center, 56.033% 10.526%;
+  -webkit-mask-size: contain, 5.132% 11.441%;
+  mask-position: center, 56.033% 10.526%;
+  mask-size: contain, 5.132% 11.441%;
+  transform-origin: 55.658% 18.644%;
+}
+
+.brand-wordmark__hat--ines {
+  -webkit-mask-position: center, 89.861% 65.072%;
+  -webkit-mask-size: contain, 5.263% 11.441%;
+  mask-position: center, 89.861% 65.072%;
+  mask-size: contain, 5.263% 11.441%;
+  transform-origin: 87.697% 66.949%;
+}
+
+.brand-wordmark--green {
+  color: var(--green);
+}
+
+.brand-wordmark--cream {
+  color: var(--paper);
+}
+
+.site-header {
+  position: relative;
+  z-index: 20;
+  min-height: var(--header-height);
+  border-bottom: 1px solid rgba(26, 49, 105, 0.1);
+  background-color: var(--paper);
+  background-image: var(--paper-texture);
+}
+
+.site-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--header-height);
+  padding: 0 var(--page-pad);
+  gap: 3rem;
+}
+
+.site-header__brand {
+  flex: 0 1 380px;
+  width: min(380px, 35vw);
+}
+
+.header-wordmark {
+  /* Sized to the artwork, so the hats' windows sit where they were measured. */
+  width: min(100%, calc(72px * 760 / 236));
+}
+
+/*
+ * The hats dance (9 October 2026, at Dan's request; before, each tipped once
+ * in nine or thirteen seconds): every four seconds the two hats over ê (the
+ * chapéu) hop in turn, Português, Inês, Português, Inês, each hop tipping the
+ * other way from the last, a lift of a few pixels landing on the soft spring,
+ * then they rest for the rest of the bar. The beat is the wall clock's, not
+ * the page's: PageTurn sets the hats' place in the bar from the time of day,
+ * so moving between pages, even by a full page load, never restarts the
+ * dance. Until it does, without JavaScript and with reduced motion, the hats
+ * stay still. The one ambient motion on the site, kept to the two smallest
+ * marks in it; pointing at the wordmark changes nothing.
+ */
+@property --hat-hop {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --hat-side {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+/* A hop is one arc, from 0 to 1: up and back, with the spring's give as it
+   lands; --hat-side picks which way it tips. Both are flat at 0 and 1, so the
+   side changes between hops without a mark. Without @property the hats simply
+   stay still. */
+.header-wordmark .brand-wordmark__hat {
+  --hat-lift: sin(var(--hat-hop) * 180deg);
+  translate: 0 calc(-3px * var(--hat-lift));
+  rotate: calc(var(--hat-turn) * var(--hat-side) * var(--hat-lift));
+}
+
+/* One bar of four seconds: hops of 380 ms, 260 ms apart, Português first. */
+@keyframes wordmark-hat-idle-portugues {
+  0% {
+    --hat-hop: 0;
+    --hat-side: 1;
+    animation-timing-function: var(--motion-spring);
+  }
+
+  9.5% {
+    --hat-hop: 1;
+    --hat-side: 1;
+    animation-timing-function: step-end;
+  }
+
+  13% {
+    --hat-hop: 0;
+    --hat-side: -1;
+    animation-timing-function: var(--motion-spring);
+  }
+
+  22.5%,
+  100% {
+    --hat-hop: 1;
+    --hat-side: -1;
+  }
+}
+
+@keyframes wordmark-hat-idle-ines {
+  0% {
+    --hat-hop: 0;
+    --hat-side: 1;
+    animation-timing-function: step-end;
+  }
+
+  6.5% {
+    --hat-hop: 0;
+    --hat-side: 1;
+    animation-timing-function: var(--motion-spring);
+  }
+
+  16% {
+    --hat-hop: 1;
+    --hat-side: 1;
+    animation-timing-function: step-end;
+  }
+
+  19.5% {
+    --hat-hop: 0;
+    --hat-side: -1;
+    animation-timing-function: var(--motion-spring);
+  }
+
+  29%,
+  100% {
+    --hat-hop: 1;
+    --hat-side: -1;
+  }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .header-wordmark .brand-wordmark__hat--portugues {
+    animation: wordmark-hat-idle-portugues 4s linear infinite paused;
+  }
+
+  .header-wordmark .brand-wordmark__hat--ines {
+    animation: wordmark-hat-idle-ines 4s linear infinite paused;
+  }
+}
+
+.header-wordmark .brand-wordmark__hat--portugues {
+  --hat-turn: -14deg;
+}
+
+.header-wordmark .brand-wordmark__hat--ines {
+  --hat-turn: 12deg;
+}
+
+.site-nav {
+  display: flex;
+  align-items: stretch;
+  align-self: stretch;
+  gap: clamp(1.75rem, 4vw, 4.75rem);
+}
+
+.site-nav__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--green-deep);
+  font-family: var(--ui);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: color var(--motion-surface) var(--motion-ease);
+}
+
+/* The current page and the one pointed at read in coral, with no line
+   beneath them: beside the Booking button a line read as out of place (12
+   October 2026, at Dan's request). */
+.site-nav__link:hover,
+.site-nav__link[aria-current="page"] {
+  color: var(--coral-action);
+}
+
+/* Booking stands out as the nav's one button, in the links' own dark blue
+   (11 October 2026, at Dan's request). Pointed at, it answers as the links
+   beside it do: it turns coral, keeping its shape. */
+.site-nav__book {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  border-radius: var(--squiggle-pill);
+  padding: 0 1.35rem;
+  background: var(--blue-deep);
+  color: var(--paper-light);
+  transition: background var(--motion-surface) var(--motion-ease);
+}
+
+.site-nav__link--book:hover .site-nav__book {
+  background: var(--coral-action);
+}
+
+.site-nav__link--book:focus-visible {
+  outline: 0;
+}
+
+.site-nav__link--book:focus-visible .site-nav__book {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/*
+ * An account's one bar (9 November 2026, Dan: Inês's "could it all be
+ * consolidated into one smaller banner that has her logo", then "similarly
+ * for students can the top bar merge too", "with a menu button if they care
+ * to go back"): the cream wordmark, which still leads home, a hairline, the
+ * page's name in the display hand and a splat cut off at the right edge, on
+ * the blue and grain the booking band had. The booking page's is the same
+ * bar for a visitor as for a student (11 November 2026, Dan), naming
+ * `Book a Lesson` until the page is a student's. The menu's own heading
+ * (`.nav-mobile`) is the same bar, so the wordmark stays still as the menu
+ * opens.
+ */
+.site-header__title-account,
+:root[data-booking-account] .site-header__title-book {
+  display: none;
+}
+
+:root[data-booking-account] .site-header__title-account {
+  display: inline;
+}
+
+/* A visitor's way in, in the booking page's bar: beside the menu button,
+   leading the menu instead on a phone, and gone once the page is a
+   student's, whose own menu holds their lessons. A small cream button in
+   the site's hand-cut shape (11 November 2026, Dan, of underlined words:
+   "can this be a stylised button"), as Join Meet is on her blue card;
+   pointed at, it turns coral as that one and the header's Booking do. */
+.site-header__sign-in {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-height: 42px;
+  margin-left: auto;
+  border-radius: var(--squiggle-pill);
+  padding: 0 1.25rem;
+  background: var(--paper-light);
+  color: var(--blue-deep);
+  font: 700 0.72rem/1 var(--ui);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: background-color var(--motion-surface) var(--motion-ease), color var(--motion-surface) var(--motion-ease);
+}
+
+.site-header__sign-in:hover,
+.site-header__sign-in:focus-visible {
+  background: var(--coral-action);
+  color: var(--paper-light);
+}
+
+.site-header__sign-in:focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: 3px;
+}
+
+:root[data-booking-account] .site-header__sign-in {
+  display: none;
+}
+
+.is-bar {
+  --bar-mark-width: clamp(118px, 10vw, 158px);
+  --bar-mark-right: clamp(-44px, -2.5vw, -24px);
+}
+
+.is-bar.site-header {
+  min-height: 0;
+  border-bottom: 0;
+}
+
+.is-bar :is(.site-header__inner, .nav-mobile__heading) {
+  position: relative;
+  overflow: hidden;
+  justify-content: flex-start;
+  min-height: 76px;
+  border-bottom: 0;
+  padding: 0.7rem var(--page-pad);
+  background-color: var(--blue-deep);
+  background-image: var(--paper-texture);
+  color: var(--paper);
+  gap: var(--gap-wide);
+}
+
+.is-bar .site-header__brand {
+  position: relative;
+  z-index: 2;
+  flex: 0 1 calc(52px * 760 / 236);
+  width: auto;
+  min-width: 0;
+  border-radius: var(--squiggle-chip);
+}
+
+.is-bar .header-wordmark {
+  width: 100%;
+  color: var(--paper);
+}
+
+.is-bar .site-header__title {
+  position: relative;
+  z-index: 2;
+  display: block;
+  margin: 0;
+  border-left: 1px solid var(--outline-light-edge);
+  padding-left: var(--gap-wide);
+  font-family: var(--display);
+  font-size: clamp(1.55rem, 2.4vw, 2.1rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.is-bar .site-header__mark {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: var(--bar-mark-right);
+  display: block;
+  width: var(--bar-mark-width);
+  margin: 0;
+  aspect-ratio: 1;
+  opacity: 0.96;
+  transform: translateY(-50%);
+}
+
+/* The pages are behind the menu button at every width, clear of the splat,
+   and the menu's close stands exactly where the button did. */
+.is-bar .site-nav {
+  display: none;
+}
+
+.is-bar :is(.nav-toggle, .nav-mobile__close) {
+  position: relative;
+  z-index: 2;
+  margin-right: calc(var(--bar-mark-width) + var(--bar-mark-right) + 0.5rem - var(--page-pad));
+  margin-left: auto;
+  border-radius: var(--squiggle-thumb);
+}
+
+.is-bar .site-header__sign-in + :is(.nav-toggle, .nav-mobile__close) {
+  margin-left: 0;
+}
+
+.is-bar .nav-toggle {
+  display: block;
+}
+
+.is-bar .nav-toggle__line {
+  background: var(--paper);
+}
+
+.is-bar .nav-mobile__close {
+  border-color: var(--outline-light-edge);
+  color: var(--paper);
+}
+
+.is-bar .nav-mobile__close:focus-visible {
+  color: var(--blue-deep);
+}
+
+@media (hover: hover) {
+  .is-bar .nav-mobile__close:hover {
+    color: var(--blue-deep);
+  }
+}
+
+.is-bar > .skip-link {
+  background: var(--paper-light);
+  color: var(--blue-deep);
+}
+
+/* Wide, the menu is a sheet at the right over the dimmed page. */
+@media (min-width: 821px) {
+  .is-bar.nav-mobile {
+    display: block;
+    background: rgba(18, 33, 72, 0.4);
+  }
+
+  .is-bar > .nav-mobile__inner {
+    --page-pad: 1.5rem;
+    width: min(24rem, 100%);
+    margin-left: auto;
+    background-color: var(--paper);
+    background-image: var(--paper-texture);
+  }
+
+  .is-bar > .nav-mobile__inner :is(.site-header__brand, .site-header__title) {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .is-bar :is(.site-header__inner, .nav-mobile__heading) {
+    min-height: 64px;
+    padding-block: 0.6rem;
+    gap: var(--gap-block);
+  }
+
+  .is-bar .site-header__brand {
+    flex-basis: calc(42px * 760 / 236);
+  }
+
+  .is-bar .site-header__title {
+    padding-left: var(--gap-block);
+    font-size: 1.35rem;
+  }
+
+  .is-bar .site-header__mark {
+    right: -38px;
+    width: 86px;
+  }
+
+  /* With a menu button the splat goes, the name is a little smaller and the
+     wordmark gives way first, so all three keep a line on a narrow phone. */
+  .is-bar:is(.nav-mobile, :has(.nav-toggle)) :is(.site-header__inner, .nav-mobile__heading) {
+    gap: var(--gap-list);
+  }
+
+  .is-bar:is(.nav-mobile, :has(.nav-toggle)) .site-header__title {
+    padding-left: var(--gap-list);
+    font-size: min(1.35rem, 5vw);
+  }
+
+  .is-bar:is(.nav-mobile, :has(.nav-toggle)) .site-header__mark {
+    display: none;
+  }
+
+  .is-bar :is(.nav-toggle, .nav-mobile__close) {
+    margin-right: 0;
+  }
+
+  /* No room beside the menu button on a phone, and a row of its own was
+     "very ugly" (11 November 2026, Dan): there the way in is the menu's. */
+  .site-header__sign-in {
+    display: none;
+  }
+
+  .is-bar .site-header__sign-in + :is(.nav-toggle, .nav-mobile__close) {
+    margin-left: auto;
+  }
+}
+
+/* The narrowest phones keep the wordmark and the name clear of each other
+   and let the splat go. */
+@media (max-width: 360px) {
+  .is-bar :is(.site-header__inner, .nav-mobile__heading) {
+    gap: var(--gap-list);
+  }
+
+  .is-bar .site-header__brand {
+    flex-basis: calc(36px * 760 / 236);
+  }
+
+  .is-bar .site-header__title {
+    padding-left: var(--gap-list);
+    font-size: 1.25rem;
+  }
+
+  .is-bar:is(.nav-mobile, :has(.nav-toggle)) .site-header__title {
+    font-size: min(1.25rem, 5vw);
+  }
+
+  .is-bar .site-header__mark {
+    display: none;
+  }
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+  border: 1px solid transparent;
+  /* Every call to action on the site, in the same hand as the booking flow. It
+     was the last square thing left: "Book a lesson" is the button the whole
+     site is pointing at, and it looked like it belonged to a different one. */
+  border-radius: var(--squiggle-button);
+  padding: 0.9rem 2.7rem;
+  font-family: var(--ui);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.19em;
+  line-height: 1.15;
+  text-align: center;
+  text-transform: uppercase;
+  transition:
+    background 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    box-shadow 320ms var(--motion-ease-out),
+    transform 420ms var(--motion-spring-firm),
+    border-radius 640ms var(--motion-spring);
+}
+
+.button:hover {
+  transform: translateY(-2px);
+}
+
+/* A press sinks the button a touch at once, and the spring lets it back up. */
+.button:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 200ms, 200ms, 200ms, 120ms, 80ms, 640ms;
+}
+
+.button--coral {
+  background: var(--coral-action);
+  color: var(--paper-light);
+}
+
+/* Lifted, the filled buttons cast a soft shadow in their own colour. */
+.button--coral:hover {
+  background: var(--coral-pressed);
+  box-shadow: var(--shadow-lift-coral);
+}
+
+/* Until it can act, a filled button is the same quiet outline as the booking's
+   final action, so coral and blue appear only when the action is live. White
+   on a faded fill read as broken. A disabled button does not answer either. */
+.button--coral:disabled {
+  border: 1px solid var(--rule);
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink);
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+/*
+ * The second choice beside a coral one. Same hand, same type, outlined rather
+ * than filled, so "How I teach" or "Payment questions" reads as something to
+ * press instead of a caption under the real button. The mirrored squiggle
+ * keeps a pair of buttons from looking stamped out of one mould.
+ */
+.button--outline {
+  border: 1.5px solid var(--outline-edge);
+  border-radius: var(--squiggle-button-alt);
+  background: transparent;
+  color: var(--ink);
+}
+
+.button--outline:hover,
+.button--outline:focus-visible {
+  border-color: var(--ink);
+  background: var(--hover-wash);
+}
+
+.button--outline-light {
+  border: 1.5px solid var(--outline-light-edge);
+  border-radius: var(--squiggle-button-alt);
+  background: rgba(245, 236, 217, 0.05);
+  color: var(--paper);
+}
+
+.button--outline-light:hover,
+.button--outline-light:focus-visible {
+  border-color: var(--paper);
+  background: rgba(245, 236, 217, 0.15);
+}
+
+/* Pointed at or focused, the cut shifts on the soft spring. The booking
+   journey's own control grammar, later in this file, keeps its buttons as
+   they are. */
+@media (prefers-reduced-motion: no-preference) {
+  .button:where(:hover, :focus-visible):not(:disabled) {
+    border-radius: var(--squiggle-button-shift);
+  }
+
+  .button--outline:where(:hover, :focus-visible):not(:disabled),
+  .button--outline-light:where(:hover, :focus-visible):not(:disabled) {
+    border-radius: var(--squiggle-button-alt-shift);
+  }
+}
+
+/* For a supporting pair beside or beneath the page's main action. */
+.button--compact {
+  min-height: 50px;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+}
+
+.eyebrow {
+  color: var(--lavender-ink);
+  font-family: var(--ui);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.editorial-rule {
+  width: min(360px, 75%);
+  height: 2px;
+  margin: 1.4rem 0 1.2rem;
+  background: var(--lavender);
+}
+
+.editorial-rule--green {
+  background: var(--green);
+}
+
+.short-rule {
+  display: block;
+  width: 30px;
+  height: 1px;
+  margin: 0.8rem 0 1.1rem;
+  background: var(--lavender);
+}
+
+/*
+ * The rules under the headings are drawn, once, from their left end at a
+ * pen's pace as their page arrives: the hero rules a moment after the heading
+ * shows, each principle's short rule as its splat settles, and an FAQ
+ * section's rule each time the section is chosen. The heading itself never
+ * waits or moves; reduced motion and print show every rule drawn.
+ */
+@keyframes rule-draw {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .editorial-rule,
+  .short-rule,
+  .faq-group__header::after {
+    transform-origin: left center;
+    animation: rule-draw var(--rule-duration, 820ms) var(--motion-pen) var(--rule-delay, 240ms) backwards;
+  }
+
+  .short-rule {
+    --rule-duration: 520ms;
+    --rule-delay: calc(var(--land-start, 160ms) + var(--land-order, 0) * var(--land-step, 110ms) + 260ms);
+  }
+
+  .faq-group__header::after {
+    --rule-duration: 700ms;
+    --rule-delay: 60ms;
+  }
+}
+
+.asset-mark {
+  position: relative;
+  display: block;
+}
+
+.asset-mark__picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.asset-mark__image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+/*
+ * The little splats land. Each arrives the way a dab of paint does: out of
+ * nothing, a touch small and turned, then flat on the page with the smallest
+ * give. Only the picture inside the mark moves, never the mark's own box, so
+ * layout, hit areas and measured sizes stay put, and a mark placed by its own
+ * transform (the FAQ banner's) keeps it.
+ *
+ * Marks in the first screen land as the page arrives; SplatArrivals holds the
+ * rest until the reader reaches them. Text and controls never wait for a
+ * landing, nothing repeats or loops, and reduced motion, print and a page
+ * without JavaScript show every splat at rest. The large painted fields on the
+ * pages do not land: they are the paper these marks land on.
+ */
+/* Soft at first, as wet paint is, then sharp. */
+@keyframes splat-appear {
+  from {
+    opacity: 0;
+    filter: blur(5px);
+  }
+}
+
+/* A disc that widens from the mark's middle, so the body of a splat shows
+   before its outer flecks, the way paint spreads from where it lands. At its
+   widest it covers the whole mark, and it is gone once the landing ends. */
+@keyframes splat-spread {
+  from {
+    -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent);
+    mask-image: radial-gradient(closest-side, #000 55%, transparent);
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: 10% 10%;
+    mask-size: 10% 10%;
+  }
+
+  to {
+    -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent);
+    mask-image: radial-gradient(closest-side, #000 55%, transparent);
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: 320% 320%;
+    mask-size: 320% 320%;
+  }
+}
+
+@keyframes splat-land {
+  from {
+    transform: scale(var(--land-scale, 0.72)) rotate(var(--land-turn, -10deg));
+  }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .asset-mark--lands > .asset-mark__picture {
+    --land-delay: calc(var(--land-start, 160ms) + var(--land-order, 0) * var(--land-step, 110ms));
+    animation:
+      splat-appear 480ms var(--motion-ease-out) var(--land-delay) backwards,
+      splat-spread 720ms var(--motion-ease-out) var(--land-delay) backwards,
+      splat-land var(--land-duration, var(--motion-land)) var(--motion-spring) var(--land-delay) backwards;
+  }
+
+  .asset-mark--lands[data-splat="held"] > .asset-mark__picture {
+    opacity: 0;
+    animation: none;
+  }
+}
+
+/* A group lands in reading order, and no two neighbours turn the same way. */
+:is(.principle, .approach-item, .lesson-product, .nav-mobile__link):nth-child(2) {
+  --land-order: 1;
+  --land-turn: 9deg;
+}
+
+:is(.principle, .approach-item, .lesson-product, .nav-mobile__link):nth-child(3) {
+  --land-order: 2;
+  --land-turn: -7deg;
+}
+
+.nav-mobile__link:nth-child(4) {
+  --land-order: 3;
+  --land-turn: 11deg;
+}
+
+/* Sign in, the menu's last row for anyone not signed in. */
+.nav-mobile__link:nth-child(5) {
+  --land-order: 4;
+  --land-turn: -8deg;
+}
+
+/* Home */
+
+/* The hero fills whatever the snug footer leaves, so home never ends on a
+   strip of bare paper above the footer. */
+.home-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-hero {
+  display: grid;
+  flex: 1 0 auto;
+  grid-template-columns: minmax(0, 1.15fr) minmax(420px, 0.85fr);
+  min-height: min(660px, calc(100vh - var(--header-height)));
+}
+
+.home-hero__copy {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: hidden;
+  padding: clamp(3.25rem, 7vw, 7rem) var(--page-pad);
+  background-color: var(--green);
+  background-image: var(--paper-texture);
+  color: var(--paper);
+}
+
+.home-hero__copy h1 {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 720px;
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2.6rem, 4.8vw, 5.9rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+}
+
+.home-hero__copy h1 > span {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.home-title__script {
+  margin-top: 0.06em;
+  color: var(--lavender);
+  font-style: italic;
+  letter-spacing: -0.04em;
+}
+
+/*
+ * Beth Ellen's descenders reach about 0.4em below the baseline and its
+ * capitals rise almost a full em above it, so at the tight line heights of the
+ * display headings a descender on one line runs into the letters of the next.
+ * The second line of a two-line heading sits lower by that much.
+ */
+.display-second-line {
+  display: inline-block;
+  margin-top: 0.4em;
+  line-height: 1.14;
+}
+
+.home-hero__copy > p {
+  margin-bottom: 1.7rem;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  line-height: 1.25;
+}
+
+/* Booking first, then the two ways to read more, on one row where it fits. */
+.home-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.home-hero__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+/* Where the three do not fit on one row (38.25rem is their width together),
+   Book a lesson spans the pair beneath it, as on a phone, rather than
+   dangling alone above a longer row. */
+.home-hero__copy {
+  container-type: inline-size;
+}
+
+@media (min-width: 561px) {
+  @container (max-width: 38.25rem) {
+    .home-hero__actions {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      width: fit-content;
+      max-width: 100%;
+    }
+
+    .home-hero__links {
+      display: grid;
+      grid-template-columns: auto auto;
+    }
+  }
+}
+
+@media (max-width: 560px) {
+  .home-hero__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  /* Two halves of one row under the full-width booking button. */
+  .home-hero__links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+  }
+
+  .home-hero__links .button {
+    padding-right: 0.6rem;
+    padding-left: 0.6rem;
+    letter-spacing: 0.1em;
+  }
+}
+
+/* Narrower, the actions take the full width of the hero. */
+@media (max-width: 413px) {
+  .home-hero__actions {
+    align-self: stretch;
+  }
+
+  /* The two ways in stay side by side, a size smaller, rather than a whole
+     extra row above the fold (13 October 2026, Dan). */
+  .home-hero__links .button {
+    padding-inline: 0.6rem;
+    font-size: 0.64rem;
+    letter-spacing: 0.08em;
+  }
+}
+
+/* At 320px "Lessons and prices" still broke onto a second line in an equal
+   half, so below 360px the pair takes widths to suit their labels and both
+   stay on one line. */
+@media (max-width: 359px) {
+  .home-hero__links {
+    grid-template-columns: auto auto;
+  }
+}
+
+.principles-strip {
+  display: grid;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  border-left: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--rule-soft);
+  background-color: var(--lavender-soft);
+  background-image: var(--paper-texture);
+}
+
+.principle {
+  min-height: 0;
+  border-bottom: 1px solid var(--rule-soft);
+  padding: clamp(1.5rem, 2.5vw, 2.5rem) clamp(1.5rem, 3vw, 3.5rem);
+}
+
+.principles-strip > :last-child {
+  border-bottom: 0;
+}
+
+.principle {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.principle .asset-mark {
+  width: 68px;
+  height: 80px;
+}
+
+.principle h2 {
+  margin: 0;
+  color: var(--lavender-ink);
+  font-family: var(--display);
+  font-size: clamp(1.35rem, 1.8vw, 1.75rem);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 1.4;
+}
+
+.principle p {
+  max-width: 360px;
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+
+/* Approach */
+
+.approach-composition {
+  display: grid;
+  grid-template-columns: 45% 55%;
+  min-height: 700px;
+}
+
+.approach-intro {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(3.5rem, 6vw, 6rem) var(--page-pad);
+  background-color: var(--lavender);
+  background-image: var(--paper-texture);
+}
+
+.approach-intro h1 {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(3rem, 5.6vw, 6.2rem);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+  word-spacing: 0.08em;
+}
+
+/*
+ * Cream on lavender measured 1.95:1, so half the page heading was barely
+ * readable. Blue on lavender keeps the two-tone display device at 3.2:1 —
+ * the same tonal relationship the home hero already uses for lilac on blue.
+ */
+.approach-intro h1 em {
+  display: inline-block;
+  margin-top: 0.46em;
+  color: var(--blue);
+  font-style: normal;
+}
+
+.approach-intro > p {
+  position: relative;
+  z-index: 2;
+  max-width: 400px;
+  margin: 0;
+  font-size: clamp(1.2rem, 1.7vw, 1.55rem);
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+/* Side by side, the fan reaches in under the words wherever it is large
+   beside a narrow column; the measure narrows with the column so the last
+   word always stops short of the paint. */
+@media (min-width: 821px) and (max-width: 1100px) {
+  .approach-intro > p {
+    max-width: 360px;
+  }
+}
+
+@media (min-width: 1101px) {
+  .approach-intro > p {
+    max-width: clamp(250px, 44.9vw - 307px, 400px);
+  }
+}
+
+.approach-intro__splat {
+  position: absolute;
+  right: -22%;
+  bottom: -8%;
+  z-index: 1;
+  width: min(78%, 440px);
+  aspect-ratio: 1;
+  background-size: contain;
+}
+
+.approach-list {
+  position: relative;
+  overflow: hidden;
+  padding: 2rem var(--page-pad);
+}
+
+.approach-item {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  align-items: center;
+  min-height: 210px;
+  border-bottom: 1px solid var(--rule);
+  gap: 2rem;
+}
+
+.approach-item:last-of-type {
+  border-bottom: 0;
+}
+
+.approach-item .asset-mark {
+  width: 126px;
+  height: 132px;
+}
+
+/* Sentence case, like the Home principles, at reading size rather than in
+   tracked capitals: each point says what it is and the line beneath it does
+   the talking. */
+.approach-item h2 {
+  margin-bottom: 0.45rem;
+  font-family: var(--ui);
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+@media (min-width: 821px) {
+  /*
+   * Wide split layouts need a real secondary surface. When both columns use
+   * the page paper, the rail disappears into the body and the composition
+   * reads as cream on cream. Mobile stacks these sections, so spacing and the
+   * intervening rules already provide the separation there.
+   */
+  .approach-list,
+  .faq-index {
+    background-color: var(--lavender-soft);
+    background-image: var(--paper-texture);
+  }
+}
+
+/* There is room for the long labels on one line from here upwards. Between
+   the stacked mobile layout and this width, wrapping keeps the two-column
+   composition intact without letting text disappear under overflow:hidden. */
+@media (min-width: 1000px) {
+  .approach-item h2 {
+    white-space: nowrap;
+  }
+}
+
+/* No larger than its heading, so each point reads heading first. */
+.approach-item p {
+  max-width: 470px;
+  margin: 0;
+  font-size: clamp(1.05rem, 1.25vw, 1.15rem);
+  line-height: 1.45;
+}
+
+.teacher-band {
+  display: grid;
+  grid-template-columns: minmax(270px, 0.6fr) 2.2fr;
+  align-items: center;
+  min-height: 136px;
+  padding: 1.5rem var(--page-pad);
+  background-color: var(--green);
+  background-image: var(--paper-texture);
+  color: var(--paper);
+}
+
+.teacher-band h2 {
+  margin: 0;
+  border-right: 2px solid var(--lavender);
+  font-family: var(--display);
+  font-size: clamp(2rem, 3vw, 3rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  word-spacing: 0.12em;
+}
+
+/* One credential to a line, a little apart, so one that wraps on a phone
+   still reads as one. */
+.teacher-band__credentials {
+  margin: 0;
+  padding: 0 0 0 clamp(2rem, 4vw, 4rem);
+  font-size: clamp(1.15rem, 1.75vw, 1.55rem);
+  line-height: 1.3;
+  list-style: none;
+}
+
+.teacher-band__credentials li {
+  text-wrap: balance;
+}
+
+.teacher-band__credentials li + li {
+  margin-top: 0.45rem;
+}
+
+.editorial-callout {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: clamp(3rem, 5vw, 5rem) var(--page-pad);
+  text-align: center;
+}
+
+.editorial-callout h2 {
+  /* Room for the descenders, so "Beginners" never reaches the text below. */
+  margin-bottom: 0.5em;
+  font-family: var(--display);
+  font-size: clamp(2.4rem, 4.6vw, 4.4rem);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+}
+
+@media (max-width: 560px) {
+  /* "Beginners welcome." wraps on a phone; the second line clears the g. */
+  .editorial-callout h2 {
+    line-height: 1.45;
+  }
+}
+
+.editorial-callout > p:not(.eyebrow) {
+  max-width: 660px;
+  margin: 0 auto 2rem;
+  font-size: 1.25rem;
+  text-wrap: pretty;
+}
+
+/* Lessons */
+
+.lessons-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  min-height: 230px;
+}
+
+.lessons-hero__title {
+  display: flex;
+  align-items: center;
+  padding: 2rem var(--page-pad);
+  background-color: var(--lavender);
+  background-image: var(--paper-texture);
+}
+
+.lessons-hero h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2.5rem, 4.4vw, 4.6rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+}
+
+.lessons-hero h1 em {
+  font-weight: 400;
+}
+
+.lessons-hero__art {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--blue);
+  background-image: var(--paper-texture);
+}
+
+.lessons-hero__art .lessons-hero__field {
+  position: absolute;
+  right: -6%;
+  bottom: -7%;
+  width: 112%;
+  height: 112%;
+  background-position: center;
+  background-size: contain;
+}
+
+.lesson-programme {
+  padding: clamp(2.25rem, 4vw, 3.5rem) var(--page-pad);
+}
+
+.lesson-programme__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: clamp(1.5rem, 2.6vw, 2.5rem);
+}
+
+/*
+ * Three cards from the same hand: one family of wobbly edge, never the same
+ * one twice, each carrying the lesson's own mark. It is the mark that lesson
+ * wears later, in the booking flow and on booked lessons, so the same splat
+ * means the same lesson wherever a student meets it. The whole card is the
+ * way into booking that lesson; hovering it warms the colour while the button
+ * lifts and fills, and its mark turns a little on the soft spring. The card
+ * itself stays where it is.
+ */
+.lesson-product {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  min-width: 0;
+  flex-direction: column;
+  border: 1.5px solid var(--rule-soft);
+  border-radius: 58px 24px 52px 30px / 27px 56px 25px 50px;
+  padding: clamp(1.4rem, 2.2vw, 1.9rem) clamp(1.4rem, 2.3vw, 2.1rem) clamp(1.5rem, 2.3vw, 2rem);
+  background-color: var(--paper-light);
+  transition:
+    background-color var(--motion-surface) var(--motion-ease), border-color var(--motion-surface) var(--motion-ease);
+}
+
+.lesson-product--trial {
+  border-color: rgba(85, 79, 145, 0.4);
+  border-radius: 30px 60px 26px 54px / 55px 26px 58px 29px;
+  background-color: var(--lavender-soft);
+}
+
+.lesson-product--long {
+  border-radius: 46px 30px 60px 22px / 34px 58px 24px 52px;
+}
+
+.lesson-product:hover,
+.lesson-product:focus-within {
+  border-color: var(--lavender);
+  background-color: #f1eaf1;
+}
+
+.lesson-product--trial:hover,
+.lesson-product--trial:focus-within {
+  border-color: var(--lavender-ink);
+  background-color: #cfc9f1;
+}
+
+/* The name keeps clear of the corner splat. */
+.lesson-product__head {
+  position: relative;
+  z-index: 1;
+  padding-right: 4.5rem;
+}
+
+.lesson-product__head .eyebrow {
+  margin: 0;
+}
+
+/* Each splat comes in from the card's top-right corner, cropped by the card's
+   own squiggle. It lands with the page; pointed at, the card turns it a few
+   degrees and lets it swell a touch, neighbours turning opposite ways, and it
+   settles back when the pointer leaves. The landing moves the picture inside,
+   this the mark's box, so the two never meet. */
+.lesson-product__mark {
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  width: 118px;
+  height: 118px;
+  pointer-events: none;
+  --mark-turn: 8deg;
+  transition:
+    rotate 720ms var(--motion-spring),
+    scale 720ms var(--motion-spring);
+}
+
+.lesson-product--trial .lesson-product__mark,
+.lesson-product--long .lesson-product__mark {
+  --mark-turn: -8deg;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lesson-product:is(:hover, :focus-within) .lesson-product__mark {
+    rotate: var(--mark-turn);
+    scale: 1.05;
+  }
+}
+
+.lesson-product__pricing,
+.lesson-product__description,
+.lesson-product__action {
+  position: relative;
+  z-index: 1;
+}
+
+/* The card is the target: the link's hit area covers it, and the card, not
+   the button, answers the hover. */
+.lesson-product__link::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+}
+
+.lesson-product__link {
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    box-shadow 320ms var(--motion-ease-out),
+    transform 420ms var(--motion-spring-firm),
+    border-radius 640ms var(--motion-spring);
+}
+
+/* The button answers too, apart from the card's wash: it lifts and fills. */
+.lesson-product:hover .lesson-product__link,
+.lesson-product:focus-within .lesson-product__link {
+  box-shadow: 0 6px 14px rgba(26, 49, 105, 0.16);
+  transform: translateY(-2px);
+}
+
+/* Pressing anywhere on the card presses its button. */
+.lesson-product .lesson-product__link:active {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 200ms, 200ms, 200ms, 120ms, 80ms, 640ms;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lesson-product:is(:hover, :focus-within) .lesson-product__link {
+    border-radius: var(--squiggle-button-shift);
+  }
+
+  .lesson-product:is(:hover, :focus-within) .lesson-product__link.button--outline {
+    border-radius: var(--squiggle-button-alt-shift);
+  }
+}
+
+.lesson-product:hover .lesson-product__link.button--coral,
+.lesson-product:focus-within .lesson-product__link.button--coral {
+  background: var(--coral-pressed);
+}
+
+.lesson-product:hover .lesson-product__link.button--outline,
+.lesson-product:focus-within .lesson-product__link.button--outline {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper-light);
+}
+
+/* The price with its length beside it as a small tag: one line, one unit. */
+.lesson-product__pricing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-top: 0.7rem;
+  gap: 0.4rem 0.8rem;
+}
+
+.lesson-product__price {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(3rem, 4.3vw, 4.3rem);
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.lesson-product__duration {
+  /* Centred on the price rather than hung from its baseline, so it never
+     makes the line taller and the three cards' rules stay level. */
+  align-self: center;
+  margin: 0;
+  border-radius: var(--squiggle-pill);
+  padding: 0.32rem 0.7rem;
+  background: rgba(170, 164, 230, 0.24);
+  color: var(--lavender-ink);
+  font-family: var(--ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lesson-product--trial .lesson-product__duration {
+  background: rgba(251, 244, 229, 0.7);
+}
+
+.lesson-product__description {
+  margin: 1.1rem 0 0;
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 1.05rem;
+  font-size: 1.04rem;
+  line-height: 1.5;
+}
+
+/* Pinned to the foot of the card and full width, so the three buttons form
+   one row whatever the length of the description above them. */
+.lesson-product__action {
+  margin-top: auto;
+  padding-top: 1.4rem;
+}
+
+.lesson-product__action .button {
+  width: 100%;
+}
+
+/*
+ * The page closes on one blue card in the same hand as the lessons above:
+ * where lessons happen, what a visitor sees before paying, and where the
+ * payment questions are answered. Booking itself lives on each card.
+ */
+.lessons-closing {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  margin: 0 var(--page-pad) clamp(2.5rem, 4.5vw, 3.75rem);
+  border-radius: var(--squiggle-panel);
+  padding: clamp(1.25rem, 2.2vw, 1.75rem) clamp(1.5rem, 3vw, 2.75rem);
+  background-color: var(--blue);
+  background-image: var(--paper-texture);
+  color: var(--paper);
+  gap: 1rem clamp(1.25rem, 2.6vw, 2.5rem);
+}
+
+.lessons-closing__mark {
+  width: 76px;
+  height: 64px;
+}
+
+.lessons-closing__copy p {
+  margin: 0;
+}
+
+.lessons-closing__title {
+  font-family: var(--ui);
+  font-size: clamp(0.95rem, 1.5vw, 1.2rem);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.lessons-closing__copy p + p {
+  max-width: 48ch;
+  margin-top: 0.35rem;
+  color: var(--lavender-soft);
+  font-size: 0.98rem;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.lessons-closing__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+@media (max-width: 1100px) {
+  /* Narrower, the two buttons stack on the right rather than dropping to a
+     row of their own and leaving that side empty. */
+  .lessons-closing__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 900px) {
+  .lesson-programme__grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.4rem;
+  }
+
+}
+
+/* Between a phone and three across, the trial runs the full width and the
+   two lengths sit side by side beneath it, rather than three cards each the
+   width of the page with an empty half beside every line. */
+@media (min-width: 641px) and (max-width: 900px) {
+  .lesson-programme__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+
+  .lesson-product--trial {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 820px) {
+  /* Title and splat side by side: one band, not a lilac screen and a blue one. */
+  .lessons-hero {
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    min-height: 170px;
+  }
+
+  .lessons-hero__title {
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .lessons-hero__art .lessons-hero__field {
+    right: -22%;
+    width: 150%;
+  }
+}
+
+@media (max-width: 560px) {
+  /* Two columns squeezed the title into four broken lines. The title takes
+     the band instead, and the splat sits in a square-cornered blue strip at
+     its right edge, as the wider layouts' blue column does. */
+  .lessons-hero {
+    position: relative;
+    display: block;
+    min-height: 0;
+    overflow: hidden;
+    background-color: var(--lavender);
+    background-image: var(--paper-texture);
+  }
+
+  .lessons-hero__title {
+    position: relative;
+    z-index: 2;
+    padding-top: 1.6rem;
+    padding-right: 28%;
+    padding-bottom: 1.6rem;
+    background: none;
+  }
+
+  .lessons-hero h1 {
+    font-size: clamp(1.6rem, 8vw, 2.7rem);
+  }
+
+  .lessons-hero__art {
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 26%;
+  }
+
+  .lessons-hero__art .lessons-hero__field {
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: auto;
+    height: 112%;
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+  }
+
+  .lesson-product__mark {
+    width: 108px;
+    height: 108px;
+  }
+
+  .lesson-product__price {
+    font-size: 3rem;
+  }
+
+  .lessons-closing {
+    border-radius: var(--squiggle-card);
+  }
+
+  .lessons-closing__mark {
+    width: 58px;
+    height: 50px;
+  }
+}
+
+@media (max-width: 640px) {
+  .lessons-closing {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  /* Beneath the copy, side by side wherever both labels fit, as on a phone
+     held sideways; stacked, each the full width, only where they do not. */
+  .lessons-closing__actions {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  }
+}
+
+/*
+ * Three across from 901px, or alone at 320px, a card is about 250px inside,
+ * and its button label broke onto a second line. There the labels set a
+ * little tighter, so each button stays on one line. The corner splat steps
+ * back a little and the name stops at its edge, so a name that still needs
+ * two lines takes them rather than running into the splat.
+ */
+.lesson-product {
+  container-type: inline-size;
+}
+
+@container (max-width: 252px) {
+  .lesson-product__head {
+    padding-right: 4.625rem;
+  }
+
+  .lesson-product__head .eyebrow {
+    letter-spacing: 0.12em;
+  }
+
+  .lesson-product__mark {
+    top: -26px;
+    right: -26px;
+    width: 100px;
+    height: 100px;
+  }
+
+  .lesson-product .lesson-product__link {
+    padding-inline: 0.6rem;
+    letter-spacing: 0.08em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lesson-product,
+  .lesson-product__mark,
+  .lesson-product__link {
+    transition: none;
+  }
+
+  .lesson-product:hover .lesson-product__link,
+  .lesson-product:focus-within .lesson-product__link,
+  .lesson-product .lesson-product__link:active {
+    transform: none;
+  }
+
+  .faq-group {
+    animation: none;
+  }
+}
+
+/* FAQ */
+
+/* The question splat sits whole, halfway down the band inside the page margin;
+   the heading keeps clear of it. */
+.faq-hero {
+  --faq-mark: clamp(170px, 21vw, 280px);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  min-height: 200px;
+  overflow: hidden;
+  padding: 2rem calc(var(--page-pad) + clamp(120px, 18vw, 250px)) 2rem var(--page-pad);
+  background-color: var(--lavender);
+  background-image: var(--paper-texture);
+  gap: clamp(0.75rem, 3vw, 3rem);
+}
+
+.faq-hero h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2.5rem, 4.6vw, 4.7rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+
+/* The drawing leaves more room at its right and foot than at its left and
+   top, so the offsets centre what is drawn rather than its square. */
+.faq-hero__mark {
+  /* Twice the size of the other marks, so it travels half as far to land. */
+  --land-scale: 0.86;
+  --land-turn: -6deg;
+  position: absolute;
+  top: 50%;
+  right: var(--page-pad);
+  width: var(--faq-mark);
+  aspect-ratio: 1;
+  pointer-events: none;
+  transform: translate(16%, -47%);
+}
+
+@media (max-width: 560px) {
+  .faq-hero {
+    --faq-mark: clamp(116px, 38vw, 170px);
+    min-height: 150px;
+    padding-top: 1.5rem;
+    padding-right: calc(var(--page-pad) + var(--faq-mark) * 0.78);
+    padding-bottom: 1.5rem;
+  }
+
+  .faq-hero h1 {
+    font-size: clamp(2.1rem, 9.6vw, 3rem);
+  }
+}
+
+.faq-reference {
+  display: grid;
+  grid-template-columns: minmax(260px, 30%) 1fr;
+  border-bottom: 1px solid var(--rule);
+}
+
+.faq-index {
+  position: relative;
+  overflow: hidden;
+  border-right: 1px solid var(--rule);
+  padding: 3rem var(--page-pad);
+}
+
+.faq-index ol {
+  position: relative;
+  z-index: 2;
+  margin: 1.2rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.faq-index li {
+  border-top: 1px solid var(--rule-soft);
+}
+
+.faq-index li:last-child {
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.faq-index a {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  font-family: var(--ui);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.faq-index a[aria-current="true"] {
+  color: var(--coral-action);
+}
+
+.faq-index a:hover {
+  color: var(--coral-action);
+}
+
+/* The number keeps its width when a label wraps, so every label starts on
+   one edge. */
+.faq-index a span {
+  width: 42px;
+  flex: none;
+  color: var(--lavender-ink);
+}
+
+/* Beside the questions below 1024px the rail is narrow: a shorter right
+   inset keeps more of its labels on one line. */
+@media (min-width: 821px) and (max-width: 1023px) {
+  .faq-index {
+    padding-right: 1.25rem;
+  }
+}
+
+/* Below the list, in the flow: one section at a time can be shorter than the
+   index, and a mark pinned to the bottom then sat on the last entry. */
+.faq-index__answer-index {
+  position: relative;
+  display: block;
+  width: min(60%, 170px);
+  margin: 2.4rem 0 0 auto;
+  aspect-ratio: 1;
+  opacity: 0.9;
+}
+
+.faq-groups {
+  padding: 1.2rem var(--page-pad) 4rem;
+}
+
+.faq-group {
+  scroll-margin-top: calc(var(--header-height) + 20px);
+  animation: faq-group-in 240ms var(--motion-ease);
+}
+
+/* Choosing a section in the index fades it in where the last one was. */
+@keyframes faq-group-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.faq-group__header h2 {
+  scroll-margin-top: 1.25rem;
+}
+
+.faq-group__header h2:focus {
+  outline: none;
+}
+
+/* The index numbers the sections, so the heading needs no number of its own.
+   Its rule is a line of its own rather than a border, so it can be drawn. */
+.faq-group__header {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  padding: 1.3rem 0 calc(0.9rem + 2px);
+}
+
+.faq-group__header::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--green);
+  content: "";
+}
+
+.faq-group__header h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2rem, 3vw, 3.2rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
+
+.faq-row {
+  border-bottom: 1px solid var(--rule);
+}
+
+.faq-row summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 66px;
+  cursor: pointer;
+  padding: 1rem 0;
+  font-family: var(--body);
+  font-size: clamp(1.02rem, 1.25vw, 1.15rem);
+  list-style: none;
+  gap: 2rem;
+}
+
+.faq-row summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-row__symbol {
+  position: relative;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  transition: transform 560ms var(--motion-spring);
+}
+
+/* Opening a question is one motion: the plus makes a half turn and folds into
+   a minus while the answer grows and fades in beneath it. */
+.faq-row[open] .faq-row__symbol {
+  transform: rotate(180deg);
+}
+
+.faq-row__symbol::before,
+.faq-row__symbol::after {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 24px;
+  height: 2px;
+  background: var(--coral-action);
+  content: "";
+}
+
+.faq-row__symbol::after {
+  transform: rotate(90deg);
+  transition: transform 560ms var(--motion-spring);
+}
+
+.faq-row[open] .faq-row__symbol::after {
+  transform: rotate(0);
+}
+
+.faq-row__answer {
+  max-width: 720px;
+  padding: 0 3.5rem 1.5rem 0;
+}
+
+.faq-groups {
+  interpolate-size: allow-keywords;
+}
+
+/* Where the browser can animate to the answer's own height it does; elsewhere
+   the answer simply appears, as before. */
+.faq-row::details-content {
+  overflow-y: clip;
+  block-size: 0;
+  opacity: 0;
+  transition:
+    block-size 380ms var(--motion-ease),
+    opacity 300ms ease,
+    content-visibility 380ms allow-discrete;
+}
+
+.faq-row[open]::details-content {
+  block-size: auto;
+  opacity: 1;
+}
+
+.faq-row[open] .faq-row__answer {
+  animation: faq-answer-in 380ms var(--motion-ease);
+}
+
+@keyframes faq-answer-in {
+  from {
+    transform: translateY(-6px);
+  }
+}
+
+.faq-row summary:hover > span:first-child {
+  color: var(--blue);
+}
+
+.faq-row__answer p {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.faq-row__answer p + p {
+  margin-top: 0.8rem;
+}
+
+.faq-contact {
+  padding: clamp(2.5rem, 4.5vw, 4rem) var(--page-pad);
+  text-align: center;
+}
+
+.faq-contact h2 {
+  margin-bottom: 1.25rem;
+  font-family: var(--display);
+  font-size: clamp(2.2rem, 3.8vw, 3.8rem);
+  font-weight: 400;
+  letter-spacing: -0.04em;
+}
+
+/* WhatsApp and booking sit together on one row, wrapping on a phone. */
+.faq-contact__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+}
+
+/* Missing page */
+
+/* One handwritten line in the middle of the paper, between the site's own
+   header and footer. */
+.not-found-page {
+  display: grid;
+  place-items: center;
+  padding: clamp(4rem, 10vw, 7rem) var(--page-pad);
+  text-align: center;
+}
+
+.not-found-page h1 {
+  max-width: 13em;
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2.3rem, 5vw, 3.8rem);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  /* Wrapped, each line drops the 0.4em Beth Ellen's descenders need, as a
+     two-line display heading's second line does, so none crosses the next. */
+  line-height: 1.55;
+  text-wrap: balance;
+}
+
+/* Booking */
+
+/* The workspace runs down to the footer. With a short first step it used to
+   stop early and leave its bottom border floating across empty paper. */
+.book-page {
+  display: flex;
+  flex-direction: column;
+}
+
+/* One title shows: Book a Lesson, or Your Lessons for a student (BookingFlow). */
+.booking-title {
+  display: contents;
+}
+
+/*
+ * Dan, 22 September 2026: the site behaves like an app, so headings, labels
+ * and buttons never light up under a stray drag or double-tap. Only what
+ * someone is likely to copy stays selectable: anything they type, error
+ * messages they might send to Inês, booking references, the terms with her
+ * contact details, and the student details in the teacher's lesson dialog.
+ */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.policy-information {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Read and focused, but not drawn. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+#booking-lesson-choice,
+#lesson-calendar,
+#booking-next-step,
+#booking-step-heading {
+  scroll-margin-top: 1rem;
+}
+
+/* One scrim behind every dialog, the student's and Inês's alike: the page
+   lightly dimmed and softened, never darker for one task than another. */
+.policy-dialog::backdrop {
+  background: rgba(26, 49, 105, 0.24);
+  backdrop-filter: blur(3px);
+}
+
+/* Every dialog's way out is the same round lilac button in the same top
+   right corner: the lesson dialog, the change overlay, Terms & privacy and a
+   day's lessons. Focus keeps the site's ring. */
+.policy-dialog__heading button {
+  position: absolute;
+  z-index: 3;
+  top: 0.8rem;
+  right: 0.85rem;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--squiggle-pill);
+  padding: 0;
+  background: rgba(170, 164, 230, 0.18);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.policy-dialog__heading button:hover,
+.policy-dialog__heading button:focus-visible {
+  background: rgba(170, 164, 230, 0.34);
+  color: var(--coral-action);
+}
+
+/* The menu shares the header's geometry so its wordmark stays still. Only
+   the links drop down. Its own scroll area also works from a footer opener. */
+.nav-toggle {
+  display: none;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.nav-toggle > span {
+  display: block;
+  width: 26px;
+  margin: 0 auto;
+}
+
+.nav-toggle__line {
+  display: block;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--green-deep);
+  transition: transform 180ms ease, opacity 140ms ease;
+}
+
+.nav-toggle__line + .nav-toggle__line {
+  margin-top: 6px;
+}
+
+.nav-toggle.is-open {
+  visibility: hidden;
+}
+
+.nav-mobile {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  display: none;
+  visibility: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  opacity: 0;
+  background-color: var(--paper);
+  background-image: var(--paper-texture);
+  transition: opacity 180ms ease, visibility 0s linear 220ms;
+}
+
+.nav-mobile.is-open {
+  visibility: visible;
+  opacity: 1;
+  transition: opacity 180ms ease, visibility 0s;
+}
+
+/* Full height, so its corner splat sits at the foot of the screen and is
+   cropped there rather than widening the scroll area. */
+.nav-mobile__inner {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  min-height: 100%;
+  flex-direction: column;
+}
+
+.nav-mobile__heading {
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(26, 49, 105, 0.1);
+}
+
+.nav-mobile__links,
+.nav-mobile__cta {
+  position: relative;
+  z-index: 1;
+  transform: translateY(-6px);
+  transition: transform 220ms var(--motion-ease);
+}
+
+.nav-mobile__links {
+  display: flex;
+  flex-direction: column;
+  padding: 0.35rem var(--page-pad) 0;
+}
+
+.nav-mobile.is-open .nav-mobile__links,
+.nav-mobile.is-open .nav-mobile__cta {
+  transform: none;
+}
+
+/* A short card for the two things most visitors came to do. */
+.nav-mobile__cta {
+  margin: 1.4rem var(--page-pad) 2.2rem;
+  border-radius: var(--squiggle-panel);
+  padding: 1.15rem 1.2rem 1.25rem;
+  background-color: var(--blue);
+  background-image: var(--paper-texture);
+  color: var(--paper);
+}
+
+.nav-mobile__cta p {
+  margin: 0 0 0.85rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.nav-mobile__cta-actions {
+  display: grid;
+  gap: 0.6rem;
+}
+
+/* In the menu, WhatsApp is a lilac fill beside the coral Book, so the pair
+   reads as two filled choices rather than one and an outline (10 October
+   2026, at Dan's request). */
+.nav-mobile__cta .button--outline-light {
+  border-color: var(--lavender);
+  background: var(--lavender);
+  color: var(--ink);
+}
+
+.nav-mobile__cta .button--outline-light:hover,
+.nav-mobile__cta .button--outline-light:focus-visible {
+  border-color: var(--lavender-soft);
+  background: var(--lavender-soft);
+}
+
+.nav-mobile__splat {
+  --land-start: 90ms;
+  --land-scale: 0.8;
+  --land-turn: -12deg;
+  --land-duration: 1200ms;
+  position: absolute;
+  z-index: 0;
+  right: -86px;
+  bottom: -86px;
+  width: 300px;
+  aspect-ratio: 1;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* The menu stays mounted once opened, so its marks land each time it opens,
+   in step with the links dropping into place, rather than only the first. The
+   splat cropped into its foot blooms with them, a little more slowly. */
+.nav-mobile {
+  --land-start: 40ms;
+  --land-step: 60ms;
+}
+
+.nav-mobile__cta {
+  --land-order: 4;
+}
+
+/* Opening, the destinations drop in one after another, then the card. */
+@keyframes menu-item-in {
+  from {
+    opacity: 0;
+    translate: 0 -10px;
+  }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .nav-mobile:not(.is-open) .asset-mark--lands > .asset-mark__picture {
+    animation: none;
+  }
+
+  .nav-mobile.is-open .nav-mobile__link,
+  .nav-mobile.is-open .nav-mobile__cta {
+    animation: menu-item-in 520ms var(--motion-ease-out) calc(30ms + var(--land-order, 0) * 45ms) backwards;
+  }
+}
+
+.nav-mobile__close {
+  display: grid;
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-thumb);
+  background: transparent;
+  color: var(--blue-deep);
+  cursor: pointer;
+  transition: background 200ms var(--motion-ease), border-color 200ms var(--motion-ease);
+}
+
+/* Pointed at, the close fills with lilac and its cross gives a quarter turn
+   on the soft spring (10 October 2026, at Dan's request). Only where there
+   is a pointer: the finger that opened the menu lands where the close
+   appears, and a touch would otherwise leave it turned. */
+.nav-mobile__close:focus-visible {
+  border-color: var(--lavender);
+  background: var(--lavender-soft);
+}
+
+@media (hover: hover) {
+  .nav-mobile__close:hover {
+    border-color: var(--lavender);
+    background: var(--lavender-soft);
+  }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .nav-mobile__close svg {
+    transition: rotate 420ms var(--motion-spring);
+  }
+
+  .nav-mobile__close:hover svg,
+  .nav-mobile__close:focus-visible svg {
+    rotate: 90deg;
+  }
+}
+
+.nav-mobile__link {
+  position: relative;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  min-height: 78px;
+  border-bottom: 1px solid var(--rule-soft);
+  color: var(--green-deep);
+  gap: 1rem;
+  transition: color var(--motion-surface) var(--motion-ease);
+}
+
+.nav-mobile__mark {
+  width: 46px;
+  height: 46px;
+}
+
+.nav-mobile__text {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.nav-mobile__label {
+  font-family: var(--ui);
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.nav-mobile__note {
+  color: var(--lavender-ink);
+  font-family: var(--body);
+  font-size: 0.92rem;
+  line-height: 1.3;
+}
+
+/* A coral line drawn along the row's own divider when the row is pointed at
+   or current. The phone menu's rows keep it; the header's links answer with
+   coral alone beside their Booking button. */
+.nav-mobile__link::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--coral);
+  content: "";
+  opacity: 0;
+  transform: scaleX(0.5);
+  transition: opacity 200ms ease, transform 420ms var(--motion-spring-firm);
+}
+
+.nav-mobile__link:last-child {
+  border-bottom: 0;
+}
+
+.nav-mobile__link:hover,
+.nav-mobile__link:focus-visible,
+.nav-mobile__link[aria-current="page"] {
+  color: var(--coral-action);
+}
+
+.nav-mobile__link:hover::after,
+.nav-mobile__link:focus-visible::after,
+.nav-mobile__link[aria-current="page"]::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+/* On its side a phone shows the places two by two, a little smaller, and
+   the card's two buttons side by side, so Booking and Book a lesson are in
+   view without scrolling the menu. Sign in, when it is there, follows on a
+   row of its own. */
+@media (max-height: 560px) and (orientation: landscape) {
+  .nav-mobile__links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-top: 0.2rem;
+    column-gap: 1.75rem;
+  }
+
+  .nav-mobile__link {
+    grid-template-columns: 40px minmax(0, 1fr);
+    min-height: 62px;
+    gap: 0.75rem;
+  }
+
+  .nav-mobile__mark {
+    width: 40px;
+    height: 40px;
+  }
+
+  .nav-mobile__note {
+    font-size: 0.86rem;
+  }
+
+  /* With four places the second row closes the list, as the last link does
+     stacked. With Sign in after them, that row keeps its rule. */
+  .nav-mobile__link:nth-child(3):nth-last-child(2) {
+    border-bottom: 0;
+  }
+
+  .nav-mobile__cta {
+    margin-top: 0.75rem;
+    margin-bottom: 1rem;
+    padding-top: 0.85rem;
+    padding-bottom: 1rem;
+  }
+
+  .nav-mobile__cta p {
+    margin-bottom: 0.6rem;
+  }
+
+  .nav-mobile__cta-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* With Sign in after the four places, a menu that has the whole of a
+   sideways phone shows them three across, so the list is still two rows and
+   the card's buttons stay in view. (Wider, an account's menu is a narrow
+   sheet and keeps two across.) */
+@media (max-height: 560px) and (orientation: landscape) and (min-width: 600px) and (max-width: 820px) {
+  .nav-mobile__links:has(> .nav-mobile__link:nth-child(5)) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 1.25rem;
+  }
+
+  /* Booking sits beside Sign in on the row that closes the list. */
+  .nav-mobile__links:has(> .nav-mobile__link:nth-child(5)) > .nav-mobile__link:nth-child(4) {
+    border-bottom: 0;
+  }
+}
+
+/* Native pop-ups and their backdrops share the lesson overlays' entrance. */
+dialog[open],
+dialog[open]::backdrop {
+  animation: dialog-fade-in var(--motion-dialog) ease-out both;
+}
+
+@keyframes dialog-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Terms are an overlay so reading them preserves the current booking task. */
+.policy-information-fallback {
+  display: none;
+  width: min(760px, calc(100% - 2 * var(--page-pad)));
+  margin: 2rem auto;
+  padding: 1.5rem;
+  border-radius: var(--squiggle-tile);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* One family with the lesson dialog: the same hand-cut panel on the same
+   card surface, over the same lightly dimmed page. */
+.policy-dialog {
+  width: min(760px, calc(100% - 2rem));
+  max-width: none;
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-panel);
+  padding: 0;
+  background: var(--dialog-surface);
+  box-shadow: var(--shadow-dialog);
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.policy-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The title starts where the dialog's content does, and keeps clear of the
+   close button over the heading's right end, which it is tall enough for. */
+.policy-dialog__heading {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-height: calc(1.6rem + 44px);
+  border-bottom: 1px solid var(--rule-soft);
+  padding: 0.8rem var(--pad-dialog);
+  padding-right: calc(0.85rem + 44px + 0.6rem);
+}
+
+.policy-dialog__heading h2 {
+  margin: 0;
+  font-family: var(--ui);
+  font-size: clamp(1.2rem, 3.4vw, 1.45rem);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.policy-dialog__content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.7rem var(--pad-dialog) 1rem;
+}
+
+.policy-information {
+  max-width: 68ch;
+  padding: 0.5rem 0 1.25rem;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.policy-information p {
+  margin: 0;
+}
+
+/* Three levels, each in its own voice: the dialog's title, the five sections
+   as the site's lilac eyebrows with room above them, and the bold lead-ins
+   inside the points. Set alike, they had read as one flat run of bold. */
+.policy-information h2 {
+  margin: 2.2rem 0 0.6rem;
+  color: var(--lavender-ink);
+  font-family: var(--ui);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.policy-information h2:first-child {
+  margin-top: 0.5rem;
+}
+
+/* A list never sits tight against the sentence that introduces it. */
+.policy-information ul {
+  margin: 0.6rem 0 0.9rem;
+  padding-left: 1.2rem;
+}
+
+.policy-information li + li {
+  margin-top: 0.55rem;
+}
+
+.policy-information p + p {
+  margin-top: 0.9rem;
+}
+
+.policy-information a,
+.policy-redirect a {
+  color: var(--coral-action);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.policy-redirect {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 3rem var(--page-pad);
+}
+
+.policy-redirect h1 {
+  font-family: var(--display);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 400;
+}
+
+/*
+ * The footer is a sign-off, so it hugs its contents: the wordmark on the left,
+ * then the four destinations and Terms & privacy on one row on the right. On a
+ * phone the destinations are behind Menu, with Terms & privacy beside it
+ * wherever the two fit and beneath it only on the narrowest screens; both
+ * keep a 44px touch target.
+ */
+.site-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 2px solid var(--lavender);
+  padding: 0.85rem var(--page-pad);
+  background-color: var(--blue-deep);
+  background-image: var(--paper-texture);
+  color: var(--paper);
+  gap: 1rem clamp(2rem, 4vw, 4rem);
+}
+
+.site-footer__brand {
+  flex: 0 0 auto;
+  width: clamp(150px, 12.5vw, 188px);
+}
+
+.footer-wordmark {
+  width: 100%;
+}
+
+.site-footer__actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0 clamp(1.1rem, 2.2vw, 2.4rem);
+}
+
+.site-footer__nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0 clamp(1rem, 2.2vw, 2.4rem);
+  font-family: var(--ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.site-footer__nav a,
+.site-footer__legal a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
+
+.site-footer__nav a:hover,
+.site-footer__nav a:focus-visible {
+  color: var(--lavender-soft);
+}
+
+/* Quieter than the destinations, set apart by one short lilac stroke. */
+.site-footer__legal {
+  display: flex;
+  align-items: center;
+  color: var(--lavender-soft);
+  font-family: var(--ui);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  gap: clamp(1.1rem, 2.2vw, 2.4rem);
+}
+
+.site-footer__legal::before {
+  width: 1px;
+  height: 16px;
+  background: rgba(220, 216, 245, 0.4);
+  content: "";
+}
+
+.site-footer__legal a:hover,
+.site-footer__legal a:focus-visible {
+  color: var(--paper);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Menu repeats the destinations, so it exists only where they are hidden. */
+.site-footer__contact {
+  display: none;
+}
+
+.site-footer__menu {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  border: 1px solid rgba(245, 236, 217, 0.45);
+  border-radius: var(--squiggle-thumb);
+  padding: 0 1rem;
+  background: rgba(245, 236, 217, 0.06);
+  color: inherit;
+  cursor: pointer;
+  gap: 0.4rem;
+  font-family: var(--ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: background var(--motion-surface) var(--motion-ease), border-color var(--motion-surface) var(--motion-ease);
+}
+
+.site-footer__menu:hover,
+.site-footer__menu:focus-visible {
+  border-color: var(--paper);
+  background: rgba(245, 236, 217, 0.16);
+}
+
+@media (max-width: 820px) {
+  .site-footer {
+    padding-top: 0.9rem;
+    padding-bottom: 0.9rem;
+  }
+
+  .site-footer__brand {
+    width: 150px;
+  }
+
+  .site-footer__nav {
+    display: none;
+  }
+
+  /* Terms & privacy and Menu share a row wherever they fit, Menu at the
+     right edge like the header's own, reading in their tab order. On the
+     narrowest phones the row wraps upwards, so Menu sits above. */
+  .site-footer__actions {
+    flex-wrap: wrap-reverse;
+  }
+
+  .site-footer__contact {
+    display: flex;
+  }
+
+  .site-footer__legal::before {
+    display: none;
+  }
+}
+
+@media (max-width: 1100px) {
+  :root {
+    --header-height: 96px;
+  }
+
+  .site-header__inner {
+    gap: 2rem;
+  }
+
+  .site-header__brand {
+    flex-basis: 300px;
+  }
+
+  .site-nav {
+    gap: 1.8rem;
+  }
+
+  .home-hero__copy h1 {
+    font-size: clamp(2.6rem, 5vw, 4.8rem);
+  }
+
+  .principle {
+    grid-template-columns: 68px 1fr;
+  }
+
+  .approach-composition {
+    grid-template-columns: 44% 56%;
+  }
+
+  .approach-item {
+    grid-template-columns: 105px 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .home-hero {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .home-hero__copy {
+    min-height: 500px;
+  }
+
+  .principles-strip {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    border-left: 0;
+  }
+
+  .principle {
+    min-height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+}
+
+@media (max-width: 820px) {
+  /* Shorter than the 132px the wrapped two-row nav needed. */
+  :root {
+    --header-height: 88px;
+  }
+
+  .site-header__inner {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    gap: 1rem;
+  }
+
+  .site-header__brand {
+    flex-basis: 232px;
+    width: 232px;
+  }
+
+  .site-nav {
+    display: none;
+  }
+
+  .nav-toggle {
+    display: block;
+  }
+
+  .nav-mobile {
+    display: block;
+  }
+
+  .home-hero__copy {
+    min-height: 470px;
+  }
+
+  .principle {
+    min-height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--rule-soft);
+    padding: 1.65rem var(--page-pad);
+  }
+
+  .principle {
+    grid-template-columns: 76px 1fr;
+  }
+
+  .approach-composition {
+    grid-template-columns: 1fr;
+  }
+
+  /* Stacked, the fan comes in from the right edge halfway down the heading,
+     rather than sitting alone beneath the text or up in the corner. It keeps
+     its own orientation: mirrored, it reads as upside down. */
+  .approach-intro {
+    min-height: 0;
+    padding-top: 2.4rem;
+    padding-bottom: 2.6rem;
+  }
+
+  .approach-intro__head {
+    position: relative;
+  }
+
+  .approach-intro__splat {
+    top: 50%;
+    right: calc(-1 * var(--page-pad) - 22%);
+    bottom: auto;
+    width: min(64%, 300px);
+    transform: translateY(-50%);
+  }
+
+  .teacher-band {
+    grid-template-columns: 1fr;
+    gap: 1.2rem;
+  }
+
+  .teacher-band h2 {
+    border-right: 0;
+    border-bottom: 2px solid var(--lavender);
+    padding-bottom: 1rem;
+  }
+
+  .teacher-band__credentials {
+    padding-left: 0;
+  }
+
+  /* Stacked, the last answer's rule closes the list; a full-width rule
+     beneath it only repeated it. The same goes for the index: its own last
+     rule separates it from the section, so the section's drawn rule is the
+     only other line before the questions. */
+  .faq-reference {
+    grid-template-columns: 1fr;
+    border-bottom: 0;
+  }
+
+  .faq-groups {
+    padding-bottom: 1rem;
+  }
+
+  .faq-index {
+    min-height: auto;
+    border-right: 0;
+    padding-bottom: 1.5rem;
+  }
+
+  .faq-index ol {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .faq-index li:nth-child(2n) {
+    border-left: 1px solid var(--rule-soft);
+    padding-left: 1rem;
+  }
+
+  /* The last row closes on one rule. An odd last entry takes the whole row
+     rather than leaving an empty cell beside it. */
+  .faq-index li:nth-last-child(2):nth-child(odd) {
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  .faq-index li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .faq-index__answer-index {
+    display: none;
+  }
+
+}
+
+@media (max-width: 560px) {
+  :root {
+    --page-pad: 1.25rem;
+    /* The nav is behind the toggle from 820px down, so the header no longer
+       needs a second row here. These rules used to lay the four links out as a
+       grid; they would have overridden the menu. */
+    --header-height: 84px;
+  }
+
+  body {
+    font-size: 17px;
+  }
+
+  .site-header__brand {
+    width: 218px;
+    flex-basis: 218px;
+  }
+
+  /* A small button stays the size of its words beside them. */
+  .button:where(:not(.button--small)) {
+    width: 100%;
+    min-height: 56px;
+    padding-right: 1.4rem;
+    padding-left: 1.4rem;
+  }
+
+  .home-hero__copy {
+    min-height: 420px;
+    padding-top: 3rem;
+    padding-bottom: 3rem;
+  }
+
+  .home-hero__copy h1 {
+    font-size: clamp(2.1rem, 11vw, 4.2rem);
+  }
+
+  .home-hero__copy > p {
+    font-size: 1.2rem;
+  }
+
+  .principle {
+    grid-template-columns: 62px 1fr;
+    gap: 1.2rem;
+  }
+
+  .approach-intro h1 {
+    font-size: clamp(2.6rem, 12vw, 4.4rem);
+  }
+
+  .approach-list {
+    padding: 0 var(--page-pad);
+  }
+
+  .approach-item {
+    grid-template-columns: 70px 1fr;
+    min-height: 190px;
+    gap: 1rem;
+  }
+
+  .approach-item .asset-mark {
+    width: 72px;
+    height: 76px;
+  }
+
+  .approach-item p {
+    font-size: 1rem;
+  }
+
+  .teacher-band {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
+
+  /* The index keeps its two columns on a phone, so it is a short block
+     rather than the whole first screen. The sections name themselves, so the
+     Index label goes; the list keeps its name for assistive technology. */
+  .faq-index {
+    padding-top: 1.6rem;
+    padding-bottom: 0.4rem;
+  }
+
+  .faq-index > .eyebrow {
+    display: none;
+  }
+
+  .faq-index ol {
+    margin-top: 0;
+  }
+
+  .faq-index li:nth-child(2n) {
+    padding-left: 0.8rem;
+  }
+
+  .faq-index a {
+    min-height: 54px;
+    padding: 0.45rem 0;
+    letter-spacing: 0.06em;
+    line-height: 1.3;
+    text-wrap: balance;
+  }
+
+  .faq-index a span {
+    width: 30px;
+    flex: none;
+  }
+
+  .faq-groups {
+    padding-right: var(--page-pad);
+    padding-left: var(--page-pad);
+  }
+
+  .faq-row summary {
+    min-height: 70px;
+    font-size: 1.05rem;
+  }
+}
+
+/*
+ * A phone on its side is about 320-430px tall, and the header, the hero's
+ * phone height and its padding put Book a lesson below the fold. The header
+ * slims (the menu shares its row, so it slims with it) and the hero starts
+ * at the top and fits the screen, so Book a lesson is in view. A short laptop
+ * window already shows it, so it keeps its own header and hero.
+ */
+@media (max-width: 1023px) and (max-height: 560px) and (orientation: landscape) {
+  :root {
+    --header-height: 68px;
+  }
+
+  .site-header__inner {
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
+  }
+
+  .site-header__brand {
+    flex-basis: 180px;
+    width: 180px;
+  }
+
+  .home-hero__copy {
+    min-height: calc(100vh - var(--header-height));
+    min-height: calc(100svh - var(--header-height));
+    justify-content: flex-start;
+    /* Clear air under the header for the heading's tall loops (14 October
+       2026, Dan: too little space between the banner and the heading). */
+    padding-top: clamp(1.75rem, 9vh, 3rem);
+    padding-bottom: 1.25rem;
+  }
+
+  .home-hero__copy h1 {
+    font-size: clamp(2rem, 9.5vh, 2.9rem);
+  }
+
+  .home-hero__copy .editorial-rule {
+    margin: 0.8rem 0 0.7rem;
+  }
+
+  .home-hero__copy > p {
+    margin-bottom: 1rem;
+    font-size: 1.15rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-mobile,
+  .nav-mobile.is-open,
+  .nav-mobile__links,
+  .nav-mobile.is-open .nav-mobile__links {
+    transform: none;
+    transition: none;
+  }
+
+  dialog[open],
+  dialog[open]::backdrop {
+    animation: none;
+  }
+
+  /*
+   * The lift and slide affordances were still animating under reduced motion.
+   * Colour changes are kept so the states remain distinguishable.
+   */
+  .button,
+  .button:hover,
+  .button:active:not(:disabled) {
+    transform: none;
+    transition: background var(--motion-surface) var(--motion-ease), color var(--motion-surface) var(--motion-ease);
+  }
+
+  .nav-mobile__link::after,
+  .nav-mobile__link:hover::after,
+  .nav-mobile__link[aria-current="page"]::after {
+    transform: none;
+    transition: none;
+  }
+
+  .faq-row__symbol,
+  .faq-row__symbol::after,
+  .faq-row::details-content {
+    transition: none;
+  }
+
+  .faq-row[open] .faq-row__answer {
+    animation: none;
+  }
+}
+
+/* Moving between Your lessons, Past lessons and Your details, the card's
+   contents slide in from the side they were reached from while the places'
+   thumb glides above them (AccountMenu). */
+@media (prefers-reduced-motion: no-preference) {
+  [data-account-slide="forward"] > :not(:has(.account-menu)):not(.account-signature) {
+    animation: account-slide-forward 360ms var(--motion-ease) both;
+  }
+
+  [data-account-slide="back"] > :not(:has(.account-menu)):not(.account-signature) {
+    animation: account-slide-back 360ms var(--motion-ease) both;
+  }
+}
+
+@keyframes account-slide-forward {
+  from {
+    opacity: 0;
+    transform: translateX(42px);
+  }
+}
+
+@keyframes account-slide-back {
+  from {
+    opacity: 0;
+    transform: translateX(-42px);
+  }
+}
+
+/* The painting, with its examples and other languages beneath it, sits
+   beside the facts; the button ends the facts' column at the
+   card's foot, with no rule or footer band (7 November 2026, Dan). */
+@property --paint-sheet-h {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+

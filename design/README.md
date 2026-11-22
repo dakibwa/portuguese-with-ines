@@ -1,20 +1,15 @@
 # Current visual direction
 
-This file is the canonical human-readable contract for the website's visual
-direction, responsive composition, motion, and important interaction states.
-Git owns the production implementation and browser-ready assets, and the
-published site is the acceptance surface. When this contract and the site
-diverge, reconcile them in the repository rather than maintaining a second
-design system elsewhere.
-
-The site's one design system is the folder [`system/project/`](./system/project/)
-beside this file: the brand book, the pages, tokens named as the CSS variables,
-the site's own stylesheets, cards cut from the live pages, and the pictures. It
-is plain files that any person or assistant can read, held on no account and in
-no design tool; [`system/README.md`](./system/README.md) says how to draw it as
-a page that opens in any browser. It is updated in the same change as the look
-and is never edited into a competing specification; where it and this file
-differ, this file wins.
+Background for the site's design system. The system is the folder
+[`system/project/`](./system/project/) beside this file, plain files written for
+agents: the first screen of its README has the rules, which file wins and how to
+check a change, and [`system/README.md`](./system/README.md) says how to draw it
+as a page. Where this file and the system differ, the system wins (Who wins, in
+its README; Dan, 22 Nov 2026: "yes fix everything please so it's unified"). This
+file keeps the longer record, with its history: read the part about the piece you
+are changing. Git owns the production implementation and browser-ready assets,
+and the published site is the acceptance surface. Until 22 Nov 2026 this file was
+the canonical contract and outranked the system.
 
 The current direction is:
 
@@ -30,15 +25,17 @@ The current direction is:
 
 Keep each accepted correction in the narrowest place that can enforce it:
 
-- this file owns the reader's job, information hierarchy, composition, copy
-  tone, responsive behaviour, reachable states, and named failure patterns;
+- the design system's rules (`system/project/README.md`, each with an id) own
+  the reader's job, information hierarchy, composition, copy tone, responsive
+  behaviour, reachable states and the named failure patterns; this file keeps
+  their longer history;
 - `src/app/globals.css` (and `src/app/workspace.css` for what only the booking
   page, accounts and her schedule show), components, and `public/visuals/` own exact reusable
   colours, type, spacing, controls, layouts, and production assets;
 - focused scripts and tests own failures that can be detected mechanically.
 
-Add or change a rule here only after a deliberate product decision or when the
-same accepted correction recurs. For agent-generated visual work, keep the
+Add or change a rule in the design system only after a deliberate product
+decision or when the same accepted correction recurs. For agent-generated visual work, keep the
 brief, inputs, model, and viewport stable for a matched before/after comparison,
 retain the first result, and check that the correction helps both desktop and
 mobile without weakening another important state. A one-off preference stays

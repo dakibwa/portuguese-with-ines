@@ -7,3 +7,11 @@ What a sign-in link opens: the splat, a handwritten Welcome, one line and one co
 - Keep the splat and the Beth Ellen `Welcome`: a plain card heading here read as a regression (Dan, 2 Nov 2026).
 - For a student with no email the card adds `Your email` and `So you can sign in on any phone or computer.`, and `See my lessons` stays greyed until an address is typed.
 - One step to a screen, nothing said twice: the rules and what they pay for come on the card page that follows.
+
+## Write
+
+Drawn once, by `BookingCalendar` in `src/components/BookingCalendar.tsx`: change it there, and never write a second copy. It is what a sign-in link opens.
+
+## Source
+
+- `src/components/BookingCalendar.tsx`, find `<h2>Welcome</h2>`

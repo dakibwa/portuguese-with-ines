@@ -7,3 +7,15 @@ The blue band that closes every page: the cream wordmark, the four links, Terms 
 - `blue-deep` with the grain and a 2px `lavender` top edge; 0.85rem × `page-pad`.
 - Links in `footer-label` (0.72rem, 700, uppercase) in `paper`; Terms & privacy is the footer's one underlined link and opens the Terms dialog.
 - On Inês's schedule the footer meets the bottom of the window.
+
+## Write
+
+```tsx
+<SiteFooter />
+```
+
+The last thing on every public page, after `</main>`.
+
+## Source
+
+- `src/components/SiteFooter.tsx#SiteFooter`

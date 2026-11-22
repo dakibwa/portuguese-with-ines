@@ -9,3 +9,12 @@ Inês's week in hours: a column per day with its date and Day off switch, lesson
 - Lunch and breaks are hatched in `lavender` with their name; hours outside her weekly hours are shaded.
 - The week title is `week-title` (`7 – 13 September`; a date range keeps its spaces, a time range closes up). Edit weekly hours is a lilac button.
 - On a phone the days run as a row of tabs over one day's column.
+
+## Write
+
+Drawn by `WeeklyTimetable` (`src/components/teacher/WeeklyTimetable.tsx`) in `TeacherSchedule`: change it there.
+
+## Source
+
+- `src/components/teacher/WeeklyTimetable.tsx#WeeklyTimetable`
+- `src/components/TeacherSchedule.tsx`, find `<WeeklyTimetable`

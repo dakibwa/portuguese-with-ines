@@ -93,4 +93,4 @@ Name the failure **stacked card**: one fact per line, with a lone button underne
 - Is the card taller than its content, or is there empty paper inside it or under it?
 - At 390px, does the state wrap as a whole?
 
-Keep this in step with the "Stranded action" entry in `design/README.md`, which stays canonical.
+The "Stranded action" entry in `design/README.md` keeps its history; where the two differ, this page and the rule `use-the-space` win.

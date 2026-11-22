@@ -8,3 +8,15 @@ Inês's hand-lettered name, the site's only logo: blue on cream in the header, c
 - The two circumflexes are their own layers so they can dance: every four seconds they hop in turn, Português, Inês, on the soft spring, to the wall clock's beat so the dance carries across pages. It is the one ambient motion on the site; reduced motion keeps them still.
 - The header's wordmark is the way home. Pointing at it changes nothing (a coral hover was removed, Dan, 9 Oct 2026).
 - Never put a second wordmark or the name in Beth Ellen type on the same screen: page headings name the page, not the brand.
+
+## Write
+
+```tsx
+<BrandWordmark tone="cream" className="footer-wordmark" />
+```
+
+`tone` is the ground it sits on; it is always this component, never the name typed in Beth Ellen (Rules: the-wordmark).
+
+## Source
+
+- `src/components/BrandWordmark.tsx#BrandWordmark`

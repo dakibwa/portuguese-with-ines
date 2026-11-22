@@ -7,3 +7,16 @@ The blue band over Inês's tabs: the lesson happening now or next, and Join Meet
 - `blue-deep`, `squiggle-panel`, `paper-light` text; the eyebrow in small capitals, the name at 1.1rem 700, the rest `next-lesson`.
 - `Join Meet` is a cream pill with Google Meet's own mark, the only place the Meet colours appear.
 - The eyebrow reads `Happening now` while a lesson runs and `Next lesson` before it. Pressing the lesson opens its dialog.
+
+## Write
+
+```tsx
+<NextLesson bookings={bookings} now={now} onOpen={setSelectedBooking} />
+```
+
+At the top of Inês’s schedule, in `TeacherSchedule`.
+
+## Source
+
+- `src/components/teacher/NextLesson.tsx#NextLesson`
+- `src/components/TeacherSchedule.tsx`, find `<NextLesson`

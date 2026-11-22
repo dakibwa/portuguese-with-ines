@@ -8,3 +8,11 @@ The lesson's three choices in one bar: Lesson (Trial, Single, Weekly), Where (On
 - Each length carries its price on its own label (`60 mins · €20`); a price Inês set to €0 reads `Free`, never €0.
 - Choosing Weekly opens Repeat among the choices as they ease narrower; choosing Single eases them back.
 - On a phone each choice takes its own row; at the confirm step the bar stays above the chosen lessons so the choice can still change.
+
+## Write
+
+Drawn once, by `BookingCalendar` in `src/components/BookingCalendar.tsx`: change it there, and never write a second copy.
+
+## Source
+
+- `src/components/BookingCalendar.tsx`, find `booking-bar`

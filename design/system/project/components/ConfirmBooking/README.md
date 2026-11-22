@@ -9,3 +9,11 @@ The last step: the choices and chosen lessons on the left, and one card on the r
 - Payment facts sit under the note, then the agreement, then the final action, all one width. The agreement chosen turns blue beside the coral action, so two coral fills never meet.
 - The final action names what it does: `Book 2 lessons & agree to pay`. Until it can act it is the quiet outline.
 - On a phone everything stacks in one column in the same order.
+
+## Write
+
+Drawn once, by `BookingCalendar` in `src/components/BookingCalendar.tsx`: change it there, and never write a second copy.
+
+## Source
+
+- `src/components/BookingCalendar.tsx`, find `booking-confirmation-columns`

@@ -8,3 +8,16 @@ Terms & privacy: the one policy, in a dialog lifted off the page, its sections i
 - Every pop-up's title is set alike and its way out is the same 44px hand-cut close button.
 - Section names (Booking, Payments, Changes, Your rights, Privacy) in `eyebrow-label`; bullets lead with a bold phrase. Links inside sentences are underlined in `coral-action`.
 - One name for the policy everywhere: `Terms & privacy`. Without JavaScript it is readable in the booking page itself.
+
+## Write
+
+```tsx
+<BookingInformation />
+```
+
+Placed once, in `src/app/layout.tsx`; the policy opens as its `policy-dialog`. Never write the rules anywhere else (Rules: said-once).
+
+## Source
+
+- `src/components/BookingInformation.tsx#BookingInformation`
+- `src/components/BookingInformation.tsx`, find `policy-dialog`

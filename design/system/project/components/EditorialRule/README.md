@@ -8,3 +8,16 @@ The drawn rule under a display heading, and the short rule under a principle's h
 - `short-rule`: 30 × 1px, under each Home principle's heading.
 - They are drawn in once, from the left end at a pen's pace (`motion-pen`): the hero's a moment after its heading shows, a principle's as its splat settles, an FAQ section's each time it is chosen. Nothing else on a page makes an entrance.
 - Rules are the only lines under headings; never underline a heading or bake a line into artwork.
+
+## Write
+
+```tsx
+<div className="editorial-rule editorial-rule--green" aria-hidden="true" />
+```
+
+Under a heading, as Approach writes it; `editorial-rule--green` is the blue (an old name).
+
+## Source
+
+- `src/app/approach/page.tsx`, find `className="editorial-rule editorial-rule--green"`
+- `src/app/globals.css`, find `.editorial-rule`

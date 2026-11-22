@@ -8,3 +8,11 @@ Edit details: the student's splat, name, email, card and NIF, each with a Change
 - Every `Change`, `Add NIF` and `Sign out` is the same 14px small outline button, so the card speaks at one size. A long email breaks after its `@`.
 - `Have a code from Inês?` is the small button that folds the code field away; it looks pressed while open. Only some students have a code, so nothing suggests most should.
 - A row eases open and shut to its new height; a splat chosen lands in its row and in the card's corner.
+
+## Write
+
+Drawn once, by `MyLessons` in `src/components/MyLessons.tsx`: change it there, and never write a second copy.
+
+## Source
+
+- `src/components/MyLessons.tsx`, find `my-lessons__fact`

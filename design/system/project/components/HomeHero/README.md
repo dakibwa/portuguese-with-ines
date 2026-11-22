@@ -8,3 +8,11 @@ The home page's first screen: a blue panel with the title, one line, Book a less
 - The principles take the right of the hero above 900px, stacked on a soft-lavender rail (`lavender-soft`), each a splat (76px), a `display-principle` heading in `lavender-ink`, a `short-rule` and one `copy-small` line. At 900px and below they follow the blue panel in the same order.
 - The three actions share one row where they fit; where they don't (under 38.25rem of the panel), Book a lesson spans the pair beneath it. On a phone the pair sits side by side, a size smaller, rather than adding a row above the fold.
 - Never the business-card artwork here (the "business-card transplant").
+
+## Write
+
+Drawn once, by `the home page` in `src/app/page.tsx`: change it there, and never write a second copy.
+
+## Source
+
+- `src/app/page.tsx`, find `home-hero`

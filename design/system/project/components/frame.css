@@ -1,0 +1,72 @@
+/* ── Design system frame ─────────────────────────────────────────────────────
+   Not in the site. Lets the cards render outside a page: the paper's grain (the site
+   sets --paper-texture on body inline), no entrance animations, and wrappers that
+   keep fixed or full-height parts of a page in the flow. Every token comes from the
+   site's own stylesheets; apart from the grain, only .ds-* classes. */
+body {
+  --paper-texture: url("../assets/Fields/paper-grain.svg");
+}
+html:has(> body > .ds-preview),
+html:has(> body > .ds-preview) > body {
+  height: auto;
+  min-height: 0;
+}
+.ds-preview *,
+.ds-preview *::before,
+.ds-preview *::after {
+  animation: none !important;
+  transition: none !important;
+}
+.ds-pad {
+  padding: 28px;
+}
+.ds-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+.ds-stack {
+  display: grid;
+  gap: 22px;
+}
+.ds-band {
+  padding: 28px;
+  background-color: var(--blue-deep);
+  background-image: var(--paper-texture);
+}
+.ds-note {
+  margin: 0 0 8px;
+  color: var(--lavender-ink);
+  font: 700 0.64rem/1.3 var(--ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.ds-band .ds-note {
+  color: var(--lavender-soft);
+}
+.ds-static {
+  position: relative !important;
+  inset: auto !important;
+  transform: none !important;
+  margin: 0 !important;
+}
+.ds-dialog-host :is(.lesson-manage-overlay, .lesson-manage-dialog, .policy-dialog, .teacher-lesson-dialog) {
+  position: relative !important;
+  inset: auto !important;
+  transform: none !important;
+  max-height: none !important;
+  margin-inline: auto !important;
+}
+.ds-dialog-host .policy-dialog {
+  max-height: 720px !important;
+}
+.ds-preview .nav-mobile {
+  min-height: 844px;
+}
+.ds-preview .route-fade,
+.ds-preview .teacher-page,
+.ds-preview .book-page,
+.ds-preview .idioms-page {
+  min-height: 0 !important;
+}

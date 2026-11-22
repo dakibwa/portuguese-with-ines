@@ -9,3 +9,11 @@ How I teach (`/approach/`): the biggest heading on the site over a painted fan, 
 - Above 820px the teaching list sits on a soft-lavender rail beside the cream column; at 820px and below it stacks on cream. From 1000px up each item's heading stays on one line.
 - The one statement of European Portuguese on the site lives here: Inês teaches it, and any variety already known is welcome.
 - The callout reads "Beginners welcome." (not "Nervous beginners welcome.") with one coral `Book a trial lesson`.
+
+## Write
+
+Drawn once, by `the Approach page` in `src/app/approach/page.tsx`: change it there, and never write a second copy.
+
+## Source
+
+- `src/app/approach/page.tsx`, find `approach-intro`

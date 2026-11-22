@@ -8,3 +8,16 @@ What payment means, as four short facts, each led by a dab of paint.
 - The words are the same wherever a student meets them: the free part first, its first four words bold in `ink` (coral is for a charge), then the €5 in `coral-action`.
 - When lessons are charged follows the charge window: `after each lesson` while the charge runs an hour after the end, `at the end of each lesson` once that window is nothing. With no fee: `No fee to change or cancel, or for a missed lesson`.
 - The full rules stay behind the Terms & privacy link; never a paragraph here.
+
+## Write
+
+```tsx
+<FeeFacts feeCents={lateFeeCents} noticeHours={noticeHours} noShow={postpay || !lateFeeCents} />
+```
+
+The fee facts, as `BookingCalendar` and `CardOnFile` write them; the list is `<ul className="booking-payment-facts">`.
+
+## Source
+
+- `src/components/FeeFacts.tsx#FeeFacts`
+- `src/components/BookingCalendar.tsx`, find `booking-payment-facts`

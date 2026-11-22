@@ -19,6 +19,13 @@
    dakibwa/design-system-page: change it there first, then copy it into each
    repository again, unchanged. It has no dependencies.
 
+   WHERE IT LIVES, the same in every repository:
+     AGENTS.md                 names design/system/project/README.md, the first read
+     design/system/project/    the design system
+     design/system/make/       this file and site.mjs, and the repository's own tools
+     design/system/README.md   what the folder is and how to run them
+     design/README.md          other design notes, if any: background
+
    THE FORMAT, IN SHORT (full text: dakibwa/design-system-page, design/README.md)
      tokens.json   "format": 2 once the system follows this.
                    "source": {"styles": [...]}  the product's own stylesheets:
@@ -35,6 +42,7 @@
      components/<Name>/README.md   Write, Parts, States, Tokens, Rules, Source.
      components/<Name>/preview.html   the product's markup lies between
                    <!-- product --> and <!-- /product -->; ds- classes are the frame.
+                   a preview made only of pictures of the product needs no marks.
      a rule        "- **id** sentence."  then, optionally,
                    "  - check: forbid|require `pattern` in `glob`"
      who wins      Dan's latest word; then the code on what exists; then this
@@ -166,6 +174,21 @@ else {
   if (who != null && squash(who) !== squash(WHO_WINS)) error('first-screen', 'README.md', '"Who wins" is not the fixed text, word for word');
 }
 
+/* ---- where it lives: the same folders in every repository ---- */
+const PLACE = 'design/system/project', TOOLS = 'design/system/make';
+const fromRoot = p => relative(ROOT, real(p)).split(sep).join('/');
+if (fromRoot(SYSTEM) !== PLACE) error('structure', fromRoot(SYSTEM) || '.', `the design system belongs in ${PLACE}, where every repository keeps it`);
+{ // a copy kept in the repository (the home copy, run from outside it, can be anywhere)
+  const here = fromRoot(HERE);
+  if (here !== '..' && !here.startsWith('../') && !isAbsolute(here)) {
+    if (here !== TOOLS) error('structure', here || '.', `the copies of check.mjs and site.mjs belong in ${TOOLS}`);
+    else if (!existsSync(join(HERE, 'site.mjs'))) error('structure', TOOLS, 'site.mjs is not beside check.mjs');
+  }
+}
+const agents = readIf(root('AGENTS.md'));
+if (agents == null) error('structure', 'AGENTS.md', `there is none, so nothing sends an agent to ${PLACE}/README.md`);
+else if (!agents.includes(PLACE)) error('structure', 'AGENTS.md', `names no ${PLACE}, so an agent arriving cold does not find the system`);
+
 /* ---- each piece's card ---- */
 const CARD = ['Write', 'Parts', 'States', 'Tokens', 'Rules', 'Source'];
 const leadOf = text => { const after = text.replace(/^[\s\S]*?^# .*$/m, '').replace(/^\s+/, ''); const m = /^(?!#)([\s\S]*?)(?:\n\s*\n|\n#|$)/.exec(after); return m ? squash(m[1]) : ''; };
@@ -201,8 +224,11 @@ for (const name of components) {
   if (text == null) continue;
   const opens = (text.match(/<!--\s*product\s*-->/g) || []).length, closes = (text.match(/<!--\s*\/product\s*-->/g) || []).length;
   const frames = /<iframe\b[^>]*\bsrc=["'][^"']*preview\.html/i.test(text);
+  // a preview made only of pictures of the product (its screens) has no markup to copy, so no marks
+  const body = (/<body[^>]*>([\s\S]*)<\/body>/i.exec(text)?.[1] ?? '').replace(/<!--[\s\S]*?-->|<(script|style)\b[\s\S]*?<\/\1>/gi, '');
+  const pictures = [...body.matchAll(/<([a-z][\w-]*)\b([^>]*)>/gi)].every(([, tag, attrs]) => /^(img|picture|source|video|br)$/i.test(tag) || /\bclass=["'](?:[^"']*\s)?ds-/.test(attrs));
   if (opens !== closes) error('preview-marks', file, `${opens} <!-- product --> and ${closes} <!-- /product -->`);
-  else if (!opens && !frames) error('preview-marks', file, 'no <!-- product --> marks, so nothing says which markup is the product\'s');
+  else if (!opens && !frames && !pictures) error('preview-marks', file, 'no <!-- product --> marks, so nothing says which markup is the product\'s');
   const inside = [...text.matchAll(/<!--\s*product\s*-->([\s\S]*?)<!--\s*\/product\s*-->/g)].map(m => m[1]).join('\n');
   const classes = [...new Set([...inside.matchAll(/\bclass=["']([^"']*)["']/g)].flatMap(m => m[1].split(/\s+/)).filter(Boolean))];
   const frame = classes.filter(c => c.startsWith('ds-'));

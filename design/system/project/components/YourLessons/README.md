@@ -9,3 +9,12 @@ A student's home on the site: their name and Book a lesson on one row, the next 
 - The month title is `month-title` with a `?` beside it; the arrows are solid `blue-deep` with a white arrow, and a coral count shows lessons further on.
 - Days are `raised` tiles cut `squiggle-tile`. A one-off booked day is `coral-action` filled (the next lesson) or `booked`; a weekly one `weekly`; each shows its time and a globe (online) or a little person (in Porto). Past days fade.
 - Hovering a day shows its lessons in full; pressing one opens the LessonDialog. The key sits under the weeks: One-off lesson, Weekly lesson, Online, In Porto.
+
+## Write
+
+Drawn once, by `BookingCalendar` in `src/components/BookingCalendar.tsx`: change it there, and never write a second copy. The page is `/my-lessons/` (`src/app/my-lessons/page.tsx`), which opens `BookingFlow` on the lessons view.
+
+## Source
+
+- `src/components/BookingCalendar.tsx`, find `unified-calendar--overview`
+- `src/app/my-lessons/page.tsx`, find `<BookingFlow initialView="lessons" />`

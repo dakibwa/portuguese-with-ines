@@ -8,3 +8,12 @@ Confirm your card payments: the lessons Inês added with their prices, the two f
 - The fee is stated once, the free part first, then the €5, as two dabs (Dan, 2 Nov 2026).
 - `I authorise card payments for my future lessons` is the Agreement's control with its Terms & privacy link; the final action stays the quiet outline until it is ticked.
 - The card page shows on its own, with the student's lessons held back until it is agreed.
+
+## Write
+
+Drawn by `MyLessons` (`src/components/MyLessons.tsx`) through `CardPrompt` in `src/components/CardOnFile.tsx`: change it there.
+
+## Source
+
+- `src/components/CardOnFile.tsx#CardPrompt`
+- `src/components/MyLessons.tsx`, find `<CardPrompt`

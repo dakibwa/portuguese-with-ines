@@ -12,3 +12,18 @@ Every call to action: coral to book or commit, blue for Inês's main action, sof
 - Under the pointer a button lifts 2px, a filled one casts a soft shadow in its own colour (`shadow-lift-coral`, `-blue`, `-lilac`), its fill deepens (`coral-pressed`, `ink`, `lilac-pressed`) and its cut shifts to `squiggle-button-shift` on `motion-spring`. A press sinks it to 97%.
 - Disabled, a filled button becomes the quiet outline (1px `rule`, transparent, 55% opacity) and does not answer, so coral and blue appear only when the action is live.
 - Labels say what happens in a few words: Book a lesson, Change, Move lesson, Send on WhatsApp. Every booking action says `Book a lesson`; every retry says `Try again`. No underlined word stands in for a button.
+
+## Write
+
+```tsx
+<Link className="button button--coral" href="/book/?lesson=trial">Book a trial lesson</Link>
+<button className="button button--outline button--compact" onClick={signInInstead} type="button">Sign in</button>
+```
+
+A link that goes somewhere is `Link`; an action is a `<button type="button">`. The colour is a modifier: `button--coral`, `--blue`, `--lilac`, `--outline`, `--outline-light`; `button--compact` for the pair beside a main action.
+
+## Source
+
+- `src/app/approach/page.tsx`, find `className="button button--coral"`
+- `src/components/AuthPanel.tsx`, find `className="button button--outline button--compact"`
+- `src/app/globals.css`, find `.button--coral`
