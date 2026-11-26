@@ -43,8 +43,8 @@ source resolution. Two worth knowing about:
 - The wordmark is only ever a CSS `mask-image` over `currentColor`, so the
   browser discards its RGB channels. It ships as an alpha-only WebP at 760px
   (the header renders 380px) rather than a 900px RGBA PNG — 45KB to 22KB.
-- The business-card-derived splat is retained for the generated social share
-  image only. It no longer loads in the home-page hero.
+- The same open-centre lavender splat appears on the Lessons page, in the
+  phone menu and in both corners of the share image.
 
 ## Delivery
 

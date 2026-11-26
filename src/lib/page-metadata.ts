@@ -4,11 +4,11 @@ import type { Metadata } from "next";
 export const SITE_URL = "https://portuguesewithines.com";
 
 export const shareImage = {
-  url: "/og.png?v=20261126",
+  url: "/og.png?v=20261126b",
   width: 1200,
   height: 630,
   type: "image/png",
-  alt: `${BRAND} in cream script on deep blue. A lavender splat with a coral stroke runs off the top right corner.`
+  alt: `${BRAND} in cream script, centred on deep blue. Lavender splats with coral strokes come in from the top right and bottom left corners.`
 };
 
 /**
