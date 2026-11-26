@@ -1,8 +1,11 @@
 /**
- * Render the link preview using the same lettering, colours and paper grain
- * as the site. The flower runs past the top and right edges of the card.
- * Run `npm run build:og-image` and update the image version in page-metadata.ts
- * when the artwork changes. An optional argument overrides the output path.
+ * Render the link preview with the site's own lettering, colours and grain.
+ * The flowers frame the wordmark from the top right and bottom left.
+ *
+ * Run `npm run build:og-image` and give `shareImage.url` a new `?v=` in
+ * src/lib/page-metadata.ts when the artwork changes. An optional argument
+ * overrides the output path. Keep the PNG in full colour so it matches the
+ * site's blue. Sharp's `effort`, `quality` and `colours` enable a palette.
  */
 
 import { chromium } from "playwright";
@@ -47,35 +50,46 @@ const html = `<!doctype html><html><head><meta charset="utf-8">
     background-image: url("${grain}");
   }
   /*
-   * The flower's open centre is at 44.7% 48.6% of its square artwork. It is
-   * seated 116px in from the right edge and 106px down, and the flower turns
-   * about it, so the centre stays whole while the petals above it and to its
-   * right run off the card. At 880px the artwork is scaled down, never up.
+   * Rotate around the open centre of the painted flower so its coral stroke
+   * can point towards the lettering while its petals cross the card edges.
    */
   .flower {
     position: absolute;
-    left: 691px;
-    top: -322px;
-    width: 880px;
-    height: 880px;
     transform-origin: 44.7% 48.6%;
+  }
+  .flower--top {
+    left: 825px;
+    top: -312px;
+    width: 700px;
+    height: 700px;
     transform: rotate(16deg);
   }
-  /* --paper behind the wordmark's alpha mask, as .brand-wordmark--cream. */
+  .flower--bottom {
+    left: -254px;
+    top: 288px;
+    width: 680px;
+    height: 680px;
+    transform: rotate(200deg);
+  }
+  /*
+   * Use the footer's --paper mask and render the lettering at its native size.
+   * Its ink is centred horizontally and sits 7px above the card's midline.
+   */
   .wordmark {
     position: absolute;
-    left: 94px;
-    top: 244px;
+    left: 220px;
+    top: 190px;
     width: 760px;
     height: 236px;
     background: ${paper};
-    -webkit-mask: url("${wordmark}") no-repeat center / contain;
-    mask: url("${wordmark}") no-repeat center / contain;
+    -webkit-mask: url("${wordmark}") no-repeat 0 0 / 760px 236px;
+    mask: url("${wordmark}") no-repeat 0 0 / 760px 236px;
   }
 </style></head>
 <body>
   <div class="card">
-    <img class="flower" src="${flower}" alt="">
+    <img class="flower flower--top" src="${flower}" alt="">
+    <img class="flower flower--bottom" src="${flower}" alt="">
     <div class="wordmark" role="img" aria-label="Português com a Inês"></div>
   </div>
 </body></html>`;
