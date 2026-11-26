@@ -6,7 +6,8 @@ import {
   AKIBWA_PROJECT_VIEW_BOOTSTRAP,
   AkibwaProjectBanner
 } from "@/components/AkibwaProjectBanner";
-import { shareImage } from "@/lib/page-metadata";
+import { shareImage, SITE_URL } from "@/lib/page-metadata";
+import { BRAND, LANGUAGE, LANGUAGE_VARIETY, TUTOR_CITY } from "@/lib/tutor";
 import { publicAssetPath, publicAssetUrl } from "@/lib/paths";
 import "./globals.css";
 
@@ -37,26 +38,25 @@ const montserrat = Montserrat({
 // Facebook, iMessage) need an absolute image URL; without this Next resolves
 // og:image against localhost and the preview comes back blank. This is the
 // canonical production domain — the Portuguese-spelling domain redirects to it.
-const SITE_URL = "https://portuguesewithines.com";
-const shareDescription = "One-to-one Portuguese lessons, online or in person. Any level.";
+const homeTitle = `${LANGUAGE} lessons in ${TUTOR_CITY} and online | ${BRAND}`;
+const shareDescription = `One-to-one ${LANGUAGE_VARIETY} lessons, online or in ${TUTOR_CITY}. See prices and book a lesson at your level.`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Português com a Inês | Portuguese Lessons",
-  description:
-    "One-to-one Portuguese lessons with Inês, online or in person. Any level, no fixed syllabus.",
+  title: homeTitle,
+  description: shareDescription,
   openGraph: {
-    title: "Português com a Inês | Portuguese Lessons",
+    title: homeTitle,
     description: shareDescription,
     url: "/",
-    siteName: "Português com a Inês",
+    siteName: BRAND,
     locale: "en_GB",
     type: "website",
     images: [shareImage]
   },
   twitter: {
     card: "summary_large_image",
-    title: "Português com a Inês | Portuguese Lessons",
+    title: homeTitle,
     description: shareDescription,
     images: [shareImage]
   }

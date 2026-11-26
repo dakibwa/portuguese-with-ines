@@ -3,6 +3,8 @@ import Link from "next/link";
 import { AssetMark } from "@/components/BrandMarks";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { SITE_URL } from "@/lib/page-metadata";
+import { BRAND } from "@/lib/tutor";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 
@@ -29,7 +31,9 @@ export default function Home() {
     <>
       <SiteHeader currentPage="home" />
 
-      <main className="home-page" id="main-content">
+      <main className="home-page" id="main-content" itemScope itemType="https://schema.org/WebSite">
+        <meta itemProp="name" content={BRAND} />
+        <link itemProp="url" href={SITE_URL + "/"} />
         <section className="home-hero" aria-labelledby="home-title">
           <div className="home-hero__copy">
             <h1 id="home-title">

@@ -2,7 +2,7 @@ import { CONTACT_WHATSAPP_NUMBER, CONTACT_WHATSAPP_URL, LESSON_CHANGE_DEADLINE, 
 
 export function TermsPrivacyInformation() {
   return (
-    <div className="policy-information">
+    <div className="policy-information" data-nosnippet="">
       <h2 id="booking" tabIndex={-1}>Booking</h2>
       <p>Book at least {NOTICE_HOURS} hours ahead. Choose your lessons and check the price before confirming.</p>
 
