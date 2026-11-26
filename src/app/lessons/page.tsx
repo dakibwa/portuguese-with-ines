@@ -8,7 +8,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { lessonProducts } from "@/lib/lesson-products";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Lessons | Português com a Inês",
+  title: "Lessons and prices",
   description: "Prices for one-to-one Portuguese lessons, online or in person.",
   path: "/lessons/"
 });

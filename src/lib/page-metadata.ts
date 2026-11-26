@@ -18,7 +18,7 @@ export const shareImage = {
  */
 export function pageMetadata({ title, description, path }: { title: string; description: string; path: string }): Metadata {
   return {
-    title,
+    title: `${title} · ${BRAND}`,
     description,
     alternates: { canonical: path },
     openGraph: {

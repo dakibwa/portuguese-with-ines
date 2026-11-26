@@ -4,10 +4,11 @@ import { pageMetadata } from "@/lib/page-metadata";
 import { preconnect } from "react-dom";
 import { BookingFlow } from "@/components/BookingFlow";
 import { BOOKING_READ_TIMEOUT_MS, BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, MAX_BOOKING_HORIZON_DAYS } from "@/lib/config";
+import { LANGUAGE } from "@/lib/tutor";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Booking | Português com a Inês",
-  description: "Book a one-to-one Portuguese lesson, online or in person.",
+  title: `Book a ${LANGUAGE} lesson`,
+  description: "Choose a lesson, find a time and book online.",
   path: "/book/"
 });
 

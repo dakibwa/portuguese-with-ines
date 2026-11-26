@@ -7,7 +7,7 @@ import {
   AkibwaProjectBanner
 } from "@/components/AkibwaProjectBanner";
 import { shareImage, SITE_URL } from "@/lib/page-metadata";
-import { BRAND, LANGUAGE, LANGUAGE_VARIETY, TUTOR_CITY } from "@/lib/tutor";
+import { BRAND, LANGUAGE, LANGUAGE_VARIETY, TUTOR_CITY, TUTOR_NAME } from "@/lib/tutor";
 import { publicAssetPath, publicAssetUrl } from "@/lib/paths";
 import "./globals.css";
 
@@ -38,15 +38,16 @@ const montserrat = Montserrat({
 // Facebook, iMessage) need an absolute image URL; without this Next resolves
 // og:image against localhost and the preview comes back blank. This is the
 // canonical production domain — the Portuguese-spelling domain redirects to it.
-const homeTitle = `${LANGUAGE} lessons in ${TUTOR_CITY} and online | ${BRAND}`;
-const shareDescription = `One-to-one ${LANGUAGE_VARIETY} lessons, online or in ${TUTOR_CITY}. See prices and book a lesson at your level.`;
+const homeTitle = `${LANGUAGE} lessons with ${TUTOR_NAME}, online or in ${TUTOR_CITY}`;
+const shareTitle = `${LANGUAGE} lessons at your pace`;
+const shareDescription = `I teach ${LANGUAGE_VARIETY} one to one, here in ${TUTOR_CITY} and online.`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: homeTitle,
   description: shareDescription,
   openGraph: {
-    title: homeTitle,
+    title: shareTitle,
     description: shareDescription,
     url: "/",
     siteName: BRAND,
@@ -56,7 +57,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: homeTitle,
+    title: shareTitle,
     description: shareDescription,
     images: [shareImage]
   }
