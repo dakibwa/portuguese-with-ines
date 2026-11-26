@@ -9,7 +9,7 @@ import { CONTACT_WHATSAPP_URL, LESSON_CHANGE_DEADLINE, NOTICE_HOURS, SAME_DAY_RE
 import { HOMEWORK } from "@/lib/tutor";
 
 export const metadata: Metadata = pageMetadata({
-  title: "FAQ | Português com a Inês",
+  title: "Questions before booking?",
   description: "Answers for anyone nervous about speaking, plus levels, booking, payment and changing a lesson.",
   path: "/faq/"
 });

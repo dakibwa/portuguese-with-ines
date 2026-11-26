@@ -4,10 +4,11 @@ import Link from "next/link";
 import { AssetMark } from "@/components/BrandMarks";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { LANGUAGE } from "@/lib/tutor";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Approach | Português com a Inês",
-  description: "How the lessons work: one to one, no fixed syllabus, built around what you need Portuguese for.",
+  title: `How I teach ${LANGUAGE}`,
+  description: "We start from what you can already say. Where it goes after that is up to you.",
   path: "/approach/"
 });
 
