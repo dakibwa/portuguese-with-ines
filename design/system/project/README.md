@@ -215,7 +215,7 @@ The wordmark is Inês's own lettering of "Português com a Inês" (Wordmark): on
 
 ## Assets
 
-- **Logos:** `wordmark-cream.webp` (the master, 760 × 236 artwork), `icon.png` (the browser tab), `og.png` (every shared link: the open-centre lavender splat on the right of one continuous blue ground, its tips intact and clear of the words).
+- **Logos.** `wordmark-cream.webp` is the 760 × 236 master. `icon.png` is the browser icon. On the share card (`og.png`), Inês's cream wordmark sits on the site's grainy deep blue. The open-centre lavender splat runs off the top and right edges.
 - **Splats:** the eight V2 marks students choose from, the FAQ question mark, and three generated marks (`relaxed-practical-blob.webp` for booking, `conversation-` and `build-confidence-splat-generated-v2.webp`).
 - **Fields:** the large painted fields that stay still under the page (the Approach fan, the Lessons open-centre splat, each with its phone crop) and `paper-grain.svg`.
 - **Email:** the banner, the four dabs and Meet's mark that the transactional emails draw with.

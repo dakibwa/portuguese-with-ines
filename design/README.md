@@ -390,9 +390,9 @@ the same identity or action:
 
 `design/business-cards/` contains the original business-card exports. They are
 historical brand references, not competing website specifications. The social
-share image uses the complete open-centre lavender splat from the lessons page
-on the right of one continuous blue background, with clear space around it.
-Keep its tips intact and separate from the words.
+share image pairs Inês's cream wordmark with the deep blue and paper grain of
+the site. The open-centre lavender splat from the lessons page runs off the
+top and right edges, clear of the lettering.
 
 `design/stickers/` contains the historical sticker sheet. Do not cut new
 production assets from it unless a new asset is deliberately reviewed and

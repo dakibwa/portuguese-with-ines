@@ -1,11 +1,14 @@
-import { BRAND, LANGUAGE } from "@/lib/tutor";
+import { BRAND } from "@/lib/tutor";
 import type { Metadata } from "next";
 
+export const SITE_URL = "https://portuguesewithines.com";
+
 export const shareImage = {
-  url: "/og.png?v=20260914",
+  url: "/og.png?v=20261126",
   width: 1200,
   height: 630,
-  alt: `${BRAND}: one-to-one ${LANGUAGE} lessons`
+  type: "image/png",
+  alt: `${BRAND} in cream script on deep blue. A lavender splat with a coral stroke runs off the top right corner.`
 };
 
 /**
