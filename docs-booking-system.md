@@ -2892,9 +2892,9 @@ permission. The Google sign-in client is separate.
   current*). Old invitations previously imported into her primary calendar may
   need one-time manual cleanup after checking the new calendar; never remove
   personal appointments or silently delete old records.
-- Inês can share this specific calendar with `dakibwa@gmail.com` using **Settings
-  and sharing → Add people → See event details**. Dan accepts Google’s sharing
-  invitation to add it to his calendar. This is read-only access; her personal
+- Inês can give someone read-only access to the booking calendar under
+  **Settings and sharing → Add people → See event details**. The recipient
+  accepts Google’s invitation to add it to their calendar. Her personal
   calendars remain separate. Calendar sharing is configured once in Google by
   its owner, not via a broad ACL permission granted to the website.
 - Booking edits remain on the website. This is one-way website-to-Google sync;
