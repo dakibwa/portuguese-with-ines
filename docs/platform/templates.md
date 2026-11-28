@@ -1,22 +1,27 @@
-# Tutor platform: the ten site templates
+# Tutor platform: the site templates
 
-Status note for whoever picks this up next. Last updated 9 November 2026.
+Status note for whoever picks this up next. Last updated 28 November 2026.
 
 ## Where it stands
 
 - **Done: concepts.** Ten layouts and ten colour sets are drawn as working previews. Each one is filled with a made-up tutor in a different language and shown at desktop (1280) and phone (390) width.
   - Source: [templates/ten-layouts.html](./templates/ten-layouts.html). It is one self-contained page; open it in a browser.
   - Published preview: https://claude.ai/artifact/HbyncsUc7WFBsorVgj5LEA. It is private to Dan's account.
-- **Waiting on Dan:** which layouts to keep, swap or drop. Nothing has been built into the real site yet, so `src/` is unchanged.
-- **Not started:** building the chosen layouts as real components that read the tutor record (see "Next steps").
+- **Decided by Dan, 28 November 2026: three layouts at launch, not ten.** His words: "lets do 3", and "we shouldn't re-use ines'".
+  - **Atelier and the Porto colour set stay Inês's own.** No other tutor can pick them.
+  - **Proposed for launch:** Portrait, Playground and Postcard. Portrait and Playground were proposed with Atelier, which Dan ruled out; Postcard is proposed in its place. Waiting on Dan to confirm.
+  - The other concepts stay drawn here, to add one at a time when tutors ask for them.
+- **Not started:** building the launch layouts as real components that read the tutor record (see "Next steps"). Nothing has been built into the real site yet, so `src/` is unchanged.
 
 Dan's brief (9 Nov 2026): the templates "should all be quite distinct but have character in their own regard", and "we should cover most peoples tastes". They are the visible answer to competitors that "look like AI slop", so quality comes before quantity.
 
-## The ten layouts
+## The ten layout concepts
+
+At launch, tutors choose from three of these (see "Where it stands"). Atelier is Inês's alone.
 
 | Layout | Character | Type | Sample tutor | Its own colour set |
 |---|---|---|---|---|
-| Atelier | Painted splats and a handwritten name. This is Inês's site as it stands, and her site becomes this layout. | Beth Ellen, Montserrat | Spanish, Lucía, Valencia | Porto |
+| Atelier | Painted splats and a handwritten name. This is Inês's site as it stands, and her site becomes this layout. It stays hers: no other tutor can pick it. | Beth Ellen, Montserrat | Spanish, Lucía, Valencia | Porto |
 | Lexicon | The home page is a dictionary entry for "lesson" in the tutor's language, with thumb-index tabs. | Literata | French, Claire, Lyon | Plum |
 | Grid | Swiss: huge type on a visible grid, with a real teaching table (der/die/das) in the hero. | Hanken Grotesk | German, Jonas, Berlin | Newsprint |
 | Postcard | Airmail stripes, a postmark, a handwritten note, and the price on a stamp. | Alfa Slab One, Zilla Slab, Kalam | Italian, Giulia, Bologna | Riviera |
@@ -31,7 +36,7 @@ All tutors, prices and quotes in the previews are invented. The sample URLs use 
 
 ## The ten colour sets
 
-Porto (Inês's navy, lilac, cream and coral), Newsprint, Plum, Riviera, Sherbet, Matcha, Oxford, Signal, Midnight (the dark one) and Eucalyptus. Each layout has its own set, and any set works on any layout: that gives 10 × 10 = 100 looks. The preview's colour chips show every combination.
+Porto (Inês's navy, lilac, cream and coral), Newsprint, Plum, Riviera, Sherbet, Matcha, Oxford, Signal, Midnight (the dark one) and Eucalyptus. Each layout has its own set, and any set works on any layout. The preview's colour chips show every combination. Porto stays Inês's own, so other tutors choose from the other nine, which with three layouts gives 27 looks.
 
 A colour set holds **role tokens only**. The roles are:
 
@@ -48,7 +53,7 @@ pop onPop pop2
 
 ## The contract (agreed with the build thread)
 
-- The tutor record gets `look: { layout, palette }`. Inês is `{ layout: "atelier", palette: "porto" }`.
+- The tutor record gets `look: { layout, palette }`. Inês is `{ layout: "atelier", palette: "porto" }`. Both are hers alone: no other tutor's record may use `atelier` or `porto`.
   - The record is `tutors/<id>/tutor.json`, read by `workers/booking/tutor.mjs` (`tutorOf(env)`) and `src/lib/tutor.ts`.
   - Step 1 of the record was on branch `claude/project-thread-hqd06v` at the time of writing.
 - A **layout** owns composition, type, shape, ornament and motion. A **colour set** owns colour only. Changing the set is free; switching layout is free; Dan reworking photos or pages is the paid change.
@@ -62,7 +67,7 @@ pop onPop pop2
   - `about{heading,body}` and an optional `photo`
   - `faq[{group,items[{q,a}]}]`
   - an optional layout-specific `feature`, such as Grid's table, Lexicon's word or Postcard's city. Every layout must render well without it.
-- Every layout must look right with short or long names and words, with or without a photo, and with 2 to 6 lesson types. The onboarding thread (https://claude.ai/artifact/KyUBnDuD7RrKYe5sZvUdAE) has tutors swipe through all ten filled with their own record, so each layout also needs a small live render that is quick on a phone.
+- Every layout must look right with short or long names and words, with or without a photo, and with 2 to 6 lesson types. The onboarding thread (https://claude.ai/artifact/KyUBnDuD7RrKYe5sZvUdAE) has tutors swipe through the launch layouts filled with their own record, so each layout also needs a small live render that is quick on a phone.
 - Tutor sites carry only a small "Site by <platform>" colophon. The colour sets deliberately avoid the platform's own look, which is the brand thread's exercise-book style.
 
 ## How the preview page works
@@ -103,9 +108,9 @@ These mechanics are specific to the preview, not to the real build.
 
 ## Next steps
 
-1. Dan picks which layouts to keep, swap or drop. If any are swapped, draw the replacement in the same page first.
+1. Dan confirms the three launch layouts (Portrait, Playground and Postcard are proposed). If he wants one that isn't drawn, draw it in the same page first.
 2. With the build thread, add `look` to `tutors/ines/tutor.json` and a `content.json` for Inês, with no visible change to her site.
 3. Build the shared booking and schedule components with the `--bk-*`, `--btn-*` and `--r-*` tokens, so that Inês's current look is exactly Atelier + Porto.
-4. Build the other layouts one at a time as real pages that read the record. Check each at 1280 and 390 against its concept.
+4. Build the three launch layouts one at a time as real pages that read the record. Check each at 1280 and 390 against its concept. Add another concept later only when tutors ask for it.
 5. Give each layout a small live render for the onboarding swipe.
 6. When the real components land, add them to the design system in `design/system/project/`, or say in the PR that it is behind (see AGENTS.md).
