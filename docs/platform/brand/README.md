@@ -2,7 +2,7 @@
 
 Status on 9 November 2026: **the name is not picked.** The brand direction below is a draft made under the working name Chapeau, which Dan has since ruled out. Read this before any naming, logo or visual work on the platform, and update it when Dan decides something.
 
-The platform is the white-label site, booking and payments product for language tutors that this repository is growing into (see the build plan in the project memory: Inês's site becomes its first tutor, free; €25 a month flat, no commission; 10 layouts × 10 colour sets for tutors' own sites).
+The platform is the white-label site, booking and payments product for language tutors that this repository is growing into (see [HANDOFF.md](../HANDOFF.md): Inês's site becomes its first tutor, free; tutors use it free and the platform takes 5% of each lesson paid through it, at most €30 a month; tutors' own sites have three layouts and nine colour sets).
 
 ## Dan's steers
 

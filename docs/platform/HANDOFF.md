@@ -1,7 +1,7 @@
 # Tutor platform: handoff
 
 This file is for picking the platform work back up in a new session. It was last
-brought up to date on 9 November 2026.
+brought up to date on 28 November 2026.
 
 Dan's idea is to turn this repository, the booking site and Worker behind
 Português com a Inês, into a platform that language tutors anywhere can run
@@ -11,14 +11,27 @@ file first, then [docs-booking-system.md](../../docs-booking-system.md)
 
 ## What Dan has decided
 
-All of these were decided on 9 November 2026.
+These were decided on 9 November 2026, unless a later date is given.
 
 - **Go.** At 13:32 Dan said to build it end to end, in this repository, reusing
   the Inês back end. Inês's live site must keep working at every step.
-- **Price.** €25 a month, flat, with no commission on lessons. The target is 100
-  tutors.
-- **Looks.** There are 10 layouts and 10 colour sets, and switching either is
-  free. Dan charges a fee when he reworks a tutor's photos or pages.
+- **Price** (27 November, replacing €25 a month with no commission). Free to
+  use; the platform takes 5% of each lesson paid through it, and never more
+  than €30 a month from one tutor. Dan's words: "give them the product for
+  free, and then take a small cut", and "cap it at like 30 euros a month".
+  Lessons paid by hand earn the platform nothing. The 9 November target of 100
+  tutors went with the old price; no new target is set.
+- **Who it's for** (27 November). Tutors who already have students and bring
+  them on: "target teachers that already have students and they could onboard
+  their students". So inviting students has to be effortless.
+- **Video** (27 November). Lessons use each tutor's own Google Meet, through
+  their own Google account, as on Inês's site today.
+- **Looks** (28 November, replacing 10 layouts). Three layouts at launch and
+  nine colour sets, and switching either is free. Dan: "lets do 3". Atelier and
+  the Porto colours stay Inês's own: "we shouldn't re-use ines'". Portrait and
+  Playground were proposed with Atelier; Postcard is proposed in its place, and
+  the three wait on Dan's confirmation ([templates.md](./templates.md)). Dan
+  charges a fee when he reworks a tutor's photos or pages.
 - **Rules are settings.** Every rule that is in the teacher's interest is a
   setting: notice, prices, lengths, fees, horizon, buffer, cancellation and
   payment mode.
@@ -34,8 +47,8 @@ All of these were decided on 9 November 2026.
 - **Onboarding is self-serve, with no calls with anyone** (14:07 and 14:10).
   - The site goes live straight away on a free subdomain.
   - Students pay the tutor by hand until the tutor connects Stripe.
-  - Billing is a 30-day free trial from going live, with no card to start. The
-    dashboard asks for the card before day 30.
+  - No subscription and no trial (the 27 November price): tutors never give the
+    platform a card.
   - A support agent reads each new site within the hour, and passes it to Dan
     only if something looks wrong.
 - **Merge as you go** (14:24). Dan asked for the work to be merged and for
@@ -44,7 +57,8 @@ All of these were decided on 9 November 2026.
 ## Where the plans live
 
 - **Feasibility and pricing**: [Claude Doc](https://claude.ai/artifact/KDWopQzkHBaEJNREXZUri2).
-  It still says €39; €25 is the decision.
+  It still says €39; the price is now free to use with a 5% cut, at most €30 a
+  month.
 - **Onboarding plan**, approved by Dan: [onboarding.md](./onboarding.md) in this
   folder, the published [artifact](https://claude.ai/artifact/KyUBnDuD7RrKYe5sZvUdAE)
   and its source [onboarding-plan.html](./onboarding-plan.html). It covers the
@@ -58,9 +72,9 @@ All of these were decided on 9 November 2026.
 - **Design system**, Inês's site and the bar for the templates:
   the files in [design/system/project/](../../design/system/project/), and
   [design/README.md](../../design/README.md).
-- **The 10 templates**: [templates.md](./templates.md) and the concepts in
-  [templates/](./templates/). Dan still has to pick which layouts to keep, so
-  nothing is built into `src/` yet.
+- **The templates**: [templates.md](./templates.md) and the concepts in
+  [templates/](./templates/). Three launch layouts are proposed, Atelier stays
+  Inês's, and nothing is built into `src/` yet.
 - **The name and brand**: [brand/README.md](./brand/README.md). The name is not
   picked. Chapeau, the working name in the onboarding plan, is ruled out, and a
   shortlist of English and Latin words is with Dan.
@@ -76,7 +90,7 @@ All of these were decided on 9 November 2026.
 | 3 | The site's words, layout and colours come from the tutor's record and content | Next, with the templates thread |
 | 4 | Tutors connect their own Stripe (Connect, Accounts v2, embedded onboarding) | Later |
 | 5 | Sign-up and onboarding, as in the onboarding plan | Later |
-| 6 | The platform's home page, and €25 monthly billing (Stripe Billing, 30-day trial) | Later |
+| 6 | The platform's home page, and its cut: 5% of each card payment, at most €30 a month per tutor (a Stripe Connect application fee) | Later |
 | 7 | The curriculum | After the core platform |
 
 Steps 1 to 2b changed nothing for Inês: her booking, email and homework tests
@@ -148,13 +162,14 @@ SQLite-backed Durable Object:
 ## Step 3 contract (agreed with the templates thread)
 
 - **The look.** `tutor.json` gains `look: { layout, palette }`. Inês's is
-  `atelier` + `porto`. The layout ids are `atelier`, `lexicon`, `grid`,
+  `atelier` + `porto`, and both are hers alone. The concept ids are `atelier`, `lexicon`, `grid`,
   `postcard`, `play`, `still`, `scholar`, `poster`, `portrait` and `garden`. The
   palettes are the lower-case set names (`porto`, `plum`, `newsprint`,
   `riviera`, `sherbet`, `matcha`, `oxford`, `signal`, `midnight`,
   `eucalyptus`). A palette holds role tokens only, and the one shared booking
   set is skinned by `--bk-*`, `--btn-*` and `--r-*` (see
-  [templates.md](./templates.md)).
+  [templates.md](./templates.md)). Other tutors choose from the three launch
+  layouts, in any palette but `porto`.
 - **The content.** `tutors/<id>/content.json` holds:
   - `hero {title, line}`;
   - three `principles {title, body}`;
@@ -215,7 +230,8 @@ Numbers in brackets are the systems map's findings.
 ## Open questions for Dan
 
 - The platform's name and domain ([brand/README.md](./brand/README.md)).
-- Which of the 10 template concepts to keep ([templates.md](./templates.md)).
+- Whether Portrait, Playground and Postcard are the three launch layouts
+  ([templates.md](./templates.md)).
 - Whether Workers Paid is on, which decides the sweep cost above.
 - From the systems map: packages paid up front and paying before a first lesson
   (not in the plan yet), and whether WhatsApp messages for students without
